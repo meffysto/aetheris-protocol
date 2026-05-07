@@ -433,6 +433,8 @@ function queueConstruction(emp, action, playerName) {
     return;
   }
 
+  if (!checkRequiert(def.requiert, planete, emp, playerName, `construction ${action.unite}`)) return;
+
   // Bouclier planétaire : max 1 par planète
   if (categorie === 'defense' && def.max_par_planete) {
     const dejaLa = (planete.defenses || {})[action.unite] || 0;
@@ -542,6 +544,35 @@ function queueAttaque(emp, action, playerName) {
   console.log(`  ⚔ ${playerName}: attaque ${action.depuis} → ${cible.joueur}/${cible.planete} (${dureeUTJ} UTJ)`);
 }
 
+// Verifie qu'un bloc `requiert: { k: niveau, ... }` est satisfait.
+// - Si `k` est un bâtiment : check sur la planete concernee (pour chantier/
+//   construction) ou max empire-wide (pour recherche, ou si planete=null).
+// - Si `k` est une recherche : check empire-wide (`emp.recherche`).
+// - Si `k` n'existe ni en batiment ni en recherche : niveau considere = 0
+//   (fail explicite — protege contre les fautes de frappe dans rules.yaml).
+function checkRequiert(req, planete, emp, playerName, what) {
+  if (!req) return true;
+  const missing = [];
+  for (const [k, v] of Object.entries(req)) {
+    const isBat = !!rules.batiments?.[k];
+    const isRech = !!rules.recherches?.[k];
+    let level = 0;
+    if (isBat) {
+      level = planete
+        ? (planete.batiments?.[k] || 0)
+        : Math.max(0, ...(emp.planetes || []).map(p => p.batiments?.[k] || 0));
+    } else if (isRech) {
+      level = emp.recherche?.[k] || 0;
+    }
+    if (level < v) missing.push(`${k} niv ${v} (a niv ${level})`);
+  }
+  if (missing.length) {
+    console.log(`  · ${playerName}: ${what} requiert ${missing.join(', ')}`);
+    return false;
+  }
+  return true;
+}
+
 function queueChantier(emp, action) {
   const planete = (emp.planetes || []).find(p => p.nom === action.planete);
   if (!planete) return;
@@ -549,6 +580,7 @@ function queueChantier(emp, action) {
   if (action.niveau_cible !== niveauActuel + 1) return;
   const def = rules.batiments[action.batiment];
   if (!def) return;
+  if (!checkRequiert(def.requiert, planete, emp, emp.joueur, `chantier ${action.batiment}`)) return;
 
   // Coût × multiplicateur^(niveau-1)
   const mult = Math.pow(def.multiplicateur_cout, niveauActuel);
@@ -579,6 +611,8 @@ function queueRecherche(emp, action) {
   if (!def) return;
   const niveauActuel = (emp.recherche || {})[action.technologie] || 0;
   if (action.niveau_cible !== niveauActuel + 1) return;
+  // Recherche est empire-wide → planete=null, le helper fait max sur tous les batiments.
+  if (!checkRequiert(def.requiert, null, emp, emp.joueur, `recherche ${action.technologie}`)) return;
   const mult = Math.pow(def.mult || 2.0, niveauActuel);
   const cout = {};
   for (const [k, v] of Object.entries(def.cout_base || {})) cout[k] = Math.floor(v * mult);

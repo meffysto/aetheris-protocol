@@ -1,7 +1,7 @@
 # Généré par engine/tick.mjs — ne pas éditer.
 version: 1
 joueur: meff
-tick: 51
+tick: 52
 score_total: 504
 points_militaires: 0
 rang: 999
@@ -18,11 +18,11 @@ planetes:
       total: 240
     ressources:
       ferrum:
-        stock: 38323
+        stock: 39433
         production_par_utj: 185
         capacite: 100000
       lumen:
-        stock: 8164
+        stock: 8572
         production_par_utj: 68
         capacite: 100000
       plasmide:

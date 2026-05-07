@@ -1,7 +1,7 @@
 # Généré par engine/tick.mjs — ne pas éditer.
 version: 1
 joueur: meff
-tick: 40
+tick: 41
 score_total: 400
 points_militaires: 0
 rang: 999
@@ -18,11 +18,11 @@ planetes:
       total: 240
     ressources:
       ferrum:
-        stock: 29189
+        stock: 27223
         production_par_utj: 185
         capacite: 100000
       lumen:
-        stock: 5026
+        stock: 4240
         production_par_utj: 42
         capacite: 100000
       plasmide:
@@ -41,8 +41,15 @@ planetes:
       usine_robotique: 0
       chantier_spatial: 0
       laboratoire: 0
-    file_chantier: []
-    file_construction: []
+    file_chantier:
+      - batiment: extracteur_lumen
+        niveau_cible: 2
+        fin_utj: 2
+    file_construction:
+      - unite: chasseur_leger
+        categorie: vaisseau
+        quantite: 1
+        fin_utj: 1
     flotte_au_sol: {}
     defenses: {}
 flottes_en_vol: []

@@ -2,8 +2,10 @@ name: aetheris-validate-orders
 
 # Valide les PRs touchant joueurs/<nom>/ordres.yaml, peu importe le nom de branche.
 # Verifie : 1 fichier touche, signature Ed25519 OK, tick_cible coherent.
-# Auto-merge si tout passe. Le script sort silencieusement (exit 0) sur les PRs
-# multi-fichiers (ex: inscription) — c'est validate-join qui les gere.
+# Auto-merge UNIQUEMENT si validate-orders.mjs sort en exit 0 (success). Toute
+# autre sortie (exit 1 = invalide, exit 2 = hors-perimetre) skip l'auto-merge.
+# IMPORTANT : continue-on-error sur Validate empeche le workflow de fail sur
+# exit 2, mais steps.validate.outcome distingue success de failure.
 
 on:
   pull_request_target:
@@ -50,6 +52,8 @@ jobs:
           fi
 
       - name: Validate
+        id: validate
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -58,7 +62,9 @@ jobs:
         run: node engine/validate-orders.mjs ${{ github.event.pull_request.number }}
 
       - name: Auto-merge
-        if: success()
+        # Strict: merge UNIQUEMENT si validate exit 0. exit 1 (invalide) ou
+        # exit 2 (hors-perimetre) → outcome=failure → ce step est skip.
+        if: steps.validate.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch

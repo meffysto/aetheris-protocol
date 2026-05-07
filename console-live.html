@@ -724,6 +724,46 @@ h2.sect .num {
   font-size: 13px; cursor: pointer; transition: all .12s;
 }
 .onboarding .ob-go:hover { background: var(--brass-2); transform: translateY(-1px); }
+.onboarding .ob-card {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin: 0 0 18px;
+}
+.onboarding .ob-stat {
+  background: var(--ink-3);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.onboarding .ob-stat .lab {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--bone-dim); display: block; margin-bottom: 4px;
+}
+.onboarding .ob-stat .val {
+  font-family: var(--display); font-weight: 600; font-size: 18px;
+  color: var(--brass); letter-spacing: -0.01em;
+}
+.onboarding .ob-stat .sub {
+  font-family: var(--sans); font-size: 11px; color: var(--bone-dim);
+  margin-top: 2px;
+}
+.onboarding .ob-tick {
+  background: linear-gradient(180deg, var(--brass), var(--brass-2));
+  color: #fff; border-radius: 10px;
+  padding: 12px 16px; margin: 0 0 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.onboarding .ob-tick .lab {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+  text-transform: uppercase; opacity: 0.8;
+}
+.onboarding .ob-tick .val {
+  font-family: var(--mono); font-weight: 600; font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+/* glossary helper used inside onboarding (and reused elsewhere) */
+.gloss {
+  border-bottom: 1px dotted var(--bone-dim);
+  cursor: help;
+}
 
 /* ─── footer ──────────────────────────────────────────────── */
 .foot {
@@ -1080,16 +1120,36 @@ h2.sect .num {
 
 <div class="onboarding-bg" id="obBg">
   <div class="onboarding">
-    <h2>Bienvenue, commandant.</h2>
-    <p class="ob-sub">Tu contrôles <strong id="ob-planet">—</strong>. Voici ton premier mouvement.</p>
+    <h2>Bienvenue, <span id="ob-name">commandant</span>.</h2>
+    <p class="ob-sub">Tu contrôles <strong id="ob-planet">—</strong>. Aetheris est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.</p>
+
+    <div class="ob-card">
+      <div class="ob-stat">
+        <span class="lab">Coordonnées</span>
+        <span class="val" id="ob-coords">—</span>
+        <div class="sub" id="ob-classe">—</div>
+      </div>
+      <div class="ob-stat">
+        <span class="lab">Champs libres</span>
+        <span class="val" id="ob-champs">—</span>
+        <div class="sub">slots de bâtiments</div>
+      </div>
+    </div>
+
+    <div class="ob-tick">
+      <span class="lab">Prochain tick dans</span>
+      <span class="val" id="ob-countdown">—</span>
+    </div>
+
     <ol>
-      <li>Dans la barre de gauche, clique <strong>Bâtiments</strong></li>
-      <li>Sur la carte <em>Mine de Ferrum</em>, clique <strong>Améliorer →</strong></li>
-      <li>L'ordre est signé et poussé — il sera exécuté au prochain tick</li>
+      <li>Ta <span class="gloss" title="Mine de Ferrum : produit du ferrum (mineralia) à chaque tick. Plus le niveau est élevé, plus la production augmente.">Mine de Ferrum</span> est ta première source de revenu — améliore-la</li>
+      <li>L'ordre est signé localement (ta clé ne quitte jamais ton browser) et poussé en PR</li>
+      <li>Le moteur l'auto-merge en ~20s, puis l'applique au tick suivant</li>
     </ol>
+
     <div class="ob-actions">
       <button class="ob-skip" onclick="closeOnboarding(false)">Plus tard</button>
-      <button class="ob-go" onclick="closeOnboarding(true)">Aller aux Bâtiments →</button>
+      <button class="ob-go" id="obGoBtn" onclick="upgradeFirstMine()">Améliorer ma Mine maintenant →</button>
     </div>
   </div>
 </div>
@@ -2156,6 +2216,7 @@ document.getElementById('main').addEventListener('click', e => {
 function tickCountdown() {
   const info = nextTickInfo();
   document.getElementById('countdown').textContent = `prochain · ${fmtCountdown(info.secs)}`;
+  refreshOnboardingTick();
 }
 setInterval(tickCountdown, 1000);
 
@@ -2680,8 +2741,11 @@ document.getElementById('cfgSave').onclick = () => {
   render();
 };
 document.getElementById('cfgClear').onclick = () => {
-  if (!confirm('Effacer connexion GitHub et clé de ce navigateur ?')) return;
+  if (!confirm('Effacer connexion GitHub, clé et pseudo de ce navigateur ?')) return;
   cfg.pat = ''; cfg.key = '';
+  localStorage.removeItem('aetheris.player');
+  localStorage.removeItem('aetheris.onboarding.done');
+  state.current = null;
   openSettings();
 };
 
@@ -2812,8 +2876,32 @@ document.getElementById('missionSubmit').onclick = () => {
 /* ───────────────────────────── Onboarding ──────────────────────────────── */
 function showOnboarding(planetName) {
   if (localStorage.getItem('aetheris.onboarding.done')) return;
+  if (!cfg.ready) return; // attend que la connexion + cle soient prets
+  const emp = state.players[state.current];
+  const p = emp?.planetes?.[0];
+  if (!p) return;
+  document.getElementById('ob-name').textContent = state.current || 'commandant';
   document.getElementById('ob-planet').textContent = planetName;
+  document.getElementById('ob-coords').textContent = (p.coordonnees || []).join(':') || '—';
+  document.getElementById('ob-classe').textContent = p.type || '—';
+  const ch = p.champs || {};
+  document.getElementById('ob-champs').textContent = `${(ch.total || 0) - (ch.utilises || 0)} / ${ch.total || 0}`;
+  // bouton direct desactive si pas de regles chargees ou pas de Mine constructible
+  const goBtn = document.getElementById('obGoBtn');
+  const niv = p.batiments?.mine_ferrum || 0;
+  goBtn.textContent = niv === 0
+    ? 'Construire ma Mine de Ferrum →'
+    : `Améliorer ma Mine (niv ${niv} → ${niv + 1}) →`;
   document.getElementById('obBg').classList.add('on');
+  refreshOnboardingTick();
+}
+function refreshOnboardingTick() {
+  const el = document.getElementById('ob-countdown');
+  if (!el || !document.getElementById('obBg').classList.contains('on')) return;
+  const info = nextTickInfo();
+  const m = Math.floor(info.secs / 60);
+  const s = info.secs % 60;
+  el.textContent = `${m}m ${String(s).padStart(2,'0')}s`;
 }
 function closeOnboarding(goToBat) {
   localStorage.setItem('aetheris.onboarding.done', '1');
@@ -2823,6 +2911,12 @@ function closeOnboarding(goToBat) {
     localStorage.setItem('aetheris.view', 'batiments');
     applyView();
   }
+}
+async function upgradeFirstMine() {
+  // Ferme le modal, bascule sur la vue Batiments pour que le joueur voie
+  // l'ordre apparaitre dans le rail droit, puis declenche l'amelioration.
+  closeOnboarding(true);
+  await submitImprove('mine_ferrum');
 }
 
 /* ───────────────────────────── Toast ────────────────────────────────────── */

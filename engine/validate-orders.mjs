@@ -113,13 +113,16 @@ const changes = filesRaw.split('\n').filter(Boolean).map(l => {
   return { status: status[0], path: rest.join(' ') };
 });
 
-// Sortie silencieuse si la PR n'est manifestement pas un ordre (multi-fichiers
-// ou path hors-perimetre). validate-join.yml gere les inscriptions ; les autres
-// PRs ne nous concernent pas. On ne commente pas — on ne fait rien.
+// Sortie sur exit 2 ("skip, ne rien faire") si la PR n'est pas un ordre.
+// validate-join.yml gere les inscriptions ; les autres PRs ne nous concernent
+// pas. CRITIQUE : on n'exit PAS 0 ici — sinon le workflow `if: success()`
+// declencherait l'auto-merge sur une PR multi-fichiers (ex: PR qui modifie
+// ordres.yaml ET identite.yaml d'autrui). Avec exit 2 + continue-on-error
+// dans le workflow, le step est non-success → auto-merge skip.
 const orderPathRe = /^joueurs\/([a-z][a-z0-9-]{1,15})\/ordres\.yaml$/;
 if (changes.length !== 1 || !orderPathRe.test(changes[0].path)) {
-  console.log(`PR hors-perimetre (${changes.length} fichier(s)) — skip validate-orders.`);
-  process.exit(0);
+  console.log(`PR hors-perimetre (${changes.length} fichier(s)) — skip validate-orders, ne PAS merger.`);
+  process.exit(2);
 }
 
 const change = changes[0];

@@ -1,12 +1,23 @@
-# Généré depuis la console (2026-05-07T15:50:37.042Z)
+# Généré depuis la console (2026-05-07T15:12:11.872Z)
 version: 1
 joueur: kcdq
-tick_cible: 41
-nonce: "c784b4"
+tick_cible: 37
+nonce: "5039da"
 
 ordres:
   - type: construction
     planete: kcdq-prima
-    unite: chasseur_leger
-    quantite: 1
-signature: ed25519:dWl898AM2YYqLKGGjxoroIsEv1cT1jIWDHX2+y089O+uvY6pzo/9s4izw6lyp9UkFRvlBxFTqeLcJl/tW1EPCg==
+    batiment: mine_ferrum
+    niveau_cible: 2
+  - type: chantier
+    planete: kcdq-prima
+    batiment: centrale_solaire
+    niveau_cible: 1
+  - type: chantier
+    planete: kcdq-prima
+    batiment: synthetiseur_plasmide
+    niveau_cible: 1
+  - type: recherche
+    technologie: automation_miniere
+    niveau_cible: 1
+signature: ed25519:F7bDLIrGcNcEVkKfhnXOWRHxlEakY73bqXrBbERKSWCUTvmzH6UYuMOIdLbxzNBkMZ91wO+xJZjGFgde9wVIDA==

@@ -161,9 +161,13 @@
     <section id="step-done" class="step">
       <label style="color:var(--acc)">Bienvenue dans Aetheris</label>
       <p>Ta PR a ete <strong>auto-mergee</strong>. Tu controles desormais <span id="done-planet"></span>.</p>
+      <p style="font-size:12px;color:var(--dim);margin-top:14px">
+        ✓ Cle privee chargee · ✓ Connexion GitHub active · ✓ Pseudo selectionne<br>
+        Tu peux ouvrir la console — pas besoin de re-entrer quoi que ce soit.
+      </p>
       <p><a id="done-pr-link" target="_blank" rel="noopener">Voir la PR</a></p>
       <div style="margin-top:16px">
-        <button id="btn-console">Ouvrir la console</button>
+        <button id="btn-console">Ouvrir la console →</button>
       </div>
     </section>
   </div>
@@ -640,6 +644,13 @@ $('btn-key-ok').addEventListener('click', async () => {
     $('done-planet').textContent = `${state.name}-prima en ${state.planet.coords.join(':')} (${state.planet.classe})`;
     $('done-pr-link').href = state.pr.html_url;
     $('done-pr-link').textContent = `#${state.pr.number} sur ${CONFIG.upstream}`;
+    // Continuite vers la console : on persiste cle, token OAuth et pseudo sous
+    // les memes cles localStorage que la console lit. Le joueur n'a rien a
+    // recoller en arrivant — settings deja remplis, premier ordre signable.
+    localStorage.setItem('aetheris.gh.key', state.privPem);
+    localStorage.setItem('aetheris.gh.pat', state.token);
+    localStorage.setItem('aetheris.player', state.name);
+    localStorage.removeItem('aetheris.onboarding.done'); // re-affiche le modal au 1er load
     show('step-done');
   } catch (e) {
     if (document.querySelector('#step-oauth.active')) {

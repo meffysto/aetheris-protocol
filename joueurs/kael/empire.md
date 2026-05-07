@@ -1,6 +1,6 @@
 # Empire de kael
 
-> Tick 64 · Score 300 · Alliance —
+> Tick 65 · Score 300 · Alliance —
 
 ## Planètes (1)
 
@@ -8,8 +8,8 @@
 
 | Ressource | Stock | Production/UTJ | Capacité |
 |---|---|---|---|
-| ferrum | 46 166 | +124 | 100 000 |
-| lumen | 16 171 | +42 | 100 000 |
+| ferrum | 46 910 | +124 | 100 000 |
+| lumen | 16 423 | +42 | 100 000 |
 | plasmide | 0 | +0 | 100 000 |
 
 **Bâtiments** : mine_ferrum 2, extracteur_lumen 1, synthetiseur_plasmide 0, centrale_solaire 0, depot 0, usine_robotique 0, chantier_spatial 0, laboratoire 0

@@ -1,12 +1,12 @@
-# Généré depuis la console (2026-05-07T14:28:24.695Z)
+# Généré depuis la console (2026-05-07T14:49:45.337Z)
 version: 1
 joueur: kcdq
-tick_cible: 34
-nonce: d9fe96
+tick_cible: 36
+nonce: e90127
 
 ordres:
   - type: chantier
     planete: kcdq-prima
-    batiment: mine_ferrum
+    batiment: extracteur_lumen
     niveau_cible: 1
-signature: ed25519:4S+Rd0p+c78ImEcsUs4p0xfhvAt9dZFGBZKDWZqg3P56ZQIj/CWdTV9yVSUiBifENb4MuRl07y9pDoyInU7HDw==
+signature: ed25519:CFqaWyNboQ9SVmK1nRJf8Tx9LKDdaSrFaL8zg+yLJ1DU0U96PxIWT/TC2sQXied0KpRMDd4JcvYR3nPW7E3NBw==

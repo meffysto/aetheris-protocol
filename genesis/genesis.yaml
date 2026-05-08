@@ -1,0 +1,22 @@
+# Aetheris Protocol — Genesis Block
+# Ce fichier est inscrit sur Bitcoin comme op_type=0x01 (join/genesis) du protocole.
+# Il définit les paramètres de départ du serveur Bitcoin-native.
+
+version: 1
+type: join
+serveur: bitcoin-mvp-1
+protocol_version: 0.1
+tick: 0
+seed: 0xd34db33fb17cb1tc
+demarrage_iso: 2026-05-08T00:00:00Z
+reseau: mutinynet
+
+parametres:
+  tick_source: bitcoin
+  blocs_par_tick: 1
+  galaxies: 9
+  systemes_par_galaxie: 499
+  positions_par_systeme: 15
+  planetes_max_par_joueur: 9
+
+signature: genesis

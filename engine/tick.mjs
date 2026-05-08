@@ -243,11 +243,33 @@ console.log(`joueurs = ${players.length} (${players.join(', ')})`);
 const empires = {};
 for (const p of players) empires[p] = yparse(rd(`joueurs/${p}/empire.yaml`));
 
+const ORDER_SOURCE = process.env.AETH_ORDER_SOURCE ?? 'filesystem';
 const orders = {};
-for (const p of players) {
-  if (exists(`joueurs/${p}/ordres.yaml`)) {
-    try { orders[p] = yparse(rd(`joueurs/${p}/ordres.yaml`)); }
-    catch (e) { console.warn(`  ! ordres.yaml invalide pour ${p}: ${e.message}`); }
+const ordersRawText = {}; // YAML brut pour vérification signature (mode bitcoin)
+
+if (ORDER_SOURCE === 'bitcoin') {
+  // Mode Bitcoin : charge les ordres depuis .cache/orders-<tick>.json
+  // Le cache est peuplé par sync.mjs après scan de la chaîne.
+  const cacheFile = path.join(ROOT, `.cache/orders-${manifest.tick + 1}.json`);
+  try {
+    const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    for (const entry of cached) {
+      const parsed = yparse(entry.yaml);
+      if (parsed && parsed.joueur) {
+        orders[parsed.joueur] = parsed;
+        ordersRawText[parsed.joueur] = entry.yaml;
+      }
+    }
+    console.log(`  source: bitcoin cache (${cached.length} ordres)`);
+  } catch (e) {
+    console.warn(`  ! cache bitcoin introuvable (${cacheFile}): ${e.message}`);
+  }
+} else {
+  for (const p of players) {
+    if (exists(`joueurs/${p}/ordres.yaml`)) {
+      try { orders[p] = yparse(rd(`joueurs/${p}/ordres.yaml`)); }
+      catch (e) { console.warn(`  ! ordres.yaml invalide pour ${p}: ${e.message}`); }
+    }
   }
 }
 
@@ -355,7 +377,9 @@ for (const [name, ord] of Object.entries(orders)) {
   if (!ord || !ord.ordres) continue;
 
   // Vérification de signature Ed25519
-  const rawContent = rd(`joueurs/${name}/ordres.yaml`);
+  const rawContent = ORDER_SOURCE === 'bitcoin'
+    ? (ordersRawText[name] ?? '')
+    : rd(`joueurs/${name}/ordres.yaml`);
   const sigOk = verifierSignature(name, rawContent);
   if (!sigOk) {
     if (STRICT) {

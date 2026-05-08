@@ -3,13 +3,15 @@ name: agent-aurora
 # NPC scripté qui joue automatiquement chaque tick (Forgejo / Codeberg).
 # Stratégie : eco-only (cf. agents/baseline.py).
 #
-# Déclenchement : enchaîne après chaque aetheris-tick réussi.
-# Aurora écrit alors ses ordres pour tick+1, qui seront résolus au tick suivant.
+# Déclenchement : à chaque modification de world/manifest.yaml — qui n'est
+# touché que par le tick worker. Sémantiquement équivalent à "après chaque
+# tick", sans dépendre du trigger workflow_run (support partiel sur Forgejo).
 
 on:
-  workflow_run:
-    workflows: ["aetheris-tick"]
-    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - 'world/manifest.yaml'
   workflow_dispatch: {}
 
 concurrency:
@@ -18,9 +20,10 @@ concurrency:
 
 jobs:
   play:
-    # Skip si le tick a foiré (workflow_run se déclenche aussi sur failure).
-    # workflow_dispatch n'a pas de workflow_run.conclusion → toujours OK.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Skip si l'auteur du push est aurora-bot (évite la boucle infinie :
+    # aurora push ses ordres → trigger sur main, mais sans toucher manifest.yaml
+    # le filtre paths suffit. Ceinture+bretelles quand même).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.actor != 'aurora-bot' }}
     runs-on: codeberg-tiny
     permissions:
       contents: write

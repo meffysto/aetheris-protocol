@@ -23,8 +23,10 @@ NPCs scriptés qui jouent automatiquement chaque tick via GitHub Actions.
    Garde une copie hors du repo si tu veux pouvoir signer manuellement plus tard.
 
 3. **Dupliquer le workflow** : copier `agent-aurora.yml`, remplacer `aurora` →
-   `<handle>` et `AURORA_PRIVATE_KEY` → `<HANDLE>_PRIVATE_KEY`. Décaler le cron
-   pour éviter de tomber pile sur le tick (`*/15` à 0/15/30/45).
+   `<handle>` et `AURORA_PRIVATE_KEY` → `<HANDLE>_PRIVATE_KEY`. Le workflow se
+   déclenche via `workflow_run` après chaque `aetheris-tick` réussi — pas de cron
+   à décaler (le tick lui-même est piloté par `engine/oauth-proxy/worker.js`,
+   les crons GitHub Actions étant unreliable).
 
 4. **Commit** : tout sauf `.key.pem` (gitignored par défaut).
 

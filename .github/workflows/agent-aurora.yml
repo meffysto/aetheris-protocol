@@ -2,11 +2,16 @@ name: agent-aurora
 
 # NPC scripté qui joue automatiquement chaque tick.
 # Stratégie : eco-only (cf. agents/baseline.py).
-# Cron décalé de 5 min avant chaque tick (tick.yml = */15 sur 0/15/30/45).
+#
+# Déclenchement : enchaîne après chaque aetheris-tick réussi.
+# Aurora écrit alors ses ordres pour tick+1, qui seront résolus au tick suivant.
+# (Pas de schedule cron — les triggers cron de GitHub Actions sont unreliable,
+# et le tick lui-même est piloté par engine/oauth-proxy/worker.js.)
 
 on:
-  schedule:
-    - cron: "10,25,40,55 * * * *"
+  workflow_run:
+    workflows: ["aetheris-tick"]
+    types: [completed]
   workflow_dispatch: {}
 
 concurrency:
@@ -15,11 +20,16 @@ concurrency:
 
 jobs:
   play:
+    # Skip si le tick a foiré (workflow_run se déclenche aussi sur failure).
+    # workflow_dispatch n'a pas de workflow_run.conclusion → toujours OK.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-node@v4
         with:

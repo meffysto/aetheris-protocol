@@ -19,4 +19,11 @@ parametres:
   positions_par_systeme: 15
   planetes_max_par_joueur: 9
 
+# Ancrage Bitcoin — bloc où la genesis a été inscrite.
+# La console calcule tick_courant = (tip - bloc_genesis) / blocs_par_tick.
+ancrage:
+  bloc_genesis: 3084991
+  tx_genesis: 007a7be264fe96549a9d1909c65586ca25308a1db3d02b617ad54236040fbf0e
+  reseau_explorer: https://mutinynet.com
+
 signature: genesis

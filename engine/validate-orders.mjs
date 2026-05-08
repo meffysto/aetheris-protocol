@@ -8,12 +8,15 @@
 //
 // Usage : node engine/validate-orders.mjs <pr_number>
 // Env : GH_TOKEN, PR_HEAD_SHA, PR_BASE_SHA, GITHUB_REPOSITORY
+//       API_BASE (optionnel, défaut https://api.github.com — pour Codeberg :
+//                 https://codeberg.org/api/v1)
 
 import { execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 
 const PR_NUM = process.argv[2];
 const { GH_TOKEN, PR_HEAD_SHA, PR_BASE_SHA, GITHUB_REPOSITORY } = process.env;
+const API_BASE = process.env.API_BASE || 'https://api.github.com';
 if (!PR_NUM || !GH_TOKEN || !PR_HEAD_SHA || !PR_BASE_SHA || !GITHUB_REPOSITORY) {
   console.error('manque env : GH_TOKEN, PR_HEAD_SHA, PR_BASE_SHA, GITHUB_REPOSITORY, ou pr_number');
   process.exit(2);
@@ -202,14 +205,14 @@ if (canonical && signatureB64 && pubB64) {
 
 // 6. Verdict
 async function comment(body) {
-  await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${PR_NUM}/comments`, {
+  await fetch(`${API_BASE}/repos/${GITHUB_REPOSITORY}/issues/${PR_NUM}/comments`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${GH_TOKEN}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' },
     body: JSON.stringify({ body }),
   });
 }
 async function closePR() {
-  await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUM}`, {
+  await fetch(`${API_BASE}/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUM}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${GH_TOKEN}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' },
     body: JSON.stringify({ state: 'closed' }),

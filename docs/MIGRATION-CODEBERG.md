@@ -17,8 +17,8 @@ par le shadow-ban silencieux du compte `meffysto` sur GitHub (mai 2026).
 |---|---|---|
 | `.forgejo/workflows/tick.yml` | ✅ porté | runs-on: codeberg-tiny (runner hébergé) |
 | `.forgejo/workflows/agent-aurora.yml` | ✅ porté | workflow_run identique, codeberg-tiny |
-| `.forgejo/workflows/validate-orders.yml` | ❌ à porter | dépend de `gh` CLI → réécriture en `tea` ou curl Gitea API |
-| `.forgejo/workflows/validate-join.yml` | ❌ à porter | idem |
+| `.forgejo/workflows/validate-orders.yml` | ✅ porté | curl + jq vers API Gitea, anti-spam déterministe |
+| `.forgejo/workflows/validate-join.yml` | ✅ porté | idem, age compte via /users/X.created |
 | `console-live.html` | ❌ à porter | abstraction du host (github.com vs codeberg.org) |
 | `join.html` | ❌ à porter | idem |
 | `engine/oauth-proxy/worker.js` | ❌ à adapter | Codeberg supporte OAuth2 via `/login/oauth/authorize` ; pas de device flow → bascule sur Authorization Code Flow with PKCE |

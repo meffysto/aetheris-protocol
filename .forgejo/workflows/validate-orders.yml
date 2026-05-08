@@ -1,0 +1,77 @@
+name: aetheris-validate-orders
+
+# Valide les PRs touchant joueurs/<nom>/ordres.yaml (Forgejo / Codeberg).
+# Identique en logique à .github/workflows/validate-orders.yml mais utilise
+# l'API Gitea (curl) au lieu du gh CLI GitHub-spécifique.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'joueurs/**/ordres.yaml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate-and-merge:
+    runs-on: codeberg-tiny
+    env:
+      API_BASE: https://codeberg.org/api/v1
+      REPO: ${{ github.repository }}
+      PR_NUM: ${{ github.event.pull_request.number }}
+      AUTHOR: ${{ github.event.pull_request.user.login }}
+      OWNER: ${{ github.repository_owner }}
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+
+      - name: Fetch PR head
+        run: |
+          git fetch origin pull/${PR_NUM}/head:pr-head
+          git rev-parse pr-head
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Anti-spam (1 PR active max par auteur)
+        run: |
+          set -e
+          if [ "$AUTHOR" = "$OWNER" ]; then
+            echo "owner — skip anti-spam"; exit 0
+          fi
+          OPEN=$(curl -s -H "Authorization: token $TOKEN" \
+            "$API_BASE/repos/$REPO/pulls?state=open&page=1&limit=50" \
+            | jq '[.[] | select(.user.login == env.AUTHOR) | select(.head.ref | startswith("orders/"))] | length')
+          if [ "$OPEN" -gt 1 ]; then
+            curl -s -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+              -d '{"body":"❌ Une PR d'\''ordres est deja ouverte par cet auteur. Ferme l'\''ancienne d'\''abord."}' \
+              "$API_BASE/repos/$REPO/issues/$PR_NUM/comments"
+            exit 1
+          fi
+
+      - name: Validate
+        id: validate
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node engine/validate-orders.mjs ${{ github.event.pull_request.number }}
+
+      - name: Auto-merge
+        if: steps.validate.outcome == 'success'
+        run: |
+          BRANCH=$(curl -s -H "Authorization: token $TOKEN" \
+            "$API_BASE/repos/$REPO/pulls/$PR_NUM" | jq -r '.head.ref')
+          curl -s -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+            -d '{"Do":"merge"}' \
+            "$API_BASE/repos/$REPO/pulls/$PR_NUM/merge"
+          # Supprime la branche après merge (cleanup)
+          curl -s -X DELETE -H "Authorization: token $TOKEN" \
+            "$API_BASE/repos/$REPO/branches/$BRANCH" || true

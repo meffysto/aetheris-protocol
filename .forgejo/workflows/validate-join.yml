@@ -1,0 +1,93 @@
+name: aetheris-validate-join
+
+# Valide les PRs d'inscription sur les branches `join/<nom>` (Forgejo / Codeberg).
+# Auto-merge si conforme, commente les erreurs sinon.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'joueurs/**/identite.yaml'
+      - 'joueurs/**/empire.yaml'
+      - 'joueurs/**/empire.md'
+      - 'world/galaxie.yaml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate-and-merge:
+    if: startsWith(github.event.pull_request.head.ref, 'join/')
+    runs-on: codeberg-tiny
+    env:
+      API_BASE: https://codeberg.org/api/v1
+      REPO: ${{ github.repository }}
+      PR_NUM: ${{ github.event.pull_request.number }}
+      AUTHOR: ${{ github.event.pull_request.user.login }}
+      OWNER: ${{ github.repository_owner }}
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+
+      - name: Fetch PR head
+        run: |
+          git fetch origin pull/${PR_NUM}/head:pr-head
+          git rev-parse pr-head
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Anti-spam (age compte + 1 PR active max)
+        run: |
+          set -e
+          if [ "$AUTHOR" = "$OWNER" ]; then
+            echo "owner — skip anti-spam"; exit 0
+          fi
+          # Codeberg user API : champ "created" (ISO 8601)
+          CREATED=$(curl -s "$API_BASE/users/$AUTHOR" | jq -r '.created // .created_at')
+          if [ -z "$CREATED" ] || [ "$CREATED" = "null" ]; then
+            echo "✗ impossible de lire l'âge du compte $AUTHOR"
+            exit 1
+          fi
+          NOW_S=$(date -u +%s)
+          CREATED_S=$(date -u -d "$CREATED" +%s)
+          AGE_DAYS=$(( (NOW_S - CREATED_S) / 86400 ))
+          if [ "$AGE_DAYS" -lt 14 ]; then
+            curl -s -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+              -d "{\"body\":\"❌ Compte trop jeune (${AGE_DAYS}j < 14j). Anti-spam.\"}" \
+              "$API_BASE/repos/$REPO/issues/$PR_NUM/comments"
+            exit 1
+          fi
+          OPEN=$(curl -s -H "Authorization: token $TOKEN" \
+            "$API_BASE/repos/$REPO/pulls?state=open&page=1&limit=50" \
+            | jq '[.[] | select(.user.login == env.AUTHOR) | select(.head.ref | startswith("join/"))] | length')
+          if [ "$OPEN" -gt 1 ]; then
+            curl -s -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+              -d '{"body":"❌ Une PR d'\''inscription est deja ouverte par cet auteur."}' \
+              "$API_BASE/repos/$REPO/issues/$PR_NUM/comments"
+            exit 1
+          fi
+          echo "anti-spam OK : compte ${AGE_DAYS}j, ${OPEN} PR(s) ouverte(s)"
+
+      - name: Validate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node engine/validate-join.mjs ${{ github.event.pull_request.number }}
+
+      - name: Auto-merge
+        if: success()
+        run: |
+          BRANCH=$(curl -s -H "Authorization: token $TOKEN" \
+            "$API_BASE/repos/$REPO/pulls/$PR_NUM" | jq -r '.head.ref')
+          curl -s -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+            -d '{"Do":"merge"}' \
+            "$API_BASE/repos/$REPO/pulls/$PR_NUM/merge"
+          curl -s -X DELETE -H "Authorization: token $TOKEN" \
+            "$API_BASE/repos/$REPO/branches/$BRANCH" || true

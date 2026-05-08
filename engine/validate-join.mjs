@@ -7,12 +7,14 @@
 //
 // Usage : node engine/validate-join.mjs <pr_number>
 // Env requis : GH_TOKEN, PR_HEAD_SHA, PR_BASE_SHA, GITHUB_REPOSITORY
+//              API_BASE (optionnel, défaut https://api.github.com)
 
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 
 const PR_NUM = process.argv[2];
 const { GH_TOKEN, PR_HEAD_SHA, PR_BASE_SHA, GITHUB_REPOSITORY } = process.env;
+const API_BASE = process.env.API_BASE || 'https://api.github.com';
 if (!PR_NUM || !GH_TOKEN || !PR_HEAD_SHA || !PR_BASE_SHA || !GITHUB_REPOSITORY) {
   console.error('manque env : GH_TOKEN, PR_HEAD_SHA, PR_BASE_SHA, GITHUB_REPOSITORY, ou pr_number');
   process.exit(2);
@@ -260,7 +262,7 @@ function getPlanetAt(galaxieText, g, s, pos) {
 
 // 10. Verdict
 async function comment(body) {
-  await fetch(`https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${PR_NUM}/comments`, {
+  await fetch(`${API_BASE}/repos/${GITHUB_REPOSITORY}/issues/${PR_NUM}/comments`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${GH_TOKEN}`, 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' },
     body: JSON.stringify({ body }),

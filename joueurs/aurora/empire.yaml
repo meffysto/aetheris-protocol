@@ -1,7 +1,7 @@
 # Généré par engine/tick.mjs — ne pas éditer.
 version: 1
 joueur: aurora
-tick: 81
+tick: 82
 score_total: 0
 points_militaires: 0
 rang: 999
@@ -18,11 +18,11 @@ planetes:
       total: 219
     ressources:
       ferrum:
-        stock: 1580
+        stock: 1760
         production_par_utj: 30
         capacite: 100000
       lumen:
-        stock: 1220
+        stock: 1340
         production_par_utj: 20
         capacite: 100000
       plasmide:

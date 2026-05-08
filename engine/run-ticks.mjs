@@ -81,7 +81,7 @@ async function getRevealTxid() {
 
 async function main() {
   console.log(`\n${'═'.repeat(60)}`);
-  console.log(`  AETHERIS // BITCOIN MVP — Boucle ${N_TICKS} ticks`);
+  console.log(`  CITADEL // BITCOIN MVP — Boucle ${N_TICKS} ticks`);
   console.log(`${'═'.repeat(60)}\n`);
 
   const startTick = await getCurrentTick();

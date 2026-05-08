@@ -1,4 +1,4 @@
-// AETHERIS // PROTOCOL — Initialisation du monde (logique iso).
+// CITADEL // PROTOCOL — Initialisation du monde (logique iso).
 // Importable depuis Node ou navigateur.
 //
 // Exports :

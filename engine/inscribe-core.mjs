@@ -1,4 +1,4 @@
-// Logique iso d'inscription Aetheris — pas de node:*, pas de process.
+// Logique iso d'inscription Citadel — pas de node:*, pas de process.
 // Importable depuis Node ou navigateur.
 //
 // Exports :

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"/>
-<title>AETHERIS · console (bitcoin)</title>
+<title>CITADEL · console (bitcoin)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1309,36 +1309,26 @@ h2.sect .rule {
 
 <div class="modal-bg" id="modalBg">
   <div class="modal">
-    <h2>Sceau de l'envoyé</h2>
-    <p class="lead">Tes ordres seront signés dans ce navigateur (Ed25519, Web Crypto) puis poussés dans le repo via l'API GitHub. Ces données restent en local.</p>
+    <h2>Wallet Bitcoin</h2>
+    <p class="lead">Tes ordres sont inscrits sur Bitcoin (commit + reveal sur Mutinynet). La pubkey Schnorr qui signe la TX est ton identité — le moteur vérifie au scan que l'inscripteur correspond à la pubkey enregistrée lors de ton join. Tout reste en local.</p>
 
     <input id="cfgRepo" type="hidden"/>
     <input id="cfgBranch" type="hidden"/>
     <input id="cfgPat" type="hidden"/>
+    <!-- Stubs OAuth GitHub : conservés hidden pour ne pas casser les listeners
+         hérités du flow main. Inertes en mode Bitcoin. -->
+    <div id="oauthIdle" hidden><button id="oauthConnect" type="button" hidden></button></div>
+    <div id="oauthFlow" hidden><a id="oauthUrl" hidden></a><span id="oauthCode" hidden></span><span id="oauthStatus" hidden></span></div>
+    <div id="oauthDone" hidden><span id="oauthUser" hidden></span><button id="oauthLogout" type="button" hidden></button></div>
 
-    <label>Authentification GitHub</label>
-    <div id="oauthIdle">
-      <button class="primary" id="oauthConnect" type="button">Se connecter à GitHub</button>
-      <div class="hint">Tu seras redirigé pour entrer un code à 8 caractères. Aucun PAT à créer.</div>
-    </div>
-    <div id="oauthFlow" hidden>
-      <div class="hint" style="margin-top:0">Ouvre <a id="oauthUrl" target="_blank" rel="noopener">github.com/login/device</a> et entre le code :</div>
-      <div style="font-family:var(--mono); font-size:22px; letter-spacing:0.3em; color:var(--brass); padding:14px 18px; background:var(--ink-3); border-radius:8px; text-align:center; margin:8px 0; user-select:all"><span id="oauthCode">—</span></div>
-      <div class="hint" id="oauthStatus">En attente de ton autorisation…</div>
-    </div>
-    <div id="oauthDone" hidden>
-      <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--ink-3); border-radius:8px;">
-        <span style="color:var(--green); font-weight:700">✓</span>
-        <span>Connecté en tant que <b id="oauthUser" style="font-family:var(--mono)">—</b></span>
-        <button class="ghost" id="oauthLogout" type="button" style="margin-left:auto; font-size:11px">Déconnecter</button>
-      </div>
-    </div>
+    <textarea id="cfgKey" hidden></textarea>
 
-    <label>Clé privée Ed25519 (joueurs/&lt;toi&gt;/.key.pem)</label>
-    <textarea id="cfgKey" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" autocomplete="off" spellcheck="false"></textarea>
-    <div class="hint">Colle exactement le contenu du <code>.key.pem</code>. Stocké en localStorage (rappel : pas de protection contre script malveillant).</div>
+    <label>Wallet Bitcoin Mutinynet</label>
+    <textarea id="cfgWallet" placeholder='{"network":"mutinynet","privateKeyWIF":"cN...","taprootAddress":"tb1p..."}' autocomplete="off" spellcheck="false" style="min-height:84px"></textarea>
+    <div class="hint" id="walletHint">Colle le JSON complet de ton <code>.btc-key</code>. Mutinynet = test funds — ne jamais y mettre une clé mainnet.</div>
 
     <div class="actions">
+      <button class="ghost" id="cfgResetCache" type="button" title="Vide le cache de scan IndexedDB et force un rescan complet de la chaîne">Vider cache scan</button>
       <button class="ghost" id="cfgClear">Effacer</button>
       <button class="ghost" id="cfgCancel">Fermer</button>
       <button class="primary" id="cfgSave">Sceller</button>
@@ -1386,7 +1376,7 @@ h2.sect .rule {
 <div class="onboarding-bg" id="obBg">
   <div class="onboarding">
     <h2>Bienvenue, <span id="ob-name">commandant</span>.</h2>
-    <p class="ob-sub">Tu contrôles <strong id="ob-planet">—</strong>. Aetheris est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.</p>
+    <p class="ob-sub">Tu contrôles <strong id="ob-planet">—</strong>. Citadel est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.</p>
 
     <div class="ob-card">
       <div class="ob-stat">
@@ -1424,7 +1414,7 @@ h2.sect .rule {
   <div class="head">
     <div class="brand">
       <div class="mark"></div>
-      <div class="name">Aetheris<b>Protocole · canonique</b></div>
+      <div class="name">Citadel<b>Protocole · canonique</b></div>
     </div>
     <div class="head-meta">
       <div class="tick-block">
@@ -1710,9 +1700,9 @@ const cfg = {
   set pat(v)   { v ? localStorage.setItem('aetheris.gh.pat', v)    : localStorage.removeItem('aetheris.gh.pat'); },
   get key()    { return localStorage.getItem('aetheris.gh.key')    || ''; },
   set key(v)   { v ? localStorage.setItem('aetheris.gh.key', v)    : localStorage.removeItem('aetheris.gh.key'); },
-  // Mode Bitcoin : seule la clé Ed25519 est requise pour signer le yaml.
-  // Le wallet Bitcoin (WIF taproot) est demandé à la volée via getBitcoinWallet().
-  get ready()  { return !!this.key; },
+  // Mode Bitcoin-native : seul le wallet taproot suffit. La pubkey Schnorr
+  // qui signe la TX est l'identité du joueur (vérifiée par le boot au scan).
+  get ready()  { return !!(state?.wallet?.privateKeyWIF); },
 };
 
 /* ───────────────────────────── Iconography ──────────────────────────────── */
@@ -1941,6 +1931,7 @@ async function load() {
 
     showStatus(`✓ tick ${state.manifest.tick} · ${playerNames.length} empire(s) · bloc ${state.bitcoin.tip}`);
     document.getElementById('err').classList.remove('on');
+    applySrcUI();
     render();
   } catch (e) {
     const err = document.getElementById('err');
@@ -2976,7 +2967,7 @@ document.getElementById('rail').addEventListener('click', e => {
 async function cancelOrder(idx) {
   const emp = state.players[state.current];
   if (!emp?._ordres) return;
-  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour modifier les ordres.', true); return; }
+  if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin pour pouvoir modifier les ordres.', true); return; }
   if (state.pending.has('cancelOrder')) return;
 
   const tickCible = emp._ordres.tick_cible;
@@ -3059,30 +3050,21 @@ function clearBitcoinWallet() {
 }
 
 async function getBitcoinWallet() {
-  if (state.wallet) return state.wallet;
+  if (state.wallet?.privateKeyWIF && state.wallet?.taprootAddress) return state.wallet;
   const cached = loadBitcoinWallet();
   if (cached?.privateKeyWIF && cached?.taprootAddress) {
     state.wallet = cached;
     return cached;
   }
-  // Prompt l'user — colle le contenu de .btc-key (JSON)
-  const raw = window.prompt(
-    'Wallet Bitcoin Mutinynet — colle le contenu JSON de ton .btc-key\n' +
-    '(ex: {"privateKeyWIF":"cN...","taprootAddress":"tb1p...","network":"mutinynet"})\n\n' +
-    '⚠ Stocké en clair dans localStorage — Mutinynet test funds uniquement.'
-  );
-  if (!raw) throw new Error('wallet annulé');
-  let w;
-  try { w = JSON.parse(raw); } catch { throw new Error('JSON invalide'); }
-  if (!w.privateKeyWIF || !w.taprootAddress) throw new Error('JSON manque privateKeyWIF ou taprootAddress');
-  saveBitcoinWallet(w);
-  state.wallet = w;
-  return w;
+  // Ouvre le modal settings — l'user doit coller son JSON dans le champ wallet.
+  openSettings();
+  toast('Wallet Bitcoin requis', 'Colle le contenu de ton .btc-key (JSON) dans le champ wallet, puis sceller.', true);
+  throw new Error('wallet bitcoin non configuré');
 }
 
-// pushSignedOrder version Bitcoin : signe Ed25519 puis inscrit on-chain via inscribe().
-// Remplace l'ancien flow GitHub PR. cfg.key (Ed25519 PEM) reste requis pour la signature
-// du yaml ; state.wallet (Bitcoin WIF) est requis pour broadcaster la TX.
+// pushSignedOrder version Bitcoin-native : pas de signature applicative.
+// L'authentification = la pubkey Schnorr qui signe le witness Bitcoin (vérifiée
+// par le boot lors du scan). Le YAML est inscrit tel quel.
 async function pushSignedOrder(canonicalBody, message) {
   const step = async (label, fn) => {
     try { return await fn(); }
@@ -3094,11 +3076,10 @@ async function pushSignedOrder(canonicalBody, message) {
     }
   };
 
-  const canonical = canonicalBody.replace(/\s+$/, '') + '\n';
-  const sig = await step('signature ed25519', () => signCanonical(canonical, cfg.key));
-  const finalContent = canonical + `signature: ed25519:${sig}\n`;
+  // Pas de signature applicative — la pubkey Schnorr du witness Bitcoin authentifie.
+  const finalContent = canonicalBody.replace(/\s+$/, '') + '\n';
 
-  // Récupère le wallet Bitcoin (prompt si pas déjà dispo).
+  // Récupère le wallet Bitcoin (modal si pas déjà dispo).
   const wallet = await step('wallet bitcoin', () => getBitcoinWallet());
 
   const ab = window.aetherisBitcoin;
@@ -3123,7 +3104,7 @@ async function pushSignedOrder(canonicalBody, message) {
 
 async function submitImprove(batiment) {
   if (state.pending.has(batiment)) return;
-  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour signer un ordre.', true); return; }
+  if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin dans les paramètres pour inscrire des ordres.', true); return; }
 
   const emp = state.players[state.current];
   const planete = emp?.planetes?.[0]; if (!planete) return;
@@ -3149,7 +3130,7 @@ async function submitImprove(batiment) {
 async function submitConstruction(planeteNom, unite, quantite) {
   const pendingKey = `construction:${unite}`;
   if (state.pending.has(pendingKey)) return;
-  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour signer un ordre.', true); return; }
+  if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin dans les paramètres pour inscrire des ordres.', true); return; }
   if (!quantite || quantite <= 0) return;
 
   const emp = state.players[state.current];
@@ -3178,7 +3159,7 @@ async function submitConstruction(planeteNom, unite, quantite) {
 async function submitRecherche(technologie, niveauCible) {
   const pendingKey = 'rec:' + technologie;
   if (state.pending.has(pendingKey)) return;
-  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour signer un ordre.', true); return; }
+  if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin dans les paramètres pour inscrire des ordres.', true); return; }
 
   const emp = state.players[state.current]; if (!emp) return;
   const niveauActuel = (emp.recherche || {})[technologie] || 0;
@@ -3203,7 +3184,7 @@ async function submitRecherche(technologie, niveauCible) {
 async function submitMission({ type, depuis, cibleJoueur, ciblePlanete, flotte, cargaison, nombreSondes }) {
   const pendingKey = `mission:${type}:${depuis}:${cibleJoueur}:${ciblePlanete}`;
   if (state.pending.has(pendingKey)) return;
-  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour signer un ordre.', true); return; }
+  if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin dans les paramètres pour inscrire des ordres.', true); return; }
 
   const tickCible = (state.manifest?.tick ?? 0) + 1;
 
@@ -3346,50 +3327,72 @@ function openSettings() {
   document.getElementById('cfgBranch').value = cfg.branch;
   document.getElementById('cfgPat').value = cfg.pat;
   document.getElementById('cfgKey').value = cfg.key;
-  refreshOauthUI();
+  // Pré-remplir le wallet Bitcoin
+  const wallet = state.wallet || loadBitcoinWallet();
+  document.getElementById('cfgWallet').value = wallet ? JSON.stringify(wallet, null, 2) : '';
   document.getElementById('modalBg').classList.add('on');
 }
 function closeSettings() { document.getElementById('modalBg').classList.remove('on'); }
 function applySrcUI() {
+  // Mode Bitcoin permanent : le bouton devient un indicateur read-only.
   const btn = document.getElementById('srcBtn');
   const lbl = document.getElementById('srcLabel');
-  btn.classList.toggle('github', state.source === 'github');
-  lbl.textContent = state.source === 'github' ? `github · ${cfg.branch || 'main'}` : 'local';
-  btn.title = state.source === 'github'
-    ? `Source : repo distant (${cfg.repo || '?'}). Clique pour repasser au disque local.`
-    : 'Source : disque local. Clique pour lire le repo distant à la place.';
+  if (!btn || !lbl) return;
+  const tip = state.bitcoin?.tip;
+  lbl.textContent = tip ? `⛓ ${tip}` : '⛓ bitcoin';
+  btn.title = state.bitcoin
+    ? `Bitcoin Mutinynet · tip ${tip} · tick ${state.bitcoin.tickCourant}`
+    : 'Source : Bitcoin Mutinynet (lecture en cours)';
+  btn.style.cursor = 'default';
 }
-document.getElementById('srcBtn').onclick = () => {
-  state.source = state.source === 'local' ? 'github' : 'local';
-  localStorage.setItem('aetheris.source', state.source);
-  applySrcUI();
-  load();
-};
+document.getElementById('srcBtn').onclick = () => { /* read-only en mode Bitcoin */ };
 applySrcUI();
 
 document.getElementById('gearBtn').onclick = openSettings;
 document.getElementById('cfgCancel').onclick = closeSettings;
 document.getElementById('modalBg').onclick = e => { if (e.target.id === 'modalBg') closeSettings(); };
 document.getElementById('cfgSave').onclick = () => {
-  // Le PAT/access_token est gere par le bloc OAuth — on ne sauvegarde que la cle.
-  cfg.key = document.getElementById('cfgKey').value.trim();
-  closeSettings();
-  if (cfg.ready) {
-    toast('Sceau apposé', 'Tu peux maintenant donner des ordres depuis la console.');
-  } else if (!cfg.pat) {
-    toast('Connexion GitHub requise', 'Clique "Se connecter à GitHub" pour pouvoir signer.', true);
-  } else {
-    toast('Clé manquante', 'Colle ton .key.pem pour activer la signature.', true);
+  // Wallet Bitcoin : parse JSON, valide, persiste.
+  const walletRaw = document.getElementById('cfgWallet').value.trim();
+  if (walletRaw) {
+    try {
+      const w = JSON.parse(walletRaw);
+      if (!w.privateKeyWIF || !w.taprootAddress) {
+        toast('Wallet invalide', 'Le JSON doit contenir privateKeyWIF et taprootAddress.', true);
+        return;
+      }
+      saveBitcoinWallet(w);
+      state.wallet = w;
+    } catch (e) {
+      toast('Wallet illisible', 'JSON invalide : ' + e.message, true);
+      return;
+    }
   }
+  closeSettings();
+  if (state.wallet) toast('Wallet scellé', `Adresse ${state.wallet.taprootAddress.slice(0,16)}…`);
+  else toast('Wallet manquant', 'Colle ton .btc-key (JSON) pour pouvoir inscrire des ordres.', true);
   render();
 };
 document.getElementById('cfgClear').onclick = () => {
-  if (!confirm('Effacer connexion GitHub, clé et pseudo de ce navigateur ?')) return;
+  if (!confirm('Effacer clé Ed25519, wallet Bitcoin et pseudo de ce navigateur ?')) return;
   cfg.pat = ''; cfg.key = '';
+  clearBitcoinWallet();
   localStorage.removeItem('aetheris.player');
   localStorage.removeItem('aetheris.onboarding.done');
   state.current = null;
   openSettings();
+};
+// Vide le cache scan IndexedDB et recharge — utile si le scan est désynchronisé.
+document.getElementById('cfgResetCache').onclick = async () => {
+  if (!confirm('Vider le cache scan ? Le prochain boot rescanne toute la chaîne (~quelques minutes).')) return;
+  try {
+    await window.aetherisBitcoin?.cacheAdapter?.clear();
+    closeSettings();
+    toast('Cache vidé', 'Rescan complet en cours…');
+    await load();
+  } catch (e) {
+    toast('Erreur', e.message, true);
+  }
 };
 
 /* ───────────────────────────── Mission modal ────────────────────────────── */

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Génère un wallet taproot BIP-86 pour Aetheris Bitcoin MVP.
+// Génère un wallet taproot BIP-86 pour Citadel Bitcoin MVP.
 // Écrit .btc-key à la racine du repo (gitignoré).
 //
 // Usage:

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AETHERIS // PROTOCOL — Test du résolveur de combat
+// CITADEL // PROTOCOL — Test du résolveur de combat
 // Simule la Bataille de Pyra II avec les flottes actuelles de KAEL et VEXOR.
 //
 // Usage : node engine/test-combat.mjs
@@ -135,7 +135,7 @@ const bar = (n, max, w = 30) => {
 };
 
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('  AETHERIS // BATAILLE DE PYRA II — simulation');
+console.log('  CITADEL // BATAILLE DE PYRA II — simulation');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
 const rules = yparse(rd('engine/rules.yaml'));

@@ -1,4 +1,4 @@
-// AETHERIS // PROTOCOL — Résolveur de tick (logique iso, pas de fs).
+// CITADEL // PROTOCOL — Résolveur de tick (logique iso, pas de fs).
 // Importable Node ou navigateur.
 //
 // Exports :

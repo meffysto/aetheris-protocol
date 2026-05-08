@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AETHERIS // PROTOCOL — Wrapper CLI du résolveur de tick.
+// CITADEL // PROTOCOL — Wrapper CLI du résolveur de tick.
 // La logique iso est dans engine/tick-core.mjs.
 //
 // Usage:
@@ -38,7 +38,7 @@ function ls(p) {
 }
 function exists(p) { return fs.existsSync(path.join(ROOT, p)); }
 
-console.log('━━━ AETHERIS // tick resolver ━━━');
+console.log('━━━ CITADEL // tick resolver ━━━');
 console.log(`root = ${ROOT}`);
 console.log(`mode = ${DRY ? 'DRY-RUN' : 'APPLY'}`);
 

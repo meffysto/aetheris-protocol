@@ -1,4 +1,4 @@
-# AETHERIS // PROTOCOL — Constantes du jeu
+# CITADEL // PROTOCOL — Constantes du jeu
 # Tout ici est public, lu par l'engine ET par les agents qui veulent simuler.
 # Modifier ce fichier change l'équilibre — donc fork, ne PR pas (sauf serveur custom).
 

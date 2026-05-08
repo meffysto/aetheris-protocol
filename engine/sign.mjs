@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AETHERIS // PROTOCOL — Signature d'un fichier d'ordres
+// CITADEL // PROTOCOL — Signature d'un fichier d'ordres
 //
 // Usage : node engine/sign.mjs joueurs/<name>/ordres.yaml
 //

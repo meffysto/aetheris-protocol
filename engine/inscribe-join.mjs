@@ -31,26 +31,17 @@ async function main() {
   }
 
   const identiteText = await fs.readFile(idPath, 'utf8');
-  // Extraire cle_publique + alliance depuis l'identité du joueur.
-  const pubMatch = identiteText.match(/^cle_publique:\s*(\S+)/m);
+  // En mode Bitcoin-native, la pubkey Schnorr du witness authentifie l'inscripteur.
+  // Plus besoin d'embarquer cle_publique/signature dans le YAML.
   const allMatch = identiteText.match(/^alliance:\s*(\S+)/m);
-  const dateMatch = identiteText.match(/^date_inscription(?:_iso)?:\s*(\S+)/m);
-  if (!pubMatch) {
-    console.error(`identite.yaml de ${playerArg} ne contient pas de cle_publique`);
-    process.exit(1);
-  }
 
-  // Construit le YAML de join — tous les champs sont parsables pour
-  // permettre à la console (côté browser) de reconstruire l'état.
   const joinYaml = [
-    '# Aetheris Protocol — Join inscription',
+    '# Citadel Protocol — Join inscription',
     'version: 1',
     'type: join',
     `joueur: ${playerArg}`,
-    `cle_publique: ${pubMatch[1]}`,
     `alliance: ${allMatch ? allMatch[1] : '~'}`,
-    `date_inscription: ${dateMatch ? dateMatch[1] : new Date().toISOString()}`,
-    'signature: inscribed-on-bitcoin',
+    `date_inscription: ${new Date().toISOString()}`,
   ].join('\n');
 
   // Écrit dans un fichier temporaire pour le passer à inscribe.mjs

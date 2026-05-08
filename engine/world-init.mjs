@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AETHERIS // PROTOCOL — Initialisation du monde
+// CITADEL // PROTOCOL — Initialisation du monde
 // Wipe complet + génération d'un monde tick 0 jouable.
 //
 // ATTENTION : supprime joueurs/, history/, world/events/. Confirmation requise.
@@ -36,7 +36,7 @@ if (!args.confirm) {
   process.exit(2);
 }
 
-console.log('━━━ AETHERIS // world-init ━━━');
+console.log('━━━ CITADEL // world-init ━━━');
 console.log(`serveur  = ${SERVEUR}`);
 console.log(`systèmes = ${NB_SYSTEMES}`);
 
@@ -99,7 +99,7 @@ for (let s = 1; s <= NB_SYSTEMES; s++) {
   systemes[`1:${s}`] = lines.join('\n');
 }
 
-const galaxieYaml = `# AETHERIS // galaxie canonique — generée par world-init.mjs
+const galaxieYaml = `# CITADEL // galaxie canonique — generée par world-init.mjs
 version: 1
 tick: 0
 systemes:
@@ -109,7 +109,7 @@ fs.writeFileSync(path.join(ROOT, 'world/galaxie.yaml'), galaxieYaml);
 console.log(`▸ Galaxie : ${NB_SYSTEMES} système(s) générés (1:1 .. 1:${NB_SYSTEMES})`);
 
 // 3. Manifest tick 0
-const manifestYaml = `# AETHERIS // manifest serveur — généré par world-init.mjs
+const manifestYaml = `# CITADEL // manifest serveur — généré par world-init.mjs
 version: 1
 protocol_version: 0.1
 serveur: ${SERVEUR}

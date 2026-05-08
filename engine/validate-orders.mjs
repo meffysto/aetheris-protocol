@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AETHERIS // PROTOCOL — Validateur de PR d'ordres.
+// CITADEL // PROTOCOL — Validateur de PR d'ordres.
 //
 // Lance par .github/workflows/validate-orders.yml sur les PRs `orders/<nom>`.
 // Verifie : (a) seul joueurs/<nom>/ordres.yaml est touche, (b) le YAML est

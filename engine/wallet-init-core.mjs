@@ -1,4 +1,4 @@
-// AETHERIS // PROTOCOL — Génération de wallet taproot BIP-86 (iso).
+// CITADEL // PROTOCOL — Génération de wallet taproot BIP-86 (iso).
 // Importable depuis Node ou navigateur.
 //
 // Usage browser :

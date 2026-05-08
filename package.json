@@ -2,7 +2,7 @@
   "name": "aetheris-protocol-bitcoin",
   "version": "0.1.0",
   "type": "module",
-  "description": "Aetheris Protocol — Bitcoin MVP (Mutinynet)",
+  "description": "Citadel Protocol — Bitcoin MVP (Mutinynet)",
   "engines": {
     "node": ">=20"
   },

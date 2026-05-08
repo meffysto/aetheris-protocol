@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AETHERIS // PROTOCOL — Validateur de PR d'inscription.
+// CITADEL // PROTOCOL — Validateur de PR d'inscription.
 //
 // Lance par .github/workflows/validate-join.yml sur les PRs `join/<nom>`.
 // Verifie que la PR ne fait que ce qu'elle pretend faire, puis sort 0 (auto-merge OK)
@@ -277,4 +277,4 @@ if (errors.length > 0) {
 }
 
 console.log(`✓ Inscription "${NAME}" validee.`);
-await comment(`## ✓ Inscription "${NAME}" validee\n\nAuto-merge active. Bienvenue dans Aetheris.`);
+await comment(`## ✓ Inscription "${NAME}" validee\n\nAuto-merge active. Bienvenue dans Citadel.`);

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AETHERIS // PROTOCOL — Onboarding
+// CITADEL // PROTOCOL — Onboarding
 // Génère une paire de clés Ed25519, scaffolde le dossier joueur.
 //
 // Usage :

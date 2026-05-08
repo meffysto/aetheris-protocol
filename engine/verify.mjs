@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ════════════════════════════════════════════════════════════════════════
-//  AETHERIS // verify.mjs
+//  CITADEL // verify.mjs
 //  Vérifie la chaîne de hashes des manifests à travers l'historique git.
 //
 //  Usage:
@@ -66,7 +66,7 @@ function manifestAtCommit(sha) {
   }
 }
 
-console.log('━━━ AETHERIS // verify chain ━━━');
+console.log('━━━ CITADEL // verify chain ━━━');
 
 const log = execSync(
   `git log --reverse --format=%H -- world/manifest.yaml`,

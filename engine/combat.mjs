@@ -1,4 +1,4 @@
-// AETHERIS // PROTOCOL — Résolveur de combat
+// CITADEL // PROTOCOL — Résolveur de combat
 // Déterministe, pur (pas d'I/O), import-only depuis tick.mjs ou test-combat.mjs.
 //
 // Modèle :

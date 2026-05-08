@@ -1,4 +1,4 @@
-// AETHERIS // PROTOCOL — Boot Bitcoin (orchestrator browser).
+// CITADEL // PROTOCOL — Boot Bitcoin (orchestrator browser).
 // Reconstitue l'état complet du serveur en scannant la chain Bitcoin
 // et en rejouant les ticks via runTick().
 //
@@ -18,7 +18,7 @@ import { resolveCombat, computeDebris, computePillage } from './combat.mjs';
 import * as cache from './cache.mjs';
 
 // Clé du cache scan (versionnée — bump si format change)
-const SCAN_CACHE_KEY = 'scan-v1';
+const SCAN_CACHE_KEY = 'scan-v2';  // v2: inclut inscriberPubKey
 
 /**
  * @param {object} params
@@ -108,7 +108,13 @@ export async function bootBitcoin({
       if (ins.opType === 'join') {
         const parsed = yparse(ins.yaml);
         if (parsed?.joueur && parsed.joueur !== genesis.serveur) {
-          joins.push({ blockHeight: ins.blockHeight, txid: ins.txid, yaml: ins.yaml, parsed });
+          joins.push({
+            blockHeight: ins.blockHeight,
+            txid: ins.txid,
+            yaml: ins.yaml,
+            parsed,
+            inscriberPubKey: ins.inscriberPubKey,  // pubkey Schnorr de l'inscripteur
+          });
         }
       } else if (ins.opType === 'order') {
         const parsed = yparse(ins.yaml);
@@ -118,6 +124,7 @@ export async function bootBitcoin({
           if (!ordersByTick[T][parsed.joueur]) {
             ordersByTick[T][parsed.joueur] = {
               parsed, raw: ins.yaml, blockHeight: ins.blockHeight, txid: ins.txid,
+              inscriberPubKey: ins.inscriberPubKey,
             };
           }
         }
@@ -161,10 +168,14 @@ export async function bootBitcoin({
         });
         if (result) {
           empires[playerName] = result.empire;
-          if (j.parsed.cle_publique) {
-            identites[playerName] = { cle_publique: j.parsed.cle_publique };
-          }
-          log(`  + join ${playerName} @ bloc ${j.blockHeight} (T=${T-1}) → ${result.empire.planetes[0]?.coordonnees?.join(':')}`);
+          // Identité Bitcoin-native : la pubkey Schnorr de la TX d'inscription.
+          // C'est le seul facteur d'authentification pour les ordres futurs.
+          identites[playerName] = {
+            cle_publique: j.inscriberPubKey ? `schnorr:${j.inscriberPubKey}` : null,
+            join_block: j.blockHeight,
+            join_txid: j.txid,
+          };
+          log(`  + join ${playerName} @ bloc ${j.blockHeight} (T=${T-1}) → ${result.empire.planetes[0]?.coordonnees?.join(':')} · pk ${j.inscriberPubKey?.slice(0,12)}…`);
         } else {
           log(`  ! join ${playerName}: aucune planète libre — ignoré`);
         }
@@ -173,10 +184,16 @@ export async function bootBitcoin({
       }
     }
 
-    // Récupère ordres pour ce tick
+    // Récupère ordres pour ce tick — vérifie que l'inscripteur === pubkey du join.
     const orders = {};
     const ordersRawText = {};
     for (const [name, entry] of Object.entries(ordersByTick[T] ?? {})) {
+      const expectedPk = identites[name]?.cle_publique;
+      const gotPk = entry.inscriberPubKey ? `schnorr:${entry.inscriberPubKey}` : null;
+      if (!expectedPk || !gotPk || expectedPk !== gotPk) {
+        log(`  ✗ ordre ${name} (tick ${T}) : pubkey ${gotPk?.slice(0,20)}… ≠ identité ${expectedPk?.slice(0,20)}… — REJETÉ`);
+        continue;
+      }
       orders[name] = entry.parsed;
       ordersRawText[name] = entry.raw;
     }

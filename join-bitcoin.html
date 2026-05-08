@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"/>
-<title>AETHERIS · join (bitcoin)</title>
+<title>CITADEL · join (bitcoin)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -55,7 +55,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>AETHERIS — Inscription Bitcoin</h1>
+  <h1>CITADEL — Inscription Bitcoin</h1>
   <p class="sub">Génère tes clés, fonde ton wallet sur Mutinynet, et inscris ton empire on-chain.</p>
 
   <div class="step on" data-step="name">
@@ -66,18 +66,17 @@
   </div>
 
   <div class="step" data-step="keys">
-    <h2>Sauvegarde tes clés avant de continuer</h2>
-    <p class="hint">Sans ces fichiers, tu perds définitivement l'accès à ton empire et à tes fonds Bitcoin.</p>
+    <h2>Sauvegarde ton wallet avant de continuer</h2>
+    <p class="hint">Ton wallet Bitcoin est ta seule clé : c'est lui qui te permet de broadcaster tes ordres ET il sert d'identité (ta pubkey Schnorr authentifie tes inscriptions). Si tu le perds, ton empire est inaccessible.</p>
 
     <label>Adresse Bitcoin (Mutinynet)</label>
     <code class="code-block" id="walletAddr"></code>
 
-    <label>Mnemonic BIP-39 (12 mots) — wallet Bitcoin</label>
+    <label>Mnemonic BIP-39 (12 mots) — sauvegarde-le ailleurs</label>
     <code class="code-block" id="walletMnemonic"></code>
 
-    <button id="btnDownloadEd">Télécharger .key.pem (Ed25519)</button>
-    <button id="btnDownloadBtc">Télécharger .btc-key (Bitcoin)</button>
-    <button id="btnNextFaucet" class="alt">J'ai sauvegardé mes clés →</button>
+    <button id="btnDownloadBtc">Télécharger .btc-key (JSON)</button>
+    <button id="btnNextFaucet" class="alt">J'ai sauvegardé mon wallet →</button>
   </div>
 
   <div class="step" data-step="faucet">
@@ -103,7 +102,7 @@
   </div>
 
   <div class="step" data-step="done">
-    <h2>✓ Bienvenue dans Aetheris</h2>
+    <h2>✓ Bienvenue dans Citadel</h2>
     <p>Ton join est inscrit sur Bitcoin. Une fois confirmé (~30s), tu apparaîtras dans la console et ton empire sera spawné par le moteur.</p>
     <p>Garde le contenu de <code>.btc-key</code> (JSON) à portée pour le coller dans la console quand elle demandera.</p>
     <a href="./console-live-bitcoin.html"><button>Ouvrir la console</button></a>
@@ -115,6 +114,10 @@ import { generateWallet } from './engine/wallet-init-core.mjs';
 import { inscribe } from './engine/inscribe-core.mjs';
 import * as btc from '@scure/btc-signer';
 import { schnorr } from '@noble/curves/secp256k1';
+
+// Identité Bitcoin-native : la pubkey Schnorr de la TX d'inscription.
+// Plus besoin de générer une paire Ed25519 séparée — le wallet taproot
+// est à la fois la clé de broadcast ET l'identité du joueur.
 
 const $ = sel => document.querySelector(sel);
 function showStep(name) {
@@ -136,11 +139,10 @@ function download(filename, content) {
 
 const session = {
   name: null,
-  ed25519: null,        // { pubB64, privPem }
-  wallet: null,         // { taprootAddress, privateKeyWIF, mnemonic, ... }
+  wallet: null,         // { taprootAddress, privateKeyWIF, pubKeyHex, mnemonic, ... }
 };
 
-// ─── Étape 1 — nom + génération ───────────────────────────────────────────────
+// ─── Étape 1 — nom + génération wallet ────────────────────────────────────────
 
 $('#btnGenerate').onclick = async () => {
   const name = $('#playerName').value.trim().toLowerCase();
@@ -152,16 +154,7 @@ $('#btnGenerate').onclick = async () => {
   $('#btnGenerate').disabled = true;
   $('#btnGenerate').textContent = 'Génération…';
 
-  // Ed25519 pour signer les ordres
-  const keyPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
-  const privDer = new Uint8Array(await crypto.subtle.exportKey('pkcs8', keyPair.privateKey));
-  const pubDer = new Uint8Array(await crypto.subtle.exportKey('spki', keyPair.publicKey));
-  const privB64 = btoa(String.fromCharCode(...privDer));
-  const pubB64 = btoa(String.fromCharCode(...pubDer));
-  const privPem = `-----BEGIN PRIVATE KEY-----\n${privB64.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----\n`;
-  session.ed25519 = { pubB64, privPem, privateKey: keyPair.privateKey };
-
-  // Wallet Bitcoin BIP-86
+  // Wallet Bitcoin BIP-86 — c'est ta seule clé.
   session.wallet = generateWallet({ network: 'mutinynet' });
 
   $('#walletAddr').textContent = session.wallet.taprootAddress;
@@ -169,11 +162,8 @@ $('#btnGenerate').onclick = async () => {
   showStep('keys');
 };
 
-// ─── Étape 2 — téléchargement clés ────────────────────────────────────────────
+// ─── Étape 2 — téléchargement du wallet ───────────────────────────────────────
 
-$('#btnDownloadEd').onclick = () => {
-  download(`${session.name}-key.pem`, session.ed25519.privPem);
-};
 $('#btnDownloadBtc').onclick = () => {
   download(`${session.name}-btc-key.json`, JSON.stringify(session.wallet, null, 2));
 };
@@ -222,22 +212,16 @@ $('#btnInscribe').onclick = async () => {
   $('#btnInscribe').disabled = true;
   setStatus('inscribeStatus', '▸ construction du YAML…');
 
-  // Construit le YAML join avec cle_publique (parsable côté browser).
-  const baseYaml = [
-    '# Aetheris Protocol — Join inscription',
+  // YAML join minimal — la pubkey Schnorr de la TX authentifie l'inscripteur.
+  // Pas de cle_publique embarquée, pas de signature applicative.
+  const finalYaml = [
+    '# Citadel Protocol — Join inscription',
     'version: 1',
     'type: join',
     `joueur: ${session.name}`,
-    `cle_publique: ed25519:${session.ed25519.pubB64}`,
     'alliance: ~',
     `date_inscription: ${new Date().toISOString()}`,
-  ].join('\n');
-
-  // Self-sign Ed25519 du yaml (canonical = sans la ligne `signature:`).
-  const canonical = baseYaml + '\n';
-  const sigBytes = await crypto.subtle.sign('Ed25519', session.ed25519.privateKey, new TextEncoder().encode(canonical));
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
-  const finalYaml = canonical + `signature: ed25519:${sigB64}\n`;
+  ].join('\n') + '\n';
 
   setStatus('inscribeStatus', '▸ inscription Bitcoin (commit + reveal)…');
   try {

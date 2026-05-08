@@ -1,4 +1,4 @@
-// Scanne des blocs Bitcoin et extrait les ordres Aetheris depuis les witnesses tapscript.
+// Scanne des blocs Bitcoin et extrait les ordres Citadel depuis les witnesses tapscript.
 // Isomorphique : fetch() uniquement, pas de fs, pas de child_process.
 //
 // Export principal :
@@ -48,7 +48,7 @@ export async function fetchTipHeight(api) {
 // ─── parsing de l'envelope ───────────────────────────────────────────────────
 
 /**
- * Recherche le pattern Aetheris dans un witness stack tapscript.
+ * Recherche le pattern Citadel dans un witness stack tapscript.
  * Retourne { opType, payload } ou null si pas trouvé.
  *
  * Le witness d'un script-path spend taproot = [...args, script, controlBlock]
@@ -68,10 +68,19 @@ export function parseWitness(witnessStack) {
 }
 
 /**
- * Cherche l'envelope Aetheris dans une séquence de bytes (le script du witness).
- * Pattern : ... 04 61657468 [version:01] [opType:01] [payload...] 68(ENDIF)
+ * Cherche l'envelope Citadel dans une séquence de bytes (le script du witness).
+ * Pattern : 20 <pubkey:32> ac 00 63 04 61657468 [version:01] [opType:01] [payload...] 68(ENDIF)
+ *
+ * Si le script commence par 0x20 (push 32 bytes) suivi de OP_CHECKSIG (0xac),
+ * on extrait la pubkey Schnorr de l'inscripteur — c'est l'identité Bitcoin-native.
  */
 function extractEnvelope(bytes) {
+  // Pubkey de l'inscripteur : premier push de 32 bytes (Schnorr) suivi de OP_CHECKSIG.
+  let inscriberPubKey = null;
+  if (bytes.length >= 34 && bytes[0] === 0x20 && bytes[33] === 0xac) {
+    inscriberPubKey = bytesToHex(bytes.slice(1, 33));
+  }
+
   // Cherche "aeth" (0x04 61 65 74 68) dans les bytes du script
   // 0x04 = push de 4 bytes
   const marker = new Uint8Array([0x04, 0x61, 0x65, 0x74, 0x68]);
@@ -150,7 +159,7 @@ function extractEnvelope(bytes) {
     try {
       const yamlBytes = gunzipSync(payload);
       const yaml = new TextDecoder().decode(yamlBytes);
-      return { opType: OP_TYPES_REV[opTypeByte], opTypeByte, yaml };
+      return { opType: OP_TYPES_REV[opTypeByte], opTypeByte, yaml, inscriberPubKey };
     } catch {
       continue; // pas du gzip valide, continuer la recherche
     }
@@ -162,7 +171,7 @@ function extractEnvelope(bytes) {
 // ─── scan d'une transaction ───────────────────────────────────────────────────
 
 /**
- * Cherche des inscriptions Aetheris dans toutes les TX d'un bloc.
+ * Cherche des inscriptions Citadel dans toutes les TX d'un bloc.
  * @param {string} blockHash
  * @param {number} blockHeight
  * @param {string} api  URL base Esplora
@@ -196,6 +205,7 @@ export async function* scanBlock(blockHash, blockHeight, api) {
         opType: result.opType,
         opTypeByte: result.opTypeByte,
         yaml: result.yaml,
+        inscriberPubKey: result.inscriberPubKey,  // pubkey Schnorr (hex 64) ou null
         valid: true,
       };
     }
@@ -203,7 +213,7 @@ export async function* scanBlock(blockHash, blockHeight, api) {
 }
 
 /**
- * Scanne une plage de blocs et retourne toutes les inscriptions Aetheris.
+ * Scanne une plage de blocs et retourne toutes les inscriptions Citadel.
  * @param {number} fromBlock
  * @param {number} toBlock
  * @param {{ api: string, onBlock?: (h: number) => void }} opts
@@ -232,6 +242,12 @@ function hexToBytes(hex) {
     bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
   return bytes;
+}
+
+function bytesToHex(bytes) {
+  let h = '';
+  for (let i = 0; i < bytes.length; i++) h += bytes[i].toString(16).padStart(2, '0');
+  return h;
 }
 
 // ─── CLI standalone (Node uniquement) ────────────────────────────────────────

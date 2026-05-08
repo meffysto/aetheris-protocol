@@ -1347,6 +1347,7 @@ h2.sect .rule {
       <button data-mt="espionnage" class="on">Espionnage</button>
       <button data-mt="attaque">Attaque</button>
       <button data-mt="transport">Transport</button>
+      <button data-mt="recyclage">Recyclage</button>
     </div>
 
     <label>Depuis</label>
@@ -3099,6 +3100,9 @@ async function submitMission({ type, depuis, cibleJoueur, ciblePlanete, flotte, 
   } else if (type === 'transport') {
     if (inlineMap(flotte) === '{}') { toast('Flotte vide', 'Au moins 1 vaisseau de transport est requis.', true); return; }
     orderObj = { type, depuis, cible: cibleObj, flotte: { ...flotte }, cargaison: { ...(cargaison || {}) } };
+  } else if (type === 'recyclage') {
+    if (!flotte || (flotte.recycleur || 0) <= 0) { toast('Recycleurs requis', 'Au moins 1 recycleur nécessaire.', true); return; }
+    orderObj = { type, depuis, cible: cibleObj, flotte: { recycleur: flotte.recycleur } };
   } else {
     toast('Type inconnu', type, true); return;
   }
@@ -3292,11 +3296,35 @@ function openMission(joueurCible, planeteCible) {
       ? `transport interne vers <b>${planeteCible}</b>`
       : `cible : <b>${planeteCible}</b> · ${joueurCible}`;
 
-  // Désactive les types incompatibles avec une cible alliée.
+  // Détecte un éventuel champ de débris sur la planète cible (uniquement
+  // si elle est à toi : on lit empire.yaml).
+  const targetPlanet = isOwnTarget
+    ? (emp.planetes || []).find(p => p.nom === planeteCible)
+    : null;
+  const debris = targetPlanet?.champ_debris;
+  const totalDebris = (debris?.ferrum || 0) + (debris?.lumen || 0);
+
+  // Désactive les types incompatibles avec une cible alliée et le
+  // recyclage si pas de débris à ramasser.
   document.querySelectorAll('#missionType button').forEach(b => {
-    const incompatible = isOwnTarget && (b.dataset.mt === 'espionnage' || b.dataset.mt === 'attaque');
-    b.disabled = incompatible;
-    b.title = incompatible ? 'Pas de mission hostile sur tes propres planètes' : '';
+    const mt = b.dataset.mt;
+    let dis = false, why = '';
+    if (isOwnTarget && (mt === 'espionnage' || mt === 'attaque')) {
+      dis = true; why = 'Pas de mission hostile sur tes propres planètes';
+    }
+    if (mt === 'recyclage' && (!isOwnTarget || totalDebris === 0)) {
+      dis = true;
+      why = !isOwnTarget
+        ? 'Recyclage v1 limité à tes propres planètes'
+        : 'Aucun débris à recycler ici';
+    }
+    b.disabled = dis;
+    b.title = why;
+    if (mt === 'recyclage' && totalDebris > 0) {
+      b.textContent = `Recyclage (${fmtCompact(totalDebris)})`;
+    } else if (mt === 'recyclage') {
+      b.textContent = 'Recyclage';
+    }
   });
 
   // dropdown source
@@ -3374,6 +3402,19 @@ function renderMissionFleet() {
     document.getElementById('cargoFerrum').value = 0;
     document.getElementById('cargoLumen').value = 0;
     document.getElementById('cargoPlasmide').value = 0;
+  } else if (mission.type === 'recyclage') {
+    lblEl.textContent = 'Recycleurs à envoyer';
+    cargoBlock.style.display = 'none';
+    const have = owned.recycleur || 0;
+    const cargoUnit = state.rules.vaisseaux?.recycleur?.cargo || 20000;
+    wrap.innerHTML = `<div class="fleetgrid">
+      <span class="nm">Recycleur</span>
+      <span class="av">${fmt(have)} dispo · cargo ${fmtCompact(cargoUnit)}/u</span>
+      <input type="number" min="0" max="${have}" value="${Math.min(1, have)}" data-ship="recycleur"/>
+    </div>`;
+    if (have === 0) {
+      wrap.innerHTML += `<div class="empty-fleet">Aucun recycleur sur ${mission.depuis}. Construis-en un (chantier spatial).</div>`;
+    }
   }
 }
 
@@ -3402,6 +3443,8 @@ document.getElementById('missionSubmit').onclick = () => {
       lumen: parseInt(document.getElementById('cargoLumen').value, 10) || 0,
       plasmide: parseInt(document.getElementById('cargoPlasmide').value, 10) || 0,
     };
+  } else if (mission.type === 'recyclage') {
+    payload.flotte = flotte;
   }
   submitMission(payload);
 };

@@ -410,6 +410,7 @@ function applyOrder(playerName, action) {
     case 'attaque': return queueAttaque(emp, action, playerName);
     case 'construction': return queueConstruction(emp, action, playerName);
     case 'espionnage': return queueEspionnage(emp, action, playerName);
+    case 'recyclage': return queueRecyclage(emp, action, playerName);
     default:
       console.log(`  · ${playerName}: type d'ordre non implémenté: ${action.type}`);
   }
@@ -682,6 +683,62 @@ function queueTransport(emp, action, playerName) {
   console.log(`  ✓ ${playerName}: transport ${action.depuis} → ${cibleJoueur}/${ciblePlanete} (${dureeUTJ} UTJ)`);
 }
 
+// Recyclage : envoie des recycleurs sur une planète possédée par le joueur
+// pour récupérer son champ_debris. Sur arrivée, on calcule la cargaison
+// embarquée (capped par capacité totale des recycleurs), on réduit
+// champ_debris, et la flotte revient sur la source.
+function queueRecyclage(emp, action, playerName) {
+  const src = (emp.planetes || []).find(p => p.nom === action.depuis);
+  if (!src) return;
+  const cible = action.cible || {};
+  const cibleJoueur = cible.joueur || playerName;
+  const ciblePlanete = cible.planete;
+  if (!ciblePlanete) {
+    console.log(`  · ${playerName}: recyclage sans cible valide`);
+    return;
+  }
+  // V1 : recyclage uniquement sur tes propres planètes (le champ_debris
+  // n'est pas exposé publiquement).
+  if (cibleJoueur !== playerName) {
+    console.log(`  · ${playerName}: recyclage sur planète d'autrui non autorisé (v1)`);
+    return;
+  }
+  const dst = (emp.planetes || []).find(p => p.nom === ciblePlanete);
+  const debris = dst?.champ_debris;
+  const totalDebris = (debris?.ferrum || 0) + (debris?.lumen || 0);
+  if (!totalDebris) {
+    console.log(`  · ${playerName}: aucun débris à récupérer sur ${ciblePlanete}`);
+    return;
+  }
+  const recycleurs = (action.flotte || {}).recycleur || 0;
+  if (recycleurs <= 0) {
+    console.log(`  · ${playerName}: recyclage requiert au moins 1 recycleur`);
+    return;
+  }
+  if ((src.flotte_au_sol.recycleur || 0) < recycleurs) {
+    console.log(`  · ${playerName}: pas assez de recycleurs disponibles sur ${action.depuis}`);
+    return;
+  }
+  src.flotte_au_sol.recycleur -= recycleurs;
+
+  const distance = computeDistance(action.depuis, ciblePlanete, playerName);
+  const vitesse = rules.vaisseaux.recycleur?.vitesse || 2000;
+  const dureeUTJ = Math.max(1, Math.ceil(distance / vitesse * 100));
+
+  emp.flottes_en_vol = emp.flottes_en_vol || [];
+  emp.flottes_en_vol.push({
+    id: `flt-${tickSuivant}-${rng().toString(36).slice(2, 6)}`,
+    type_mission: 'recyclage',
+    depuis: { joueur: playerName, planete: action.depuis },
+    vers: { joueur: cibleJoueur, planete: ciblePlanete },
+    arrivee_utj: dureeUTJ,
+    duree_aller_utj: dureeUTJ,
+    composition: { recycleur: recycleurs },
+    cargaison: {},
+  });
+  console.log(`  ♻ ${playerName}: recyclage ${action.depuis} → ${ciblePlanete} (${recycleurs} recycleurs, ${dureeUTJ} UTJ)`);
+}
+
 function computeDistance(from, to, playerName) {
   const emp = empires[playerName];
   const src = emp.planetes.find(p => p.nom === from);
@@ -739,6 +796,56 @@ for (const arr of arrivees.filter(a => a.flotte.type_mission === 'transport' || 
     vers: versPlanete,
     cargaison: flt.cargaison,
   });
+}
+
+// 4b. Recyclage : flotte arrive sur sa propre planète, ramasse les
+// débris (capped par cargo des recycleurs), repart en `retour`.
+const CARGO_RECYCLEUR = rules.vaisseaux.recycleur?.cargo || 20000;
+for (const arr of arrivees.filter(a => a.flotte.type_mission === 'recyclage')) {
+  const flt = arr.flotte;
+  const dst = (empires[flt.vers.joueur]?.planetes || []).find(p => p.nom === flt.vers.planete);
+  if (!dst) {
+    console.log(`  · flotte ${flt.id}: planète cible ${flt.vers.planete} introuvable`);
+    continue;
+  }
+  const debris = dst.champ_debris || { ferrum: 0, lumen: 0 };
+  const cargoTotal = (flt.composition.recycleur || 0) * CARGO_RECYCLEUR;
+  // Répartit la capacité au prorata des deux types de débris.
+  const totalDebris = (debris.ferrum || 0) + (debris.lumen || 0);
+  let pris = { ferrum: 0, lumen: 0 };
+  if (totalDebris > 0 && cargoTotal > 0) {
+    if (totalDebris <= cargoTotal) {
+      pris.ferrum = debris.ferrum || 0;
+      pris.lumen  = debris.lumen  || 0;
+    } else {
+      const ratio = cargoTotal / totalDebris;
+      pris.ferrum = Math.floor((debris.ferrum || 0) * ratio);
+      pris.lumen  = Math.floor((debris.lumen  || 0) * ratio);
+    }
+    debris.ferrum -= pris.ferrum;
+    debris.lumen  -= pris.lumen;
+    dst.champ_debris = debris;
+  }
+  // Retour vers la source avec la cargaison récupérée.
+  const empProp = empires[arr.proprietaire];
+  empProp.flottes_en_vol = empProp.flottes_en_vol || [];
+  empProp.flottes_en_vol.push({
+    id: `flt-${tickSuivant}-${rng().toString(36).slice(2, 6)}`,
+    type_mission: 'retour',
+    depuis: flt.vers,
+    vers: flt.depuis,
+    arrivee_utj: flt.duree_aller_utj || flt.arrivee_utj || 1,
+    composition: flt.composition,
+    cargaison: pris,
+  });
+  events.push({
+    type: 'recyclage-livre',
+    joueur: arr.proprietaire,
+    planete: flt.vers.planete,
+    cargaison: pris,
+    debris_restants: { ...debris },
+  });
+  console.log(`  ♻ ${arr.proprietaire}: recyclage sur ${flt.vers.planete} → ferrum=${pris.ferrum} lumen=${pris.lumen} (retour ${flt.duree_aller_utj || 1} UTJ)`);
 }
 
 console.log(`▸ Phase 5/6 — Combats & espionnage`);

@@ -1054,12 +1054,18 @@ h2.sect .rule {
 /* ─── improve row on bcard ────────────────────────────────── */
 .bcard .upg {
   grid-column: 1 / 4;
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding-top: 12px; border-top: 1px solid var(--hairline);
   margin-top: 6px;
   font-family: var(--sans); font-size: 12px; font-weight: 500;
   color: var(--bone-dim);
 }
+.bcard .upg .prod-delta {
+  flex: 0 0 100%; margin-top: 4px;
+  font-family: var(--mono); font-size: 11px; color: var(--bone-dim);
+}
+.bcard .upg .prod-delta b { color: var(--phosphor); font-family: var(--display); font-size: 13px; }
+.bcard .upg .prod-delta span { color: var(--bone-dim); }
 .bcard .upg .cost { display: flex; gap: 10px; }
 .bcard .upg .cost b { color: var(--bone-2); font-weight: 700; font-family: var(--display); font-size: 14px; }
 .bcard .upg .cost b.bad { color: var(--phosphor); }
@@ -1502,6 +1508,10 @@ h2.sect .rule {
       <div id="qBat"></div>
     </div>
     <div class="group">
+      <h3>Atelier <span class="ct" id="qAtlCt">—</span></h3>
+      <div id="qAtl"></div>
+    </div>
+    <div class="group">
       <h3>Recherche <span class="ct" id="qRecCt">—</span></h3>
       <div id="qRec"></div>
     </div>
@@ -1931,7 +1941,21 @@ async function load() {
       lastBlockSeenAt: previousTip !== result.tip ? Date.now() : (state.bitcoin?.lastBlockSeenAt || Date.now()),
     };
 
-    // Sélectionne le 1er joueur si rien n'est choisi
+    // Re-injecte les ordres en attente de confirmation on-chain : pour chaque
+    // entrée du cache local dont le tick_cible n'a pas encore été dépassé, on
+    // l'ajoute à player._ordres pour que l'UI montre le pending. Si le tick
+    // est passé (l'ordre a soit été appliqué soit raté), on purge.
+    const tickNow = state.manifest?.tick ?? 0;
+    for (const [name, cached] of Object.entries(localOrdersCache)) {
+      if (cached.tick_cible > tickNow && state.players[name]) {
+        state.players[name]._ordres = cached;
+      } else {
+        delete localOrdersCache[name];
+      }
+    }
+
+    // Sélectionne le 1er joueur si rien n'est choisi (et garde l'actuel s'il
+    // est encore dans la liste — évite de switch involontaire pendant un push).
     const playerNames = Object.keys(state.players);
     if (!state.current || !state.players[state.current]) {
       state.current = playerNames[0] || null;
@@ -2171,7 +2195,7 @@ function computeNextEvent(p, emp, tickCur) {
     return {
       label: 'Prochaine livraison',
       text: `Vos chantiers livreront <em>${labels[c.batiment] || c.batiment} niveau ${c.niveau_cible}</em> au cycle <em>${tickFin}</em>.`,
-      stamp: `dans ${ticks} cycle${ticks > 1 ? 's' : ''} · tick ${tickFin}`,
+      stamp: `dans ${ticks} cycle${ticks > 1 ? 's' : ''} · cycle ${tickFin}`,
     };
   }
   // 2) Flotte en vol
@@ -2182,7 +2206,7 @@ function computeNextEvent(p, emp, tickCur) {
     return {
       label: 'Flotte en mission',
       text: `Mission <em>${f.type_mission || 'reconnaissance'}</em> vers <em>${dest}</em>.`,
-      stamp: f.tick_arrivee ? `arrivée tick ${f.tick_arrivee}` : 'en vol',
+      stamp: f.tick_arrivee ? `arrivée cycle ${f.tick_arrivee}` : 'en vol',
     };
   }
   // 3) Sinon, état calme
@@ -2373,8 +2397,21 @@ function resourceTooltip(res, info) {
   return [role, stock, cap, prod].filter(Boolean).join('\n');
 }
 
+// Calcule la production d'une mine à un niveau donné (formule miroir du moteur).
+function simProd(k, lvl, p) {
+  const CFG = {
+    mine_ferrum:           { base: 30, baseline: 30, bonusPlanet: { tellurique: 1.30 } },
+    extracteur_lumen:      { base: 20, baseline: 20, bonusPlanet: { cristalline: 1.30 } },
+    synthetiseur_plasmide: { base: 10, baseline: 0,  bonusPlanet: { volcanique: 1.30 } },
+  };
+  const cfg = CFG[k];
+  if (!cfg || lvl <= 0) return null;
+  const bonus = cfg.bonusPlanet[p?.type] || 1.0;
+  return cfg.baseline + Math.floor(cfg.base * lvl * Math.pow(1.1, lvl) * bonus);
+}
+
 // Tooltip plus long pour le hover (attribut title="").
-function batTooltip(k, lvl) {
+function batTooltip(k, lvl, p) {
   const lines = {
     mine_ferrum: 'Extrait du Ferrum, ressource métallique principale. Bonus +30% sur planète tellurique.',
     extracteur_lumen: 'Récolte des cristaux Lumen. Bonus +30% sur planète cristalline.',
@@ -2388,9 +2425,27 @@ function batTooltip(k, lvl) {
     terminal_marchand: 'Améliore le ratio des échanges sur le marché galactique.',
     centre_diplomatique: 'Projette l\'influence diplomatique sur les voisins. Requiert terminal marchand niv 4.',
   };
+  const RES_LABEL = { mine_ferrum: 'Fe', extracteur_lumen: 'Lu', synthetiseur_plasmide: 'Pl' };
+  const BONUS_PLANET = { mine_ferrum: { tellurique: 1.30 }, extracteur_lumen: { cristalline: 1.30 }, synthetiseur_plasmide: { volcanique: 1.30 } };
   const desc = lines[k] || 'Structure planétaire.';
   const niv = lvl > 0 ? `\nNiveau actuel : ${lvl}` : '\nNon construit';
-  return `${desc}${niv}`;
+  let projection = '';
+  const resLabel = RES_LABEL[k];
+  if (resLabel && p) {
+    const curProd  = simProd(k, lvl, p);
+    const nextProd = simProd(k, lvl + 1, p);
+    if (curProd != null && nextProd != null) {
+      const delta = nextProd - curProd;
+      const pct = Math.round(delta / curProd * 100);
+      const pad = ' '.repeat(Math.max(0, String(lvl + 1).length - String(lvl).length));
+      projection = `\n\nNiv ${lvl}${pad}  → +${fmtCompact(curProd)} ${resLabel}/utj\nNiv ${lvl+1}  → +${fmtCompact(nextProd)} ${resLabel}/utj  (+${fmtCompact(delta)}, +${pct}%)`;
+    } else if (nextProd != null) {
+      projection = `\n\nNiv 1  → +${fmtCompact(nextProd)} ${resLabel}/utj`;
+    }
+    const planetBonus = (BONUS_PLANET[k] || {})[p?.type];
+    if (planetBonus) projection += `\nBonus planète ${p.type} ×${planetBonus.toFixed(2)} inclus`;
+  }
+  return `${desc}${niv}${projection}`;
 }
 
 function renderBatGrid(p, max) {
@@ -2419,11 +2474,11 @@ function renderBatGrid(p, max) {
       const remain = Math.max(0, q.fin_utj || 0);
       const eta = chantierETA(remain);
       footer = `<div class="queue"><span class="pulse"></span>
-        ouvrage · niv ${q.niveau_cible} · <b style="color:var(--phosphor)">fin tick ${eta.tickArrivee}</b> <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
+        ouvrage · niv ${q.niveau_cible} · <b style="color:var(--phosphor)">cycle ${eta.tickArrivee}</b> <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
     } else if (pend) {
       footer = `<div class="queue" style="background:rgba(196,180,138,0.18);color:var(--brass)">
         <span class="pulse" style="background:var(--brass);box-shadow:0 0 0 0 rgba(196,180,138,0.6)"></span>
-        ordre signé · niv ${pend.niveau_cible} · <b style="color:var(--brass)">en attente du moteur</b></div>`;
+        scellé · niv ${pend.niveau_cible} · <b style="color:var(--brass)">prochain cycle</b></div>`;
     } else if (state.rules && batDef(k)) {
       const cost = nextCost(k, lvl);
       const dur = nextDureeUtj(k, lvl);
@@ -2435,14 +2490,31 @@ function renderBatGrid(p, max) {
         const bad = stock < v ? ' bad' : '';
         return `<span><b class="${bad}">${fmtCompact(v)}</b> ${ICOS[res] || res}</span>`;
       }).join(' ');
+      const RES_LABEL_DELTA = { mine_ferrum: 'Fe', extracteur_lumen: 'Lu', synthetiseur_plasmide: 'Pl' };
+      const resLbl = RES_LABEL_DELTA[k];
+      let prodDeltaHtml = '';
+      if (resLbl) {
+        const curProd  = simProd(k, lvl, p);
+        const nextProd = simProd(k, lvl + 1, p);
+        if (nextProd != null) {
+          if (curProd != null) {
+            const delta = nextProd - curProd;
+            const pct = Math.round(delta / curProd * 100);
+            prodDeltaHtml = `<div class="prod-delta">→ <b>+${fmtCompact(nextProd)}</b> ${resLbl}/utj <span>(+${fmtCompact(delta)}, +${pct}%)</span></div>`;
+          } else {
+            prodDeltaHtml = `<div class="prod-delta">→ <b>+${fmtCompact(nextProd)}</b> ${resLbl}/utj</div>`;
+          }
+        }
+      }
       footer = `<div class="upg">
         <div class="cost">${costHtml}</div>
         <span class="dur" title="+1 tick de queue avant demarrage">${ticksLabel(ticks)} <span style="color:var(--bone-dim)">+ queue</span></span>
         <button data-improve="${k}" ${(!afford || pending) ? 'disabled' : ''}>${pending ? '…' : 'Améliorer'}</button>
+        ${prodDeltaHtml}
       </div>`;
     }
     const effet = batEffet(k, lvl, p);
-    const tip = batTooltip(k, lvl);
+    const tip = batTooltip(k, lvl, p);
     return `<div class="bcard ${lvl === 0 && !q ? 'zero' : ''}" data-tip="${escapeHtml(tip)}">
       <div class="gl">${ico}</div>
       <div class="nm">${labels[k] || k}<small>${taglines[k] || 'structure'}</small></div>
@@ -2509,11 +2581,11 @@ function renderRecGrid(emp) {
       const q = queue[0];
       const remain = Math.max(0, q.fin_utj || 0);
       const eta = chantierETA(remain);
-      footer = `<div class="queue"><span class="pulse"></span>en cours · niv ${q.niveau_cible} · <b>fin tick ${eta.tickArrivee}</b> <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
+      footer = `<div class="queue"><span class="pulse"></span>en cours · niv ${q.niveau_cible} · <b>cycle ${eta.tickArrivee}</b> <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
     } else if (orderPending) {
       footer = `<div class="queue" style="background:rgba(196,180,138,0.18);color:var(--brass)">
         <span class="pulse" style="background:var(--brass);box-shadow:0 0 0 0 rgba(196,180,138,0.6)"></span>
-        ordre signé · niv ${pendingOrder.niveau_cible} · <b style="color:var(--brass)">en attente</b></div>`;
+        scellé · niv ${pendingOrder.niveau_cible} · <b style="color:var(--brass)">prochain cycle</b></div>`;
     } else {
       const reqBad = !!missing;
       const blocked = reqBad || !afford || isPending || anyOrder;
@@ -2610,12 +2682,12 @@ function renderUnitGrid(p, kind) {
     if (q) {
       const remain = q.fin_utj;
       const eta = chantierETA(remain);
-      footer += `<div class="queue"><span class="pulse"></span>en construction · <b>${q.qty} unités</b> · fin tick ${eta.tickArrivee} <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
+      footer += `<div class="queue"><span class="pulse"></span>en construction · <b>${q.qty} unités</b> · cycle ${eta.tickArrivee} <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
     }
     if (pendQty > 0) {
       footer += `<div class="queue" style="background:rgba(196,180,138,0.18);color:var(--brass)">
         <span class="pulse" style="background:var(--brass);box-shadow:0 0 0 0 rgba(196,180,138,0.6)"></span>
-        ordre signé · <b style="color:var(--brass)">${pendQty} unités</b> · en attente</div>`;
+        scellé · <b style="color:var(--brass)">${pendQty} unités</b> · prochain cycle</div>`;
     }
 
     const max1 = def.max_par_planete === 1;
@@ -2749,10 +2821,9 @@ function renderRail(p, emp) {
     html += `<div class="qitem pending">
       <button class="cancel-btn" data-cancel-idx="${pi}" ${cancelLocked ? 'disabled' : ''} title="Retirer cet ordre">✕</button>
       <div class="top">
-        <div class="nm">${labels[o.batiment] || o.batiment}<small>niveau ${o.niveau_cible} · en attente</small></div>
+        <div class="nm">${labels[o.batiment] || o.batiment}<small>niveau ${o.niveau_cible}</small></div>
         <div class="tgt" style="color:var(--brass)">∙∙∙<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase">tick ${tickCible}</small></div>
       </div>
-      <div class="tmeta"><span>signé · attend le moteur</span><span>${state.source === 'github' ? 'distant' : 'local'}</span></div>
     </div>`;
   }
 
@@ -2771,6 +2842,36 @@ function renderRail(p, emp) {
 
   if (!html) html = `<div class="empty-rail">aucun ouvrage</div>`;
   document.getElementById('qBat').innerHTML = html;
+
+  // Atelier — vaisseaux & défenses (en attente + en cours)
+  const atelierPending = (tickCible && tickCible >= tickCur + 1)
+    ? (emp?._ordres?.ordres || []).filter(o => o.type === 'construction')
+    : [];
+  const atelierQueue = p?.file_construction || [];
+  document.getElementById('qAtlCt').textContent = (atelierPending.length + atelierQueue.length) || '—';
+  let atlHtml = '';
+  for (let pi = 0; pi < atelierPending.length; pi++) {
+    const o = atelierPending[pi];
+    atlHtml += `<div class="qitem pending">
+      <div class="top">
+        <div class="nm">${labels[o.unite] || o.unite}<small>${o.quantite || 1} unité${(o.quantite || 1) > 1 ? 's' : ''}</small></div>
+        <div class="tgt" style="color:var(--brass)">∙∙∙<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase">cycle ${tickCible}</small></div>
+      </div>
+    </div>`;
+  }
+  for (const c of atelierQueue) {
+    const remain = Math.max(0, c.fin_utj || 0);
+    const mins = Math.round(remain * utjMin());
+    atlHtml += `<div class="qitem">
+      <div class="top">
+        <div class="nm">${labels[c.unite] || c.unite}<small>${c.quantite || 1} unité${(c.quantite || 1) > 1 ? 's' : ''} · ${c.planete || ''}</small></div>
+        <div class="tgt">${remain}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min.">UTJ</span></small></div>
+      </div>
+      <div class="tmeta"><span>≈ <b>${mins}</b> min</span><span>${remain <= 6 ? 'livré au prochain cycle' : 'livré dans ' + Math.ceil(remain/6) + ' cycles'}</span></div>
+    </div>`;
+  }
+  if (!atlHtml) atlHtml = `<div class="empty-rail">aucune production</div>`;
+  document.getElementById('qAtl').innerHTML = atlHtml;
 
   // Recherche
   const rq = emp?.file_recherche || [];
@@ -2996,19 +3097,36 @@ async function cancelOrder(idx) {
   }
 }
 
-// Empile un nouvel ordre dans ordres.yaml (ou repart d'une liste vide si l'ancien
-// ordres.yaml ciblait un tick deja consomme), puis push via PR.
+// Empile un nouvel ordre dans ordres.yaml puis l'inscrit on-chain.
+// Mutex : sérialise les soumissions pour qu'un 2ème clic rapide ne consomme
+// pas en parallèle les mêmes UTXOs (ce qui ferait double-spend une des deux TX).
+let pushQueue = Promise.resolve();
+// Cache local des ordres soumis : survit aux load() pendant la fenêtre
+// "TX broadcastée → confirmée → scanned → appliquée au tick" (~30-60s sur
+// Mutinynet). Sinon l'UI semble perdre l'ordre fraîchement soumis pendant
+// que le scan suivant n'a pas encore vu l'inscription.
+const localOrdersCache = {};
 async function appendOrderAndPush(newOrder, message) {
-  const emp = state.players[state.current];
-  if (!emp) throw new Error('aucun joueur actif');
+  // Capture state.current MAINTENANT (au clic). Si load() rafraîchit pendant
+  // que le push est en queue, le push doit partir au nom du joueur d'origine.
+  const playerName = state.current;
   const tickCible = (state.manifest?.tick ?? 0) + 1;
-  const existing = emp._ordres && emp._ordres.tick_cible === tickCible ? emp._ordres : null;
-  const ordres = existing ? [...existing.ordres, newOrder] : [newOrder];
-  const nonce = randomNonce();
-  const orderBlocks = ordres.map(serializeOrder);
-  const body = buildOrdresYamlOrders({ joueur: state.current, tickCible, nonce, orderBlocks });
-  await pushSignedOrder(body, message);
-  emp._ordres = { tick_cible: tickCible, ordres };
+  const run = async () => {
+    const emp = state.players[playerName];
+    if (!emp) throw new Error(`joueur "${playerName}" introuvable`);
+    const existing = emp._ordres && emp._ordres.tick_cible === tickCible ? emp._ordres : null;
+    const ordres = existing ? [...existing.ordres, newOrder] : [newOrder];
+    const nonce = randomNonce();
+    const orderBlocks = ordres.map(serializeOrder);
+    const body = buildOrdresYamlOrders({ joueur: playerName, tickCible, nonce, orderBlocks });
+    await pushSignedOrder(body, message);
+    const snapshot = { tick_cible: tickCible, ordres: [...ordres], nonce };
+    emp._ordres = snapshot;
+    localOrdersCache[playerName] = snapshot;
+  };
+  const task = pushQueue.then(run, run);
+  pushQueue = task.catch(() => {});
+  return task;
 }
 
 // Sérialiseur YAML inline pour map { k: v, ... } — n'inclut que les valeurs > 0
@@ -3794,6 +3912,25 @@ function toast(title, msg, isErr) {
 /* boot */
 load();
 tickCountdown();
+
+// Si un wallet chiffré est stocké, demande le password au boot (1 fois)
+// pour qu'il soit dispo pour les soumissions suivantes sans friction.
+(async () => {
+  if (state.wallet) return; // déjà chargé (cas legacy clair)
+  const blob = readWalletBlob();
+  if (!blob?.encrypted) return; // pas de wallet ou clair → rien à faire
+  try {
+    const w = await loadBitcoinWalletAsync();
+    if (w?.privateKeyWIF) {
+      state.wallet = w;
+      toast('Wallet déverrouillé', `${w.taprootAddress.slice(0,16)}…`);
+      render();
+    }
+  } catch (e) {
+    // L'user a annulé ou mauvais password — sera redemandé au prochain submit.
+    console.warn('[wallet]', e.message);
+  }
+})();
 
 // Auto-refresh : poll uniquement le tip toutes les 15s. Si le tip a changé,
 // reload (boot incrémental — scan juste les nouveaux blocs depuis le cache).

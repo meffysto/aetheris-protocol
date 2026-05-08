@@ -28,9 +28,10 @@ export function yparse(text) {
       const ind = line.match(/^ */)[0].length;
       if (ind < indent) return out;
       if (ind > indent && firstKey) return readBlock(ind);
-      const m = line.slice(ind).match(/^([\w-]+)\s*:\s*(.*)$/);
+      const m = line.slice(ind).match(/^(?:"([^"]+)"|'([^']+)'|([\w-]+))\s*:\s*(.*)$/);
       if (!m) { i++; continue; }
-      const [, k, rest] = m;
+      const k = m[1] ?? m[2] ?? m[3];
+      const rest = m[4];
       i++;
       if (rest === '') {
         if (i < lines.length && /^\s*-\s/.test(lines[i])) out[k] = readList(ind + 2);

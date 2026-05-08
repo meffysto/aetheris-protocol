@@ -1,6 +1,6 @@
 # Empire de meff
 
-> Tick 80 · Score 504 · Alliance —
+> Tick 81 · Score 504 · Alliance —
 
 ## Planètes (1)
 
@@ -8,8 +8,8 @@
 
 | Ressource | Stock | Production/UTJ | Capacité |
 |---|---|---|---|
-| ferrum | 70 513 | +185 | 100 000 |
-| lumen | 19 996 | +68 | 100 000 |
+| ferrum | 71 623 | +185 | 100 000 |
+| lumen | 20 404 | +68 | 100 000 |
 | plasmide | 0 | +0 | 100 000 |
 
 **Bâtiments** : mine_ferrum 3, extracteur_lumen 2, synthetiseur_plasmide 0, centrale_solaire 0, depot 0, usine_robotique 0, chantier_spatial 0, laboratoire 0

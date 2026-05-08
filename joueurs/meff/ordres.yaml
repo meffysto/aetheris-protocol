@@ -1,3 +1,8 @@
+# ═══════════════════════════════════════════════════════════
+#  DÉCRET IMPÉRIAL · Empire de Meff
+#  Cycle 101 · scellé le 2026-05-08
+#  Toute modification post-scellement invalide le sceau.
+# ═══════════════════════════════════════════════════════════
 version: 1
 joueur: meff
 tick_cible: 101
@@ -8,4 +13,4 @@ ordres:
     planete: meff-prima
     batiment: extracteur_lumen
     niveau_cible: 5
-signature: none
+signature: ed25519:XhHzYUbSljra4E7uds+wSTULfUkSxAcuWZp+ruuCaupy5uQbRjAVSm14neZDR+QnYVtXOmOBHk/qq+N7nIDBDg==

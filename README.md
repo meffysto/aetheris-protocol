@@ -1,116 +1,147 @@
-# AETHERIS // PROTOCOL
+# CITADEL // PROTOCOL
 
-> Un MMO 4X spatial qui vit dans un dépôt Git.
-> Pas de serveur. Pas de base de données. Que des fichiers Markdown.
-> Jouable par des humains, des scripts, et des agents IA — indifféremment.
+> Un MMO 4X spatial 100% Bitcoin-native.
+> Pas de serveur central. Pas de base de données. L'état du jeu vit on-chain.
+> Chaque bloc Mutinynet = un tour. Les ordres sont des inscriptions Taproot.
 
 ```
-   ◉  ETAT DU SERVEUR        Alpha-7 · Tick 0142 · 12 joueurs · 2 alliances
-   ⏱  PROCHAIN TICK          dans 08m 14s  (toutes les 15 min)
-   🌍 ÂGE DE L'UNIVERS       1 jour 11h
-   📜 DERNIER ÉVÉNEMENT      Bataille de Pyra II — VEXOR perd 4128 vaisseaux
+   ◉  SERVEUR              citadel-mvp-1 (Mutinynet)
+   ⛓  BLOC GENESIS          3 084 991
+   ⏱  PROCHAIN BLOC          ~30s à 2min (Mutinynet)
+   🔑 IDENTITÉ              pubkey Schnorr du witness Bitcoin
+   📜 ORDRES                inscriptions Taproot (commit + reveal)
 ```
 
 ## Le pitch
 
-Aetheris est un jeu de stratégie spatiale persistant inspiré du genre 4X classique
-(OGame, Stellaris). **Mais son état entier — galaxie, empires, flottes, ordres,
-batailles — vit dans des fichiers `.md` et `.yaml` versionnés Git.**
+CITADEL est un fork Bitcoin-native d'[Aetheris Protocol](./README-AETHERIS-LEGACY.md).
+Là où Aetheris vivait dans un repo Git, CITADEL vit dans la blockchain Mutinynet
+(signet Bitcoin). Aucun serveur ne détient l'état canonique : il est dérivé en
+rejouant les inscriptions depuis le bloc genesis.
 
-Conséquences :
+- **Pas de backend.** Le navigateur scanne Mutinynet, extrait les inscriptions
+  CITADEL, rejoue les ordres, calcule l'état. Le serveur de jeu, c'est Bitcoin.
+- **Pas de comptes.** Ta pubkey Schnorr (witness Taproot) = ton identité. Aucune
+  signature applicative, aucun compte à créer. Tu inscris, donc tu joues.
+- **Anti-triche cryptographique.** Au scan, on vérifie que `orders[player].inscriberPubKey`
+  correspond bien à l'identité enregistrée. Un ordre frauduleux = REJET automatique.
+- **IA-native.** Un agent peut lire l'état, signer une inscription Taproot avec
+  sa propre clé, broadcaster sur Mutinynet. Surface identique humain/agent.
 
-- **Pas de backend.** Le résolveur (`engine/tick.mjs`) est un script Node de ~600 lignes,
-  déterministe à partir d'un seed. N'importe qui peut tourner un tick localement
-  et obtenir le même résultat — donc personne ne peut tricher sans qu'on le voie.
-- **Pas de comptes.** Une clé Ed25519 = un joueur. Tu signes tes ordres, point.
-- **Pas de client obligatoire.** Le repo *est* le client. Une UI HTML est fournie
-  pour le confort, mais `vim joueurs/<toi>/ordres.yaml` marche tout aussi bien.
-- **IA-native.** Un agent IA lit `joueurs/<toi>/empire.md`, raisonne, écrit
-  `joueurs/<toi>/ordres.yaml`, commit. C'est pas du *bolt-on* — c'est l'API.
-
-## Architecture en 30 secondes
+## Architecture
 
 ```
-   ┌─────────────────────────────────────────────────────────────┐
-   │  REPO GIT (un repo = un serveur de jeu)                      │
-   │                                                              │
-   │  world/         état canonique (lecture seule pour joueurs)  │
-   │  joueurs/X/     ordres signés (chacun écrit dans son dossier)│
-   │  alliances/Y/   chartes, traités, plans collectifs           │
-   │  engine/        résolveur déterministe (tick.mjs)            │
-   │  history/       chaque tick passé, archivé                   │
-   └─────────────────────────────────────────────────────────────┘
-
-                         tous les 15 min
-                                ▼
-   ┌─────────────────────────────────────────────────────────────┐
-   │  GITHUB ACTION                                               │
-   │  1. Lit l'état au tick T                                     │
-   │  2. Collecte les ordres signés des joueurs                   │
-   │  3. Vérifie les signatures, applique les commit-reveal       │
-   │  4. Calcule l'état au tick T+1                               │
-   │  5. Commit avec message "tick 0143"                          │
-   └─────────────────────────────────────────────────────────────┘
+   ┌──────────────────────────────────────────────────────────────┐
+   │  BITCOIN (Mutinynet) = serveur de jeu                         │
+   │                                                               │
+   │  Chaque ordre = inscription Taproot (commit + reveal)         │
+   │  Chaque join  = inscription identité (pubkey + nom)           │
+   │  Genesis      = inscription du seed univers (bloc 3 084 991)  │
+   └──────────────────────────────────────────────────────────────┘
+                              ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │  NAVIGATEUR (console-live-bitcoin.html)                       │
+   │  1. Scan Mutinynet depuis genesis (cache IndexedDB)           │
+   │  2. Extrait inscriptions CITADEL des leaf scripts Taproot     │
+   │  3. Rejoue runTick() bloc par bloc → état déterministe        │
+   │  4. Affiche map, empire, ordres pending                       │
+   │  5. Submit ordre → commit+reveal → broadcast Mutinynet        │
+   └──────────────────────────────────────────────────────────────┘
 ```
 
-## Pour les humains
+Le moteur (`engine/tick-core.mjs`, 1500+ lignes) est **isomorphe** : il tourne
+identique en Node et dans le navigateur. C'est ce qui permet à n'importe qui
+de vérifier l'état localement.
+
+## Comment jouer (3 étapes)
 
 ```bash
-git clone https://github.com/aetheris/alpha-7
-cd alpha-7
+# 1. Génère un wallet Bitcoin et obtiens des sats Mutinynet
+#    → https://faucet.mutinynet.com/
 
-# 1. T'inscrire (génère ta paire de clés, te crée un dossier)
-node engine/join.mjs --name kael
+# 2. Inscris ton join sur Mutinynet (ouvre dans le navigateur)
+#    → https://meffysto.codeberg.page/aetheris-protocol/join-bitcoin.html
 
-# 2. Lire ton empire
-cat joueurs/kael/empire.md
-
-# 3. Donner des ordres
-$EDITOR joueurs/kael/ordres.yaml
-
-# 4. Signer + push
-node engine/sign.mjs joueurs/kael/ordres.yaml
-git add joueurs/kael && git commit -m "kael: tour 142" && git push
-
-# 5. Attendre le prochain tick (15 min). C'est tout.
+# 3. Joue depuis la console
+#    → https://meffysto.codeberg.page/aetheris-protocol/console-live-bitcoin.html
 ```
 
-## Pour les agents IA
+Voir [`docs/HOW-TO-PLAY.md`](docs/HOW-TO-PLAY.md) pour le détail.
 
-Lis [`engine/PROTOCOL.md`](engine/PROTOCOL.md). Tout y est : schéma des fichiers,
-boucle de jeu, formats, vocabulaire. Ton agent peut être un script Python de 50 lignes
-ou un harnais LLM full-context — la surface est la même.
+## Architecture iso (browser + Node)
 
-Un exemple d'agent baseline tourne dans [`agents/baseline.py`](agents/baseline.py).
-Il joue à peu près le niveau d'un joueur OGame qui se connecte 2× par jour.
+```
+engine/
+├── tick-core.mjs          runTick() pure, tickFromBlockHeight, yparse/ystringify
+├── tick.mjs               wrapper CLI Node
+├── inscribe-core.mjs      commit+reveal Taproot (iso)
+├── inscribe.mjs           CLI Node (ordres)
+├── inscribe-join.mjs      CLI Node (joins)
+├── scan-bitcoin.mjs       scanner Mutinynet, extrait inscriberPubKey
+├── boot-bitcoin.mjs       orchestrator browser (scan → replay → state)
+├── world-init-core.mjs    spawnEmpireFromJoin() iso
+├── wallet-init-core.mjs   BIP-86 iso
+├── wallet-init.mjs        CLI Node
+├── combat.mjs             résolution combat (iso)
+├── cache.mjs              storage abstraction (cache-node + cache-browser)
+└── rules.yaml             constantes (coûts, vitesses, formules)
+```
+
+## Identité Bitcoin-native
+
+Pas de signature applicative. La pubkey Schnorr du witness Taproot = identité du joueur.
+
+```yaml
+# joueurs/meff/identite.yaml (généré au scan)
+nom: meff
+inscriberPubKey: 5cb4da974b1fc38ab710729c6c3fba911bb40ab924bca1103cecace80bd5d6b7
+genesis_block: 3085121
+```
+
+Au scan, `boot-bitcoin.mjs` extrait `inscriberPubKey` du leaf script Taproot et
+vérifie que `orders[player].inscriberPubKey === identites[player].cle_publique`.
+Toute discordance → ordre rejeté.
+
+## Statut MVP
+
+```
+[████████████████████░░] MVP Bitcoin — 90%
+ ✓ Genesis on-chain (bloc 3 084 991)
+ ✓ Inscriptions join + ordres (commit + reveal Taproot)
+ ✓ Scanner Mutinynet (cache IndexedDB v2)
+ ✓ Boot browser : scan → replay → state
+ ✓ Wallet AES-GCM/PBKDF2 200k (chiffré localStorage)
+ ✓ Console live + auto-refresh 15s
+ ✓ Anti-triche pubkey-binding
+ ✓ Tests E2E + déterminisme + fuzz
+ ◯ Onboarding tutoriel in-app
+ ◯ Cloche notifications
+```
 
 ## Pour les développeurs
 
-Le résolveur est dans [`engine/tick.mjs`](engine/tick.mjs). 600 lignes, zéro
-dépendance externe à part Node 20+. Lance-le localement contre l'état courant :
+```bash
+# Tests
+node --test tests/
+
+# Server dev local
+python3 -m http.server 8765
+# → http://localhost:8765/
+
+# Tick CLI (rejoue à partir d'un bloc Mutinynet)
+node engine/tick.mjs --from-block 3084991
+```
+
+## Déploiement
 
 ```bash
-node engine/tick.mjs --dry-run        # affiche ce qui se passerait
-node engine/tick.mjs --apply          # applique et commit
-```
-
-## Statut
-
-```
-[████████████████████░░░] MVP — 80%
- ✓ Schémas YAML
- ✓ Résolveur déterministe (production, recherche, mouvements)
- ✓ Combat 6-rondes
- ✓ Commit-reveal pour ordres scellés
- ✓ UI web read-only
- ◯ UI web read-write (push direct depuis le navigateur via OAuth)
- ◯ App mobile (PWA)
- ◯ Mode tournoi agent-vs-agent
+git push codeberg bitcoin/mvp:pages
+# → https://meffysto.codeberg.page/aetheris-protocol/
 ```
 
 ## Voir aussi
 
-- [`engine/PROTOCOL.md`](engine/PROTOCOL.md) — la spec, lue par les agents
-- [`docs/RULES.md`](docs/RULES.md) — règles du jeu (formules, coûts, tables)
-- [`docs/ETHIC.md`](docs/ETHIC.md) — pourquoi pas de pay-to-win, et ce qu'on accepte
-- [`world/README.md`](world/README.md) — l'état courant en lecture humaine
+- [`engine/PROTOCOL.md`](engine/PROTOCOL.md) — spec lisible par les agents
+- [`docs/HOW-TO-PLAY.md`](docs/HOW-TO-PLAY.md) — guide 3 étapes détaillé
+- [`CONTEXT.md`](CONTEXT.md) — vocabulaire et invariants du domaine
+- [`docs/adr/`](docs/adr/) — décisions d'architecture

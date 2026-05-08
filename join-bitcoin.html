@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>AETHERIS · join (bitcoin)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "@noble/hashes/sha256": "https://esm.sh/@noble/hashes@1.7.2/esm/sha256.js",
+    "@noble/curves/secp256k1": "https://esm.sh/@noble/curves@1.9.7/esm/secp256k1.js",
+    "@scure/btc-signer": "https://esm.sh/@scure/btc-signer@1.6.0",
+    "@scure/bip32": "https://esm.sh/@scure/bip32@2.2.0",
+    "@scure/bip39": "https://esm.sh/@scure/bip39@2.2.0",
+    "@scure/bip39/wordlists/english.js": "https://esm.sh/@scure/bip39@2.2.0/wordlists/english",
+    "fflate": "https://esm.sh/fflate@0.8.2"
+  }
+}
+</script>
+<style>
+  :root {
+    --ink: #f4ecdc; --ink-2: #ffffff; --hairline: #e6d9bd;
+    --brass: #0e1d33; --brass-2: #1f3556; --phosphor: #a83a25;
+    --bone: #2c2014; --bone-dim: #8a7c64;
+    --serif: "Fraunces", Georgia, serif;
+    --sans: "Plus Jakarta Sans", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--ink); color: var(--bone); font-family: var(--sans); }
+  body { padding: 40px 20px; }
+  .wrap { max-width: 640px; margin: 0 auto; background: var(--ink-2); border: 1px solid var(--hairline); border-radius: 14px; padding: 32px; box-shadow: 0 8px 22px rgba(28,20,8,0.06); }
+  h1 { font-family: var(--serif); font-size: 30px; margin: 0 0 6px; color: var(--brass); }
+  .sub { color: var(--bone-dim); font-size: 14px; margin: 0 0 28px; }
+  h2 { font-family: var(--serif); font-size: 20px; margin: 0 0 12px; color: var(--brass); }
+  .step { display: none; }
+  .step.on { display: block; }
+  label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--bone-dim); margin: 16px 0 6px; }
+  input[type=text] { width: 100%; padding: 10px 14px; font-family: var(--mono); font-size: 14px; border: 1px solid var(--hairline); border-radius: 8px; background: #fafaf6; }
+  button { background: var(--brass); color: var(--ink); border: none; padding: 10px 20px; font-family: var(--sans); font-weight: 600; font-size: 14px; border-radius: 8px; cursor: pointer; margin: 12px 8px 0 0; }
+  button:hover { background: var(--brass-2); }
+  button:disabled { background: #8a7c64; cursor: not-allowed; }
+  button.alt { background: var(--phosphor); }
+  code { font-family: var(--mono); font-size: 13px; background: #f7f0df; padding: 2px 8px; border-radius: 4px; word-break: break-all; }
+  .code-block { display: block; padding: 12px; background: #f7f0df; border-radius: 8px; margin: 8px 0; font-family: var(--mono); font-size: 12px; word-break: break-all; line-height: 1.5; }
+  .status { font-family: var(--mono); font-size: 13px; padding: 10px 14px; background: #fafaf6; border-left: 3px solid var(--brass); margin: 12px 0; white-space: pre-wrap; }
+  .status.err { border-left-color: var(--phosphor); color: var(--phosphor); }
+  .status.ok { border-left-color: #5a7a3a; }
+  a { color: var(--phosphor); }
+  .hint { font-size: 12px; color: var(--bone-dim); margin: 6px 0 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AETHERIS — Inscription Bitcoin</h1>
+  <p class="sub">Génère tes clés, fonde ton wallet sur Mutinynet, et inscris ton empire on-chain.</p>
+
+  <div class="step on" data-step="name">
+    <label>Nom de joueur (2-16 chars, [a-z0-9-])</label>
+    <input id="playerName" type="text" placeholder="ex: aurora" autofocus>
+    <p class="hint">Ce nom est public et permanent. Il identifie ton empire dans la chaîne Bitcoin.</p>
+    <button id="btnGenerate">Générer mes clés</button>
+  </div>
+
+  <div class="step" data-step="keys">
+    <h2>Sauvegarde tes clés avant de continuer</h2>
+    <p class="hint">Sans ces fichiers, tu perds définitivement l'accès à ton empire et à tes fonds Bitcoin.</p>
+
+    <label>Adresse Bitcoin (Mutinynet)</label>
+    <code class="code-block" id="walletAddr"></code>
+
+    <label>Mnemonic BIP-39 (12 mots) — wallet Bitcoin</label>
+    <code class="code-block" id="walletMnemonic"></code>
+
+    <button id="btnDownloadEd">Télécharger .key.pem (Ed25519)</button>
+    <button id="btnDownloadBtc">Télécharger .btc-key (Bitcoin)</button>
+    <button id="btnNextFaucet" class="alt">J'ai sauvegardé mes clés →</button>
+  </div>
+
+  <div class="step" data-step="faucet">
+    <h2>Fonde ton wallet sur Mutinynet</h2>
+    <p class="hint">Le faucet donne ~10 000 sats gratuits, suffisant pour plusieurs inscriptions.</p>
+
+    <label>Ton adresse</label>
+    <code class="code-block" id="faucetAddr"></code>
+
+    <button id="btnFaucetCopy">Copier l'adresse</button>
+    <a id="faucetLink" href="https://faucet.mutinynet.com" target="_blank"><button>Ouvrir le faucet ↗</button></a>
+
+    <div class="status" id="utxoStatus">Vérification du solde…</div>
+    <button id="btnNextInscribe" disabled>Continuer →</button>
+  </div>
+
+  <div class="step" data-step="inscribe">
+    <h2>Inscrire ton empire sur Bitcoin</h2>
+    <p class="hint">Commit + reveal sur Mutinynet. ~30 secondes pour confirmation.</p>
+
+    <div class="status" id="inscribeStatus">Prêt à inscrire.</div>
+    <button id="btnInscribe">Inscrire mon empire</button>
+  </div>
+
+  <div class="step" data-step="done">
+    <h2>✓ Bienvenue dans Aetheris</h2>
+    <p>Ton join est inscrit sur Bitcoin. Une fois confirmé (~30s), tu apparaîtras dans la console et ton empire sera spawné par le moteur.</p>
+    <p>Garde le contenu de <code>.btc-key</code> (JSON) à portée pour le coller dans la console quand elle demandera.</p>
+    <a href="./console-live-bitcoin.html"><button>Ouvrir la console</button></a>
+  </div>
+</div>
+
+<script type="module">
+import { generateWallet } from './engine/wallet-init-core.mjs';
+import { inscribe } from './engine/inscribe-core.mjs';
+import * as btc from '@scure/btc-signer';
+import { schnorr } from '@noble/curves/secp256k1';
+
+const $ = sel => document.querySelector(sel);
+function showStep(name) {
+  document.querySelectorAll('.step').forEach(s => s.classList.toggle('on', s.dataset.step === name));
+}
+function setStatus(id, msg, cls = '') {
+  const el = $('#' + id);
+  el.textContent = msg;
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+function download(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+const session = {
+  name: null,
+  ed25519: null,        // { pubB64, privPem }
+  wallet: null,         // { taprootAddress, privateKeyWIF, mnemonic, ... }
+};
+
+// ─── Étape 1 — nom + génération ───────────────────────────────────────────────
+
+$('#btnGenerate').onclick = async () => {
+  const name = $('#playerName').value.trim().toLowerCase();
+  if (!/^[a-z][a-z0-9-]{1,15}$/.test(name)) {
+    alert('Nom invalide. 2-16 chars, [a-z0-9-], commence par une lettre.');
+    return;
+  }
+  session.name = name;
+  $('#btnGenerate').disabled = true;
+  $('#btnGenerate').textContent = 'Génération…';
+
+  // Ed25519 pour signer les ordres
+  const keyPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+  const privDer = new Uint8Array(await crypto.subtle.exportKey('pkcs8', keyPair.privateKey));
+  const pubDer = new Uint8Array(await crypto.subtle.exportKey('spki', keyPair.publicKey));
+  const privB64 = btoa(String.fromCharCode(...privDer));
+  const pubB64 = btoa(String.fromCharCode(...pubDer));
+  const privPem = `-----BEGIN PRIVATE KEY-----\n${privB64.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----\n`;
+  session.ed25519 = { pubB64, privPem, privateKey: keyPair.privateKey };
+
+  // Wallet Bitcoin BIP-86
+  session.wallet = generateWallet({ network: 'mutinynet' });
+
+  $('#walletAddr').textContent = session.wallet.taprootAddress;
+  $('#walletMnemonic').textContent = session.wallet.mnemonic;
+  showStep('keys');
+};
+
+// ─── Étape 2 — téléchargement clés ────────────────────────────────────────────
+
+$('#btnDownloadEd').onclick = () => {
+  download(`${session.name}-key.pem`, session.ed25519.privPem);
+};
+$('#btnDownloadBtc').onclick = () => {
+  download(`${session.name}-btc-key.json`, JSON.stringify(session.wallet, null, 2));
+};
+$('#btnNextFaucet').onclick = () => {
+  $('#faucetAddr').textContent = session.wallet.taprootAddress;
+  showStep('faucet');
+  pollUtxo();
+};
+
+// ─── Étape 3 — faucet + poll UTXOs ────────────────────────────────────────────
+
+$('#btnFaucetCopy').onclick = async () => {
+  await navigator.clipboard.writeText(session.wallet.taprootAddress);
+  $('#btnFaucetCopy').textContent = 'Copié ✓';
+  setTimeout(() => { $('#btnFaucetCopy').textContent = "Copier l'adresse"; }, 2000);
+};
+
+let pollTimer = null;
+async function pollUtxo() {
+  if (pollTimer) clearTimeout(pollTimer);
+  try {
+    const r = await fetch(`https://mutinynet.com/api/address/${session.wallet.taprootAddress}/utxo`, { cache: 'no-store' });
+    const utxos = await r.json();
+    const total = utxos.reduce((a, u) => a + u.value, 0);
+    if (total > 0) {
+      setStatus('utxoStatus', `✓ ${total} sats disponibles (${utxos.length} UTXO)`, 'ok');
+      $('#btnNextInscribe').disabled = false;
+    } else {
+      setStatus('utxoStatus', 'Attente de fonds… (vérifie toutes les 5s)');
+      pollTimer = setTimeout(pollUtxo, 5000);
+    }
+  } catch (e) {
+    setStatus('utxoStatus', `Erreur: ${e.message}`, 'err');
+    pollTimer = setTimeout(pollUtxo, 10000);
+  }
+}
+
+$('#btnNextInscribe').onclick = () => {
+  if (pollTimer) clearTimeout(pollTimer);
+  showStep('inscribe');
+};
+
+// ─── Étape 4 — inscription join ───────────────────────────────────────────────
+
+$('#btnInscribe').onclick = async () => {
+  $('#btnInscribe').disabled = true;
+  setStatus('inscribeStatus', '▸ construction du YAML…');
+
+  // Construit le YAML join avec cle_publique (parsable côté browser).
+  const baseYaml = [
+    '# Aetheris Protocol — Join inscription',
+    'version: 1',
+    'type: join',
+    `joueur: ${session.name}`,
+    `cle_publique: ed25519:${session.ed25519.pubB64}`,
+    'alliance: ~',
+    `date_inscription: ${new Date().toISOString()}`,
+  ].join('\n');
+
+  // Self-sign Ed25519 du yaml (canonical = sans la ligne `signature:`).
+  const canonical = baseYaml + '\n';
+  const sigBytes = await crypto.subtle.sign('Ed25519', session.ed25519.privateKey, new TextEncoder().encode(canonical));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+  const finalYaml = canonical + `signature: ed25519:${sigB64}\n`;
+
+  setStatus('inscribeStatus', '▸ inscription Bitcoin (commit + reveal)…');
+  try {
+    const result = await inscribe({
+      yamlText: finalYaml,
+      keyData: session.wallet,
+      networkName: 'mutinynet',
+      feeRate: 1,
+      libs: { btc, schnorr },
+      log: (m) => setStatus('inscribeStatus', m),
+    });
+    setStatus('inscribeStatus',
+      `✓ inscrit\n  commit  : ${result.commitTxid}\n  reveal  : ${result.revealTxid}\n  explorer : https://mutinynet.com/tx/${result.revealTxid}`,
+      'ok');
+    setTimeout(() => showStep('done'), 1500);
+  } catch (e) {
+    setStatus('inscribeStatus', `✗ ${e.message}`, 'err');
+    $('#btnInscribe').disabled = false;
+  }
+};
+</script>
+</body>
+</html>

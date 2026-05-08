@@ -15,6 +15,10 @@ import { scanRange, fetchTipHeight } from './scan-bitcoin.mjs';
 import { runTick, yparse, tickFromBlockHeight } from './tick-core.mjs';
 import { spawnEmpireFromJoin } from './world-init-core.mjs';
 import { resolveCombat, computeDebris, computePillage } from './combat.mjs';
+import * as cache from './cache.mjs';
+
+// Clé du cache scan (versionnée — bump si format change)
+const SCAN_CACHE_KEY = 'scan-v1';
 
 /**
  * @param {object} params
@@ -71,45 +75,65 @@ export async function bootBitcoin({
   const tickCourant = tickFromBlockHeight(tip, blocGenesis, blocsParTick, 0);
   log(`  bloc_genesis=${blocGenesis}, tip=${tip}, tick_courant=${tickCourant}`);
 
-  // ─── Scan : collecte joins + ordres ─────────────────────────────────────
-  const scanFrom = fromBlock ?? (blocGenesis + 1);
-  log(`▸ Scan blocs ${scanFrom}..${tip} (${tip - scanFrom + 1} blocs)…`);
+  // ─── Charge le cache scan si dispo ──────────────────────────────────────
+  let cachedScan = null;
+  try { cachedScan = await cache.get(SCAN_CACHE_KEY); } catch {}
+  if (cachedScan && cachedScan.blocGenesis !== blocGenesis) {
+    log('  ! cache scan d\'un autre serveur (blocGenesis différent) — reset');
+    cachedScan = null;
+  }
 
-  const joins = []; // [{ blockHeight, yaml, parsed, txid }]
-  const ordersByTick = {}; // { tick → { player → { parsed, raw, blockHeight, txid } } }
+  // ─── Scan : collecte joins + ordres (incrémental) ───────────────────────
+  const joins = cachedScan?.joins ? [...cachedScan.joins] : [];
+  const ordersByTick = cachedScan?.ordersByTick ? { ...cachedScan.ordersByTick } : {};
+  const lastCachedBlock = cachedScan?.lastBlock ?? blocGenesis;
+  const scanFrom = fromBlock ?? (lastCachedBlock + 1);
 
-  let scanned = 0;
-  const total = Math.max(1, tip - scanFrom + 1);
-  for await (const ins of scanRange(scanFrom, tip, {
-    api,
-    onBlock: h => {
-      scanned = h - scanFrom + 1;
-      if (scanned % 10 === 0 || scanned === total) {
-        onProgress({ phase: 'scan', current: scanned, total });
-      }
-    },
-  })) {
-    if (ins.opType === 'join') {
-      const parsed = yparse(ins.yaml);
-      // On ignore la genesis elle-même (joueur === serveur)
-      if (parsed?.joueur && parsed.joueur !== genesis.serveur) {
-        joins.push({ blockHeight: ins.blockHeight, txid: ins.txid, yaml: ins.yaml, parsed });
-      }
-    } else if (ins.opType === 'order') {
-      const parsed = yparse(ins.yaml);
-      if (parsed?.joueur && parsed?.tick_cible) {
-        const T = parsed.tick_cible;
-        if (!ordersByTick[T]) ordersByTick[T] = {};
-        // Si plusieurs ordres pour le même joueur+tick, garde le 1er (= confirmé en premier)
-        if (!ordersByTick[T][parsed.joueur]) {
-          ordersByTick[T][parsed.joueur] = {
-            parsed, raw: ins.yaml, blockHeight: ins.blockHeight, txid: ins.txid,
-          };
+  if (scanFrom > tip) {
+    log(`  ✓ cache à jour (${joins.length} join(s) chargé(s) du cache)`);
+  } else {
+    log(`▸ Scan blocs ${scanFrom}..${tip} (${tip - scanFrom + 1} blocs${cachedScan ? ', incrémental depuis ' + lastCachedBlock : ''})…`);
+
+    let scanned = 0;
+    const total = Math.max(1, tip - scanFrom + 1);
+    for await (const ins of scanRange(scanFrom, tip, {
+      api,
+      onBlock: h => {
+        scanned = h - scanFrom + 1;
+        if (scanned % 10 === 0 || scanned === total) {
+          onProgress({ phase: 'scan', current: scanned, total });
+        }
+      },
+    })) {
+      if (ins.opType === 'join') {
+        const parsed = yparse(ins.yaml);
+        if (parsed?.joueur && parsed.joueur !== genesis.serveur) {
+          joins.push({ blockHeight: ins.blockHeight, txid: ins.txid, yaml: ins.yaml, parsed });
+        }
+      } else if (ins.opType === 'order') {
+        const parsed = yparse(ins.yaml);
+        if (parsed?.joueur && parsed?.tick_cible) {
+          const T = parsed.tick_cible;
+          if (!ordersByTick[T]) ordersByTick[T] = {};
+          if (!ordersByTick[T][parsed.joueur]) {
+            ordersByTick[T][parsed.joueur] = {
+              parsed, raw: ins.yaml, blockHeight: ins.blockHeight, txid: ins.txid,
+            };
+          }
         }
       }
     }
+
+    // Persist le cache scan (joins+orders+lastBlock)
+    try {
+      await cache.set(SCAN_CACHE_KEY, { blocGenesis, lastBlock: tip, joins, ordersByTick });
+    } catch (e) {
+      log(`  ! cache write skipped: ${e.message}`);
+    }
   }
 
+  // Tri des joins par bloc (cache + nouveaux)
+  joins.sort((a, b) => a.blockHeight - b.blockHeight);
   log(`  → ${joins.length} join(s), ${Object.values(ordersByTick).reduce((a, m) => a + Object.keys(m).length, 0)} ordre(s) répartis sur ${Object.keys(ordersByTick).length} tick(s)`);
 
   // ─── Replay : tick par tick, intègre les joins en première fenêtre ─────

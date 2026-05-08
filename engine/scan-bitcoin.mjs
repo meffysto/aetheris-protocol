@@ -17,14 +17,16 @@ const OP_TYPES_REV = { 0x01: 'join', 0x02: 'order', 0x03: 'sealed', 0x04: 'revea
 
 // ─── Esplora API ─────────────────────────────────────────────────────────────
 
+const FETCH_OPTS = { cache: 'no-store' };
+
 async function esploraGet(url) {
-  const res = await fetch(url);
+  const res = await fetch(url, FETCH_OPTS);
   if (!res.ok) throw new Error(`Esplora ${res.status}: ${url}`);
   return res.json();
 }
 
 export async function fetchBlockHash(height, api) {
-  const res = await fetch(`${api}/block-height/${height}`);
+  const res = await fetch(`${api}/block-height/${height}`, FETCH_OPTS);
   if (!res.ok) throw new Error(`fetchBlockHash ${height}: ${res.status}`);
   return (await res.text()).trim();
 }
@@ -38,7 +40,7 @@ export async function fetchTx(txid, api) {
 }
 
 export async function fetchTipHeight(api) {
-  const res = await fetch(`${api}/blocks/tip/height`);
+  const res = await fetch(`${api}/blocks/tip/height`, FETCH_OPTS);
   if (!res.ok) throw new Error(`fetchTipHeight: ${res.status}`);
   return parseInt(await res.text(), 10);
 }
@@ -232,9 +234,9 @@ function hexToBytes(hex) {
   return bytes;
 }
 
-// ─── CLI standalone ───────────────────────────────────────────────────────────
+// ─── CLI standalone (Node uniquement) ────────────────────────────────────────
 
-const isMain = process.argv[1] &&
+const isMain = typeof process !== 'undefined' && process.argv?.[1] &&
   new URL(import.meta.url).pathname === new URL(process.argv[1], import.meta.url).pathname;
 
 if (isMain) {

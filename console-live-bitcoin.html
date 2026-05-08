@@ -1535,31 +1535,53 @@ h2.sect .rule {
 
 <!-- ─── Module loader Bitcoin : importe les engines iso et expose des helpers ─── -->
 <script type="module">
-import { bootBitcoin } from './engine/boot-bitcoin.mjs';
-import { inscribe, API_URLS } from './engine/inscribe-core.mjs';
-import { fetchTipHeight } from './engine/scan-bitcoin.mjs';
-import { tickFromBlockHeight } from './engine/tick-core.mjs';
-import { makeBrowserAdapter } from './engine/cache-browser.mjs';
-import { initCache } from './engine/cache.mjs';
-import * as btc from '@scure/btc-signer';
-import { schnorr } from '@noble/curves/secp256k1';
+// Capture les erreurs d'import ESM et les affiche dans l'UI.
+function showBootError(msg) {
+  console.error('[aetheris-bitcoin]', msg);
+  const el = document.getElementById('boot-status');
+  if (el) {
+    el.textContent = '✗ ' + String(msg).slice(0, 200);
+    el.style.background = '#a83a25';
+    el.style.display = 'block';
+  }
+  window.aetherisBitcoinError = msg;
+}
 
-// Init cache IndexedDB une fois.
-const cacheAdapter = await makeBrowserAdapter('aetheris-bitcoin');
-initCache(cacheAdapter);
+try {
+  const [
+    { bootBitcoin },
+    { inscribe, API_URLS },
+    { fetchTipHeight },
+    { tickFromBlockHeight },
+    { makeBrowserAdapter },
+    { initCache },
+    btc,
+    { schnorr },
+  ] = await Promise.all([
+    import('./engine/boot-bitcoin.mjs'),
+    import('./engine/inscribe-core.mjs'),
+    import('./engine/scan-bitcoin.mjs'),
+    import('./engine/tick-core.mjs'),
+    import('./engine/cache-browser.mjs'),
+    import('./engine/cache.mjs'),
+    import('@scure/btc-signer'),
+    import('@noble/curves/secp256k1'),
+  ]);
 
-// Expose au script principal (non-module).
-window.aetherisBitcoin = {
-  bootBitcoin,
-  inscribe,
-  API_URLS,
-  fetchTipHeight,
-  tickFromBlockHeight,
-  btc, schnorr,
-  cacheAdapter,
-  ready: true,
-};
-window.dispatchEvent(new CustomEvent('aetheris-bitcoin-ready'));
+  const cacheAdapter = await makeBrowserAdapter('aetheris-bitcoin');
+  initCache(cacheAdapter);
+
+  window.aetherisBitcoin = {
+    bootBitcoin, inscribe, API_URLS,
+    fetchTipHeight, tickFromBlockHeight,
+    btc, schnorr, cacheAdapter,
+    ready: true,
+  };
+  console.log('[aetheris-bitcoin] modules ready');
+  window.dispatchEvent(new CustomEvent('aetheris-bitcoin-ready'));
+} catch (e) {
+  showBootError(e.message ?? e);
+}
 </script>
 
 <script>
@@ -1661,8 +1683,11 @@ const state = {
   players: {},
   current: (new URLSearchParams(location.search).get('joueur')) || localStorage.getItem('aetheris.player') || null,
   view: localStorage.getItem('aetheris.view') || 'overview',
-  source: localStorage.getItem('aetheris.source') || 'local',
+  source: 'bitcoin',
   pending: new Set(),
+  bitcoin: null,                      // { tip, blocGenesis, tickCourant, ... } setté par load()
+  wallet: (function(){ try { return JSON.parse(localStorage.getItem('aetheris.btc.wallet') || 'null'); } catch { return null; } })(),
+  identites: {},
 };
 // Sync URL-derived player to localStorage pour les refresh suivants.
 if (state.current) localStorage.setItem('aetheris.player', state.current);
@@ -1685,7 +1710,9 @@ const cfg = {
   set pat(v)   { v ? localStorage.setItem('aetheris.gh.pat', v)    : localStorage.removeItem('aetheris.gh.pat'); },
   get key()    { return localStorage.getItem('aetheris.gh.key')    || ''; },
   set key(v)   { v ? localStorage.setItem('aetheris.gh.key', v)    : localStorage.removeItem('aetheris.gh.key'); },
-  get ready()  { return !!(this.pat && this.key); },
+  // Mode Bitcoin : seule la clé Ed25519 est requise pour signer le yaml.
+  // Le wallet Bitcoin (WIF taproot) est demandé à la volée via getBitcoinWallet().
+  get ready()  { return !!this.key; },
 };
 
 /* ───────────────────────────── Iconography ──────────────────────────────── */
@@ -1869,13 +1896,15 @@ async function load() {
       fetchText('world/galaxie.yaml'),
     ]);
 
-    showStatus('▸ scan Bitcoin…');
+    showStatus('▸ boot bitcoin…');
     const result = await ab.bootBitcoin({
       api: 'https://mutinynet.com/api',
       genesisYaml, rulesYaml, galaxieYaml,
-      log: (m) => showStatus(m),
+      log: (m) => showStatus(m, true),
       onProgress: ({ phase, current, total }) => {
-        showStatus(`${phase} ${current}/${total}`);
+        if (total <= 1) return; // skip trivial 0/0 ou 1/1
+        const label = phase === 'scan' ? '⛓ scan' : '⏱ replay';
+        showStatus(`${label} ${current}/${total}`, true);
       },
       verifySignature: async (yamlContent, pubB64, sigB64) => {
         try {
@@ -1893,6 +1922,7 @@ async function load() {
     state.galaxie = result.galaxie;
     state.players = result.empires;
     state.identites = result.identites;
+    const previousTip = state.bitcoin?.tip;
     state.bitcoin = {
       tip: result.tip,
       blocGenesis: result.blocGenesis,
@@ -1900,6 +1930,7 @@ async function load() {
       tickCourant: result.tickCourant,
       joins: result.joins,
       ordersByTick: result.ordersByTick,
+      lastBlockSeenAt: previousTip !== result.tip ? Date.now() : (state.bitcoin?.lastBlockSeenAt || Date.now()),
     };
 
     // Sélectionne le 1er joueur si rien n'est choisi
@@ -1949,16 +1980,23 @@ function chantierETA(remainUtj) {
   return { tickArrivee, mins };
 }
 
+// Mode Bitcoin : un tick = un bloc Mutinynet (≈30s cible). Le compte à rebours
+// estime le temps avant le prochain bloc en se basant sur la dernière fois où
+// on a vu le tip changer (state.bitcoin.lastBlockSeenAt).
+const BLOCK_INTERVAL_SEC = 30;
 function nextTickInfo() {
   const m = state.manifest;
-  const mins = (m?.duree_tick_min) || 15;
-  const dur = mins * 60 * 1000;
-  const now = Date.now();
-  // L'Action tourne sur cron `*/15` UTC — donc xx:00, xx:15, xx:30, xx:45 wall-clock
-  const next = Math.ceil((now + 1) / dur) * dur;
-  const secs = Math.max(0, Math.round((next - now) / 1000));
-  const pct = Math.min(100, Math.max(0, ((dur - (next - now)) / dur) * 100));
-  return { tick: m?.tick ?? 0, secs, pct, mins };
+  const seenAt = state.bitcoin?.lastBlockSeenAt || Date.now();
+  const elapsed = (Date.now() - seenAt) / 1000;
+  const secs = Math.max(0, Math.round(BLOCK_INTERVAL_SEC - elapsed));
+  const pct = Math.min(100, Math.max(0, (elapsed / BLOCK_INTERVAL_SEC) * 100));
+  return {
+    tick: m?.tick ?? 0,
+    secs,
+    pct,
+    mins: BLOCK_INTERVAL_SEC / 60,                  // ≈ 0.5 min / tick (Mutinynet)
+    overdue: elapsed > BLOCK_INTERVAL_SEC,
+  };
 }
 
 function fmtCountdown(s) {
@@ -3004,10 +3042,47 @@ function randomNonce() {
   return [...a].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Pousse un ordre signé : fork, branche orders/<nom>, push fichier, ouvre PR.
-// Le workflow validate-orders verifie la signature et auto-merge dans ~20s.
-// Chaque etape est encapsulee dans `step()` pour que les erreurs API GitHub
-// portent le contexte de l'etape qui a echoue (ex: "[fork] 403 ...").
+/* ───────────────────────────── Wallet Bitcoin ───────────────────────────── */
+// Stocké en localStorage clair pour le MVP (Mutinynet, test funds uniquement).
+// TODO: encrypt avec password + IndexedDB pour production / mainnet.
+
+function loadBitcoinWallet() {
+  try { return JSON.parse(localStorage.getItem('aetheris.btc.wallet') || 'null'); }
+  catch { return null; }
+}
+function saveBitcoinWallet(w) {
+  localStorage.setItem('aetheris.btc.wallet', JSON.stringify(w));
+}
+function clearBitcoinWallet() {
+  localStorage.removeItem('aetheris.btc.wallet');
+  state.wallet = null;
+}
+
+async function getBitcoinWallet() {
+  if (state.wallet) return state.wallet;
+  const cached = loadBitcoinWallet();
+  if (cached?.privateKeyWIF && cached?.taprootAddress) {
+    state.wallet = cached;
+    return cached;
+  }
+  // Prompt l'user — colle le contenu de .btc-key (JSON)
+  const raw = window.prompt(
+    'Wallet Bitcoin Mutinynet — colle le contenu JSON de ton .btc-key\n' +
+    '(ex: {"privateKeyWIF":"cN...","taprootAddress":"tb1p...","network":"mutinynet"})\n\n' +
+    '⚠ Stocké en clair dans localStorage — Mutinynet test funds uniquement.'
+  );
+  if (!raw) throw new Error('wallet annulé');
+  let w;
+  try { w = JSON.parse(raw); } catch { throw new Error('JSON invalide'); }
+  if (!w.privateKeyWIF || !w.taprootAddress) throw new Error('JSON manque privateKeyWIF ou taprootAddress');
+  saveBitcoinWallet(w);
+  state.wallet = w;
+  return w;
+}
+
+// pushSignedOrder version Bitcoin : signe Ed25519 puis inscrit on-chain via inscribe().
+// Remplace l'ancien flow GitHub PR. cfg.key (Ed25519 PEM) reste requis pour la signature
+// du yaml ; state.wallet (Bitcoin WIF) est requis pour broadcaster la TX.
 async function pushSignedOrder(canonicalBody, message) {
   const step = async (label, fn) => {
     try { return await fn(); }
@@ -3020,70 +3095,30 @@ async function pushSignedOrder(canonicalBody, message) {
   };
 
   const canonical = canonicalBody.replace(/\s+$/, '') + '\n';
-  const sig = await step('signature', () => signCanonical(canonical, cfg.key));
+  const sig = await step('signature ed25519', () => signCanonical(canonical, cfg.key));
   const finalContent = canonical + `signature: ed25519:${sig}\n`;
-  const player = state.current;
-  const [upOwner, upRepo] = cfg.repo.split('/');
-  const baseBranch = cfg.branch || 'main';
-  const branchName = `orders/${player}`;
 
-  // 1. Identite. Si l'user est owner de l'upstream : pas de fork (push direct sur upstream).
-  const me = await step('identite GitHub', () => ghFetch('/user'));
-  const isOwner = me.login.toLowerCase() === upOwner.toLowerCase();
-  const workRepo = isOwner ? `${upOwner}/${upRepo}` : `${me.login}/${upRepo}`;
+  // Récupère le wallet Bitcoin (prompt si pas déjà dispo).
+  const wallet = await step('wallet bitcoin', () => getBitcoinWallet());
 
-  if (!isOwner) {
-    // 1b. Fork (idempotent). Necessite PAT avec scope public_repo OU fine-grained "Administration: write".
-    await step('fork', () => ghFetch(`/repos/${upOwner}/${upRepo}/forks`, { method: 'POST', body: JSON.stringify({}) }));
-    await step('attente fork pret', async () => {
-      for (let i = 0; i < 10; i++) {
-        try { return await ghFetch(`/repos/${workRepo}`); }
-        catch (e) { if (i === 9) throw e; await new Promise(r => setTimeout(r, 1500)); }
-      }
-    });
-    try { await ghFetch(`/repos/${workRepo}/merge-upstream`, { method: 'POST', body: JSON.stringify({ branch: baseBranch }) }); } catch {}
-  }
+  const ab = window.aetherisBitcoin;
+  if (!ab?.ready) throw new Error('module Bitcoin non chargé');
 
-  // 2. Reset (ou cree) orders/<nom> sur le tip de baseBranch.
-  const baseRef = await step(`lecture ${baseBranch}`, () => ghFetch(`/repos/${workRepo}/git/ref/heads/${baseBranch}`));
-  const baseSha = baseRef.object.sha;
-  await step(`branche ${branchName}`, async () => {
-    try {
-      return await ghFetch(`/repos/${workRepo}/git/refs`, { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: baseSha }) });
-    } catch {
-      return await ghFetch(`/repos/${workRepo}/git/refs/heads/${branchName}`, { method: 'PATCH', body: JSON.stringify({ sha: baseSha, force: true }) });
-    }
-  });
-
-  // 3. Push le fichier signe sur cette branche.
-  const path = `joueurs/${player}/ordres.yaml`;
-  let currentSha = null;
-  try { currentSha = (await ghFetch(`/repos/${workRepo}/contents/${path}?ref=${branchName}`)).sha; } catch {}
-  const utf8 = new TextEncoder().encode(finalContent);
-  let bin = ''; for (let i = 0; i < utf8.byteLength; i++) bin += String.fromCharCode(utf8[i]);
-  const b64 = btoa(bin);
-  await step('push ordres.yaml', () => ghFetch(`/repos/${workRepo}/contents/${path}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, branch: branchName, content: b64, ...(currentSha ? { sha: currentSha } : {}) }),
+  showStatus('▸ inscription Bitcoin (commit + reveal)…', true);
+  const result = await step('inscribe', () => ab.inscribe({
+    yamlText: finalContent,
+    keyData: wallet,
+    networkName: wallet.network || 'mutinynet',
+    feeRate: 1,
+    libs: { btc: ab.btc, schnorr: ab.schnorr },
+    log: (m) => showStatus(m, true),
   }));
 
-  // 4. Ouvre PR (head = "branchName" si meme repo, "user:branchName" si fork).
-  try {
-    await ghFetch(`/repos/${upOwner}/${upRepo}/pulls`, {
-      method: 'POST',
-      body: JSON.stringify({
-        title: message,
-        head: isOwner ? branchName : `${me.login}:${branchName}`,
-        base: baseBranch,
-        body: `Ordre signe depuis la console pour **${player}**.\n\nValide automatiquement par \`validate-orders\`. Auto-merge si signature et tick OK.`,
-        maintainer_can_modify: true,
-      }),
-    });
-  } catch (e) {
-    // 422 = PR deja ouverte — synchronize re-trigger le workflow, pas besoin d'agir.
-    if (!/already exists|422/i.test(e.message)) throw e;
-  }
+  showStatus(`✓ inscrit · reveal ${result.revealTxid.slice(0, 12)}…`, true);
+  // Pas de reset cache — le prochain boot scanne incrémentalement depuis
+  // lastBlock+1 et ramassera la nouvelle inscription une fois confirmée.
+
+  return result;
 }
 
 async function submitImprove(batiment) {
@@ -3643,8 +3678,25 @@ function toast(title, msg, isErr) {
 
 /* boot */
 load();
-setInterval(load, 5000);
 tickCountdown();
+
+// Auto-refresh : poll uniquement le tip toutes les 15s. Si le tip a changé,
+// reload (boot incrémental — scan juste les nouveaux blocs depuis le cache).
+async function pollNewBlocks() {
+  const ab = window.aetherisBitcoin;
+  if (!ab?.ready || !state.bitcoin?.tip) return;
+  try {
+    const newTip = await ab.fetchTipHeight('https://mutinynet.com/api');
+    if (newTip > state.bitcoin.tip) {
+      // Le countdown reset au nouveau bloc.
+      console.log(`[poll] tip ${state.bitcoin.tip} → ${newTip}, reload`);
+      await load();
+    }
+  } catch (e) {
+    console.warn('[poll]', e.message);
+  }
+}
+setInterval(pollNewBlocks, 15000);
 </script>
 </body>
 </html>

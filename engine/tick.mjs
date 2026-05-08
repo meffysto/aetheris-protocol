@@ -1062,8 +1062,6 @@ for (const [name, emp] of Object.entries(empires)) {
 
 console.log(`\n▸ Écriture des fichiers`);
 
-manifest.tick = tickSuivant;
-
 // Sérialisation canonique : clés triées récursivement → hash déterministe
 // indépendamment de l'ordre d'insertion des objets JS.
 function canonicalJSON(value) {
@@ -1073,9 +1071,22 @@ function canonicalJSON(value) {
   return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalJSON(value[k])).join(',') + '}';
 }
 
+// Hash chain : on récupère le tick_hash du tick précédent avant de muter
+// le manifest. Pour le tout premier tick, on ancre sur "genesis".
+const previousTickHash = manifest.tick_hash || 'genesis';
+
+manifest.tick = tickSuivant;
+manifest.previous_tick_hash = previousTickHash;
 manifest.hash_etat = 'sha256:' + crypto.createHash('sha256')
   .update(canonicalJSON(empires) + canonicalJSON(galaxie))
   .digest('hex').slice(0, 32);
+
+// tick_hash scelle ce tick : il dépend de previous_tick_hash, donc toute
+// modification rétroactive d'un tick passé invalide la chaîne suivante.
+delete manifest.tick_hash;
+manifest.tick_hash = 'sha256:' + crypto.createHash('sha256')
+  .update(canonicalJSON(manifest))
+  .digest('hex');
 wr('world/manifest.yaml', '# Généré par engine/tick.mjs — ne pas éditer.\n' + ystringify(manifest));
 
 for (const [name, emp] of Object.entries(empires)) {

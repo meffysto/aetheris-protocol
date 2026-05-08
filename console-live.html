@@ -1000,6 +1000,29 @@ h2.sect .rule {
 }
 .err .close:hover, .toast .close:hover { background: var(--ink-3); color: var(--bone-2); }
 
+/* tooltip global (utilisé par data-tip) */
+.tooltip {
+  position: fixed;
+  z-index: 200;
+  max-width: 320px;
+  padding: 10px 14px;
+  background: var(--brass);
+  color: #fff;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  line-height: 1.45;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(14,29,51,0.25);
+  pointer-events: none;
+  white-space: pre-line;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.tooltip.on {
+  opacity: 1;
+  transform: none;
+}
+
 /* effet courant (ligne dans la bcard, sous le niveau) */
 .bcard .effet {
   grid-column: 1 / 4;
@@ -2191,7 +2214,7 @@ function renderBatGrid(p, max) {
     }
     const effet = batEffet(k, lvl, p);
     const tip = batTooltip(k, lvl);
-    return `<div class="bcard ${lvl === 0 && !q ? 'zero' : ''}" title="${escapeHtml(tip)}">
+    return `<div class="bcard ${lvl === 0 && !q ? 'zero' : ''}" data-tip="${escapeHtml(tip)}">
       <div class="gl">${ico}</div>
       <div class="nm">${labels[k] || k}<small>${taglines[k] || 'structure'}</small></div>
       <div class="lvl">${lvl}<small>niveau</small></div>
@@ -3313,6 +3336,57 @@ function toast(title, msg, isErr) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('on'), 6000);
 }
+
+/* tooltip global — délégué sur tout élément avec data-tip */
+(function setupTooltip() {
+  const tip = document.createElement('div');
+  tip.className = 'tooltip';
+  document.body.appendChild(tip);
+  let target = null;
+
+  function show(el) {
+    target = el;
+    tip.textContent = el.getAttribute('data-tip') || '';
+    tip.classList.add('on');
+    position(el);
+  }
+  function hide() {
+    target = null;
+    tip.classList.remove('on');
+  }
+  function position(el) {
+    const r = el.getBoundingClientRect();
+    // Affiche tooltip de préférence à droite, sinon à gauche, sinon en bas
+    const tipR = tip.getBoundingClientRect();
+    const margin = 8;
+    let left = r.right + margin;
+    let top  = r.top;
+    if (left + tipR.width > window.innerWidth - 8) {
+      left = r.left - tipR.width - margin;
+    }
+    if (left < 8) {
+      left = Math.min(window.innerWidth - tipR.width - 8, Math.max(8, r.left));
+      top = r.bottom + margin;
+    }
+    if (top + tipR.height > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - tipR.height - 8);
+    }
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+  }
+
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-tip]');
+    if (el && el !== target) show(el);
+  });
+  document.addEventListener('mouseout', e => {
+    const el = e.target.closest('[data-tip]');
+    if (!el) return;
+    if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+    hide();
+  });
+  window.addEventListener('scroll', hide, true);
+})();
 
 /* boot */
 load();

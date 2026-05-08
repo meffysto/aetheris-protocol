@@ -355,6 +355,48 @@ h2.sect .rule {
   margin-left: 4px;
 }
 
+/* ─── planet-bar (en-tête compact hors Aperçu) ───────────── */
+.planet-bar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 22px;
+  margin-bottom: 18px;
+  background: var(--ink-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  flex-wrap: wrap;
+}
+.planet-bar .pb-title {
+  font-family: var(--display); font-weight: 600;
+  font-size: 22px; color: var(--bone-2);
+  margin: 0; line-height: 1; letter-spacing: -0.01em;
+}
+.planet-bar .pb-coord {
+  font-family: var(--mono); font-weight: 500;
+  font-size: 13px; color: var(--bone-dim);
+  margin-right: 12px; letter-spacing: 0.04em;
+}
+.planet-bar .pb-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--hairline); border-radius: var(--r-pill);
+  font-family: var(--sans); font-size: 9.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; font-weight: 700;
+  color: var(--bone); background: rgba(14,29,51,0.04);
+}
+.planet-bar .pb-chip.tellurique  { color: #3a5a22; border-color: #6a8a3a; background: rgba(106,138,58,0.10); }
+.planet-bar .pb-chip.cristalline { color: #1a5a5a; border-color: #4a8a8a; background: rgba(74,138,138,0.10); }
+.planet-bar .pb-chip.glacee      { color: #1a4a6a; border-color: #4a7a9a; background: rgba(74,122,154,0.10); }
+.planet-bar .pb-chip.volcanique  { color: #8a2818; border-color: #b8503a; background: rgba(184,80,58,0.10); }
+.planet-bar .pb-chip.gazeuse     { color: #4a2a6a; border-color: #7a5a9a; background: rgba(122,90,154,0.10); }
+.planet-bar .pb-meta {
+  font-family: var(--sans); font-size: 12px; color: var(--bone-dim);
+  font-weight: 500;
+}
+.planet-bar .pb-meta b {
+  color: var(--bone-2); font-weight: 700;
+  font-family: var(--display);
+}
+
 /* ─── BULLETIN (carte héros parchemin) ────────────────────── */
 .bulletin {
   background: linear-gradient(180deg, #fffaf0 0%, #f9efd6 100%);
@@ -1871,17 +1913,30 @@ function renderResourceStrip(p) {
 }
 
 function renderPlanetHead(p, emp) {
-  // Rebrandé en "Bulletin" — carte héros qui remplace l'ancien planet-head
-  // + les 6 mini-stats §I Synopsis de l'overview.
+  // Sur Aperçu → carte héros "Bulletin" complète.
+  // Sur les autres vues → barre compacte (nom + coords + chip).
   const head = document.getElementById('planetHead');
   if (!p) {
     head.className = '';
     head.innerHTML = `<div class="empty-stamp">aucune planète attribuée</div>`;
     return;
   }
-  head.className = 'bulletin';
   const coord = (p.coordonnees || []).join(':');
   const tickCur = state.manifest?.tick ?? 0;
+
+  // Vue compacte hors Aperçu — juste l'identité de la planète.
+  if (state.view !== 'overview') {
+    head.className = 'planet-bar';
+    head.innerHTML = `
+      <h1 class="pb-title"><span class="pb-coord">${coord}</span>${p.nom}</h1>
+      <span class="pb-chip ${p.type || ''}">${p.type || 'planète'}</span>
+      <span class="pb-meta">cycle <b>${tickCur}</b></span>
+      <span class="pb-meta">score <b>${fmt(emp?.score_total ?? 0)}</b></span>
+      <span class="pb-meta" style="margin-left:auto">champs <b>${p.champs?.utilises ?? 0}/${p.champs?.total ?? 0}</b></span>`;
+    return;
+  }
+
+  head.className = 'bulletin';
   const buildings = Object.entries(p.batiments || {});
   const built = buildings.filter(([, n]) => n > 0).length;
   const total = buildings.length;
@@ -2430,6 +2485,12 @@ function applyView() {
   document.querySelectorAll('.view').forEach(v => {
     v.classList.toggle('on', v.dataset.v === state.view);
   });
+  // Le planet-head bascule entre Bulletin (Aperçu) et barre compacte (autres
+  // vues), il faut le re-render à chaque changement de vue sans attendre
+  // le prochain tick de refresh.
+  const emp = state.players[state.current];
+  const p = emp && (emp.planetes || [])[0];
+  if (emp) renderPlanetHead(p, emp);
 }
 document.getElementById('nav').addEventListener('click', e => {
   const btn = e.target.closest('button[data-view]'); if (!btn) return;

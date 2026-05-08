@@ -1233,6 +1233,15 @@ h2.sect .rule {
 
 /* clickable enemy planets in galaxy */
 .pos.planete.enemy { cursor: pointer; }
+.pos.planete.enemy:hover {
+  background: rgba(168,58,37,0.10);
+  outline: 1px solid var(--phosphor);
+}
+.pos.planete.allyown { cursor: pointer; }
+.pos.planete.allyown:hover {
+  background: rgba(14,29,51,0.06);
+  outline: 1px solid var(--brass);
+}
 .pos.planete.enemy:hover { border-color: var(--phosphor); background: rgba(168,58,37,0.08); box-shadow: 0 0 0 2px rgba(168,58,37,0.18); }
 .pos.planete.enemy:hover .dot { box-shadow: 0 0 0 2px var(--phosphor), 0 0 8px var(--phosphor) !important; }
 
@@ -2550,17 +2559,21 @@ function renderGalaxie() {
         dot = `<span class="dot"></span>`;
       }
       const isEnemy = t === 'planete' && owner && owner !== state.current && !isMine;
+      // Une planète à moi (pas la courante) = cible valide pour transport interne.
+      const isAllyOwn = t === 'planete' && owner === state.current && !isMine;
+      const isMissionTarget = isEnemy || isAllyOwn;
       let tip = '';
       if (t === 'planete') {
         tip = `${pos.nom || 'planète'} · ${cls || '?'}${owner ? ' · ' + owner : ' · libre'}`;
         if (isEnemy) tip += ' · clic → mission';
+        else if (isAllyOwn) tip += ' · clic → transport';
       } else if (t === 'asteroide') {
         tip = `astéroïde`;
       } else { tip = `vide`; }
-      const dataAttrs = isEnemy
+      const dataAttrs = isMissionTarget
         ? ` data-mission-target="${owner}|${pos.nom || ''}"`
         : '';
-      html += `<div class="pos ${kind} ${isMine?'mine':''} ${isEnemy?'enemy':''}" data-c="${cls||''}"${dataAttrs}>
+      html += `<div class="pos ${kind} ${isMine?'mine':''} ${isEnemy?'enemy':''} ${isAllyOwn?'allyown':''}" data-c="${cls||''}"${dataAttrs}>
         <span class="num">${i}</span>${dot}
         ${owner ? `<span class="own">${owner.slice(0,5)}</span>` : ''}
         <span class="tip">${tip}</span>
@@ -3267,11 +3280,24 @@ function openMission(joueurCible, planeteCible) {
   }
   mission.cibleJoueur = joueurCible;
   mission.ciblePlanete = planeteCible;
-  mission.depuis = emp.planetes[0].nom;
-  mission.type = 'espionnage';
+  // Si la cible est une de mes propres planètes, on ne sélectionne pas
+  // celle-ci comme source par défaut (transport sur soi-même = no-op).
+  const isOwnTarget = joueurCible === state.current;
+  const others = emp.planetes.filter(p => p.nom !== planeteCible);
+  mission.depuis = (isOwnTarget && others.length > 0 ? others[0] : emp.planetes[0]).nom;
+  mission.type = isOwnTarget ? 'transport' : 'espionnage';
 
   document.getElementById('missionTarget').innerHTML =
-    `cible : <b>${planeteCible}</b> · ${joueurCible}`;
+    isOwnTarget
+      ? `transport interne vers <b>${planeteCible}</b>`
+      : `cible : <b>${planeteCible}</b> · ${joueurCible}`;
+
+  // Désactive les types incompatibles avec une cible alliée.
+  document.querySelectorAll('#missionType button').forEach(b => {
+    const incompatible = isOwnTarget && (b.dataset.mt === 'espionnage' || b.dataset.mt === 'attaque');
+    b.disabled = incompatible;
+    b.title = incompatible ? 'Pas de mission hostile sur tes propres planètes' : '';
+  });
 
   // dropdown source
   const fromSel = document.getElementById('missionFrom');

@@ -637,18 +637,35 @@ function queueRecherche(emp, action) {
 function queueTransport(emp, action, playerName) {
   const src = (emp.planetes || []).find(p => p.nom === action.depuis);
   if (!src) return;
+  // Cible normalisée — accepte action.cible (forme console) ou action.vers
+  // (forme legacy pour compat).
+  const cible = action.cible
+    || (typeof action.vers === 'object' ? action.vers : null)
+    || (typeof action.vers === 'string' ? { joueur: playerName, planete: action.vers } : null);
+  if (!cible || !cible.planete) {
+    console.log(`  · ${playerName}: transport sans cible valide`);
+    return;
+  }
+  const cibleJoueur = cible.joueur || playerName;
+  const ciblePlanete = cible.planete;
+
   // Retirer flotte + cargaison du sol
   for (const [ship, n] of Object.entries(action.flotte || {})) {
-    if ((src.flotte_au_sol[ship] || 0) < n) return;
+    if ((src.flotte_au_sol[ship] || 0) < n) {
+      console.log(`  · ${playerName}: flotte insuffisante (${ship}) pour transport`);
+      return;
+    }
   }
   for (const [res, n] of Object.entries(action.cargaison || {})) {
-    if ((src.ressources[res]?.stock || 0) < n) return;
+    if ((src.ressources[res]?.stock || 0) < n) {
+      console.log(`  · ${playerName}: cargaison ${res} insuffisante`);
+      return;
+    }
   }
   for (const [ship, n] of Object.entries(action.flotte || {})) src.flotte_au_sol[ship] -= n;
   for (const [res, n] of Object.entries(action.cargaison || {})) src.ressources[res].stock -= n;
 
-  // Calcul de la durée — distance × vitesse_min de la flotte
-  const distance = computeDistance(action.depuis, action.vers, playerName);
+  const distance = computeDistance(action.depuis, ciblePlanete, playerName);
   const vMin = Math.min(...Object.keys(action.flotte || {}).map(s => rules.vaisseaux[s]?.vitesse || 1000));
   const dureeUTJ = Math.max(1, Math.ceil(distance / vMin * 100));
 
@@ -657,12 +674,12 @@ function queueTransport(emp, action, playerName) {
     id: `flt-${tickSuivant}-${rng().toString(36).slice(2, 6)}`,
     type_mission: 'transport',
     depuis: { joueur: playerName, planete: action.depuis },
-    vers: action.vers,
+    vers: { joueur: cibleJoueur, planete: ciblePlanete },
     arrivee_utj: dureeUTJ,
     composition: action.flotte,
     cargaison: action.cargaison || {},
   });
-  console.log(`  ✓ ${playerName}: transport ${action.depuis} → ${action.vers} (${dureeUTJ} UTJ)`);
+  console.log(`  ✓ ${playerName}: transport ${action.depuis} → ${cibleJoueur}/${ciblePlanete} (${dureeUTJ} UTJ)`);
 }
 
 function computeDistance(from, to, playerName) {

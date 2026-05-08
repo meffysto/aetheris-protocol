@@ -6,7 +6,7 @@
 version: 1
 joueur: aurora
 tick_cible: 82
-nonce: ec4b2e
+nonce: a33206
 ordres:
 - type: chantier
   planete: aurora-prima
@@ -15,4 +15,4 @@ ordres:
 - type: recherche
   technologie: robotique
   niveau_cible: 1
-signature: ed25519:hMYd39EVinZ4hFOqRMmQA75mbFAVTi+FPo4yafyuxOoifrabcdzToIgtcCpdn/qbKRdsq4Wv13LmlNaiDpGEDQ==
+signature: ed25519:0u32njboEdqJ1KvlUPW5tj4m7Dg+hd9KRiiaae5GQ3qAGy/zX6QB6UF0WTlFTP3Dko6r7xtQHpiMW7sAulCGDw==

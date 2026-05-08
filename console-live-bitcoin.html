@@ -802,6 +802,15 @@ h2.sect .rule {
   border: 1px dashed var(--brass-dim);
 }
 .qitem.pending .nm small { color: var(--brass); font-weight: 600; }
+.qitem.queued { opacity: 0.65; }
+.qitem.queued .tgt { color: var(--bone-dim); }
+.qitem .qpos {
+  display: inline-block; font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.06em; color: var(--bone-dim);
+  border: 1px solid var(--ink-4); padding: 1px 5px; border-radius: 3px;
+  margin-left: 6px; vertical-align: middle;
+}
+.qitem.queued .qpos { color: var(--brass); border-color: var(--brass-dim); }
 .qitem .top {
   display: flex; justify-content: space-between; align-items: flex-start;
   gap: 12px;
@@ -1221,6 +1230,61 @@ h2.sect .rule {
 .toast.err .title { color: var(--phosphor); }
 @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* notifications panel */
+.notif-panel {
+  position: fixed; top: 62px; right: 22px;
+  width: 360px; max-height: calc(100vh - 90px);
+  background: var(--ink-2); border: 1px solid var(--ink-3);
+  border-radius: 10px; box-shadow: var(--shadow-pop);
+  z-index: 89; display: none; flex-direction: column;
+  font-family: var(--sans);
+}
+.notif-panel.on { display: flex; }
+.notif-panel header {
+  padding: 12px 14px; border-bottom: 1px solid var(--ink-3);
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.notif-panel header .ntitle-h {
+  font-family: var(--display); font-weight: 600; font-size: 14px;
+  color: var(--bone-2); margin-right: auto; letter-spacing: 0.4px;
+}
+.notif-panel header button {
+  background: transparent; border: 1px solid var(--ink-3);
+  color: var(--bone-dim); font-size: 11px; font-family: var(--sans);
+  padding: 4px 8px; border-radius: 4px; cursor: pointer;
+}
+.notif-panel header button:hover { color: var(--bone-2); border-color: var(--bone-dim); }
+.notif-list { overflow: auto; padding: 0; min-height: 80px; }
+.notif-list .empty {
+  text-align: center; color: var(--bone-dim);
+  padding: 28px 16px; font-size: 12px; font-style: italic;
+}
+.notif-item {
+  padding: 10px 14px 10px 22px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  position: relative;
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-item.unread { background: rgba(210, 170, 60, 0.04); }
+.notif-item.unread::before {
+  content: ''; position: absolute; left: 9px; top: 15px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--brass);
+}
+.notif-item.high { border-left: 2px solid var(--phosphor); padding-left: 20px; }
+.notif-item.high.unread::before { background: var(--phosphor); }
+.notif-item .nti {
+  font-family: var(--display); font-weight: 600; font-size: 13px;
+  color: var(--bone-2); margin-bottom: 2px;
+}
+.notif-item.high .nti { color: var(--phosphor); }
+.notif-item .nbo { font-size: 12px; color: var(--bone); line-height: 1.4; }
+.notif-item .nts { font-family: var(--mono); font-size: 10px; color: var(--bone-dim); margin-top: 4px; }
+.notif-panel footer {
+  padding: 8px 14px; border-top: 1px solid var(--ink-3);
+  display: flex; gap: 8px; align-items: center; font-size: 11px;
+  color: var(--bone-dim); flex-shrink: 0;
+}
+.notif-panel footer .push-state { margin-right: auto; font-family: var(--mono); }
+
 /* "needs setup" pill */
 .setup-pill {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1312,6 +1376,18 @@ h2.sect .rule {
 <div class="err" id="err"></div>
 <div id="boot-status" style="position:fixed;top:8px;right:8px;background:#1f3556;color:#f4ecdc;padding:6px 12px;border-radius:6px;font:500 12px/1.4 var(--mono);z-index:10000;max-width:340px;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);"></div>
 <div class="toast" id="toast"></div>
+
+<div class="notif-panel" id="notifPanel">
+  <header>
+    <div class="ntitle-h">Alertes</div>
+    <button type="button" id="notifClearBtn">Tout effacer</button>
+  </header>
+  <div class="notif-list" id="notifList"></div>
+  <footer>
+    <span class="push-state" id="notifPushState">push désactivé</span>
+    <button type="button" id="notifPushBtn">Activer les notifications</button>
+  </footer>
+</div>
 
 <div class="modal-bg" id="modalBg">
   <div class="modal">
@@ -1965,6 +2041,7 @@ async function load() {
     document.getElementById('err').classList.remove('on');
     applySrcUI();
     render();
+    try { detectNotifs(); } catch (e) { console.warn('notif detect failed', e); }
   } catch (e) {
     const err = document.getElementById('err');
     err.innerHTML = `⚠ liaison rompue · ${escapeHtml(e.message || 'erreur')}<button class="close" aria-label="Fermer" onclick="this.parentElement.classList.remove('on')">×</button>`;
@@ -2048,7 +2125,9 @@ function render() {
   sel.onchange = e => {
     state.current = e.target.value;
     localStorage.setItem('aetheris.player', state.current);
+    notif.load();
     render();
+    try { detectNotifs(); } catch {}
   };
 
   const emp = state.players[state.current];
@@ -2243,12 +2322,8 @@ function computeIncomingThreat(emp, tickCur) {
 }
 
 function updateBell(threat, decretsCount) {
-  const bell = document.getElementById('bellBtn');
-  const dot = document.getElementById('bellDot');
-  if (!bell || !dot) return;
-  const count = (threat ? 1 : 0) + (decretsCount > 0 ? 1 : 0);
-  if (count === 0) { bell.classList.add('silent'); dot.textContent = '0'; }
-  else { bell.classList.remove('silent'); dot.textContent = String(count); }
+  // Bell now reflects unread notif count — see refreshNotifUI().
+  refreshNotifUI();
 }
 
 function renderOverview(p, emp) {
@@ -2827,16 +2902,26 @@ function renderRail(p, emp) {
     </div>`;
   }
 
-  // Chantiers actifs
-  for (const c of queue) {
+  // Chantiers actifs — file séquentielle : seul le head avance, les autres attendent.
+  let cumTicksBat = 0;
+  for (let i = 0; i < queue.length; i++) {
+    const c = queue[i];
     const remain = Math.max(0, c.fin_utj || 0);
-    const mins = Math.round(remain * utjMin());
-    html += `<div class="qitem">
+    const itemTicks = Math.max(1, Math.ceil(remain / 6));
+    cumTicksBat += itemTicks;
+    const cumMins = Math.round(cumTicksBat * (state.manifest?.duree_tick_min || 15));
+    const isHead = i === 0;
+    const klass = isHead ? '' : ' queued';
+    const pos = isHead
+      ? `<span class="qpos">en cours</span>`
+      : `<span class="qpos">file · #${i + 1}</span>`;
+    const eta = cumTicksBat <= 1 ? 'livré au prochain cycle' : `livré dans ${cumTicksBat} cycles`;
+    html += `<div class="qitem${klass}">
       <div class="top">
-        <div class="nm">${labels[c.batiment] || c.batiment}<small>niveau ${c.niveau_cible}</small></div>
+        <div class="nm">${labels[c.batiment] || c.batiment}<small>niveau ${c.niveau_cible}${pos}</small></div>
         <div class="tgt">${remain}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
       </div>
-      <div class="tmeta"><span>≈ <b>${mins}</b> min restantes</span><span>${remain <= 6 ? 'achève au prochain tick' : Math.ceil(remain/6) + ' ticks'}</span></div>
+      <div class="tmeta"><span>≈ <b>${cumMins}</b> min</span><span>${eta}</span></div>
     </div>`;
   }
 
@@ -2859,15 +2944,25 @@ function renderRail(p, emp) {
       </div>
     </div>`;
   }
-  for (const c of atelierQueue) {
+  let cumTicksAtl = 0;
+  for (let i = 0; i < atelierQueue.length; i++) {
+    const c = atelierQueue[i];
     const remain = Math.max(0, c.fin_utj || 0);
-    const mins = Math.round(remain * utjMin());
-    atlHtml += `<div class="qitem">
+    const itemTicks = Math.max(1, Math.ceil(remain / 6));
+    cumTicksAtl += itemTicks;
+    const cumMins = Math.round(cumTicksAtl * (state.manifest?.duree_tick_min || 15));
+    const isHead = i === 0;
+    const klass = isHead ? '' : ' queued';
+    const pos = isHead
+      ? `<span class="qpos">en cours</span>`
+      : `<span class="qpos">file · #${i + 1}</span>`;
+    const eta = cumTicksAtl <= 1 ? 'livré au prochain cycle' : `livré dans ${cumTicksAtl} cycles`;
+    atlHtml += `<div class="qitem${klass}">
       <div class="top">
-        <div class="nm">${labels[c.unite] || c.unite}<small>${c.quantite || 1} unité${(c.quantite || 1) > 1 ? 's' : ''} · ${c.planete || ''}</small></div>
+        <div class="nm">${labels[c.unite] || c.unite}<small>${c.quantite || 1} unité${(c.quantite || 1) > 1 ? 's' : ''} · ${c.planete || ''}${pos}</small></div>
         <div class="tgt">${remain}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min.">UTJ</span></small></div>
       </div>
-      <div class="tmeta"><span>≈ <b>${mins}</b> min</span><span>${remain <= 6 ? 'livré au prochain cycle' : 'livré dans ' + Math.ceil(remain/6) + ' cycles'}</span></div>
+      <div class="tmeta"><span>≈ <b>${cumMins}</b> min</span><span>${eta}</span></div>
     </div>`;
   }
   if (!atlHtml) atlHtml = `<div class="empty-rail">aucune production</div>`;
@@ -3908,6 +4003,213 @@ function toast(title, msg, isErr) {
   });
   window.addEventListener('scroll', hide, true);
 })();
+
+/* ───────────────────────────── Notifications ────────────────────────────── */
+const notif = {
+  list: [],
+  pushPerm: (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported',
+  storageKey() { return `aetheris.notifs.${state.current || '_'}`; },
+  load() {
+    try { this.list = JSON.parse(localStorage.getItem(this.storageKey()) || '[]'); }
+    catch { this.list = []; }
+  },
+  save() {
+    try { localStorage.setItem(this.storageKey(), JSON.stringify(this.list.slice(0, 200))); } catch {}
+  },
+  add(n) {
+    n.id = `${n.type}:${n.key}`;
+    if (this.list.some(x => x.id === n.id)) return false;
+    n.ts = Date.now(); n.read = false;
+    this.list.unshift(n);
+    this.save();
+    toast(n.title, n.body, n.severity === 'high');
+    if (document.hidden && this.pushPerm === 'granted' && n.severity !== 'low') {
+      try {
+        const stripped = String(n.body).replace(/<[^>]+>/g, '');
+        new Notification(n.title, { body: stripped, tag: n.id });
+      } catch {}
+    }
+    return true;
+  },
+  unread() { return this.list.filter(x => !x.read).length; },
+  markAllRead() { this.list.forEach(x => x.read = true); this.save(); refreshNotifUI(); },
+  clearAll() { this.list = []; this.save(); refreshNotifUI(); },
+  async requestPush() {
+    if (typeof Notification === 'undefined') return;
+    try {
+      const p = await Notification.requestPermission();
+      this.pushPerm = p;
+      refreshNotifUI();
+      if (p === 'granted') toast('Notifications activées', 'Tu recevras les alertes critiques même hors-onglet.');
+    } catch {}
+  },
+};
+
+const notifSnap = {};
+
+let notifLoadedFor = null;
+function detectNotifs() {
+  const me = state.current; if (!me) return;
+  const emp = state.players[me]; if (!emp) return;
+  if (notifLoadedFor !== me) {
+    notif.load();
+    notifLoadedFor = me;
+  }
+  const tick = state.manifest?.tick ?? 0;
+
+  const chantiers = new Map();
+  for (const p of (emp.planetes || [])) {
+    for (const c of (p.file_chantier || [])) {
+      const key = `${p.nom}|${c.batiment || c.unite || '?'}|${c.niveau_cible ?? c.quantite ?? ''}|${c.fin_utj ?? ''}`;
+      chantiers.set(key, { p, c });
+    }
+  }
+  const research = new Map();
+  for (const r of (emp.file_recherche || [])) {
+    const key = `${r.technologie || r.recherche || r.discipline}|${r.niveau_cible ?? ''}|${r.fin_utj ?? ''}`;
+    research.set(key, r);
+  }
+  const hostile = new Set(['attaque', 'siege', 'pillage', 'bombardement']);
+  const myPlanets = new Set((emp.planetes || []).map(p => p.nom));
+  const incoming = new Map();
+  for (const [pname, e] of Object.entries(state.players || {})) {
+    if (pname === me) continue;
+    for (const f of (e.flottes_en_vol || [])) {
+      const dest = f.vers?.planete || f.vers;
+      if (!myPlanets.has(dest)) continue;
+      if (!hostile.has((f.type_mission || '').toLowerCase())) continue;
+      const key = `${pname}|${f.depuis?.planete || '?'}|${dest}|${f.type_mission}|${f.tick_arrivee || 0}`;
+      incoming.set(key, { from: pname, f, dest });
+    }
+  }
+  const stockFull = new Map();
+  for (const p of (emp.planetes || [])) {
+    for (const [res, r] of Object.entries(p.ressources || {})) {
+      if (!r || !r.capacite) continue;
+      if (r.stock >= r.capacite * 0.95 && (r.production_par_utj || 0) > 0) {
+        stockFull.set(`${p.nom}|${res}`, { p, res, r });
+      }
+    }
+  }
+
+  const prev = notifSnap[me];
+  if (prev) {
+    for (const [key, m] of prev.chantiers) {
+      if (!chantiers.has(key)) {
+        const what = m.c.batiment
+          ? `${m.c.batiment} → niv ${m.c.niveau_cible ?? ''}`
+          : `${m.c.quantite ?? 1}× ${m.c.unite ?? '?'}`;
+        notif.add({ type: 'chantier-done', severity: 'med', key,
+          title: 'Chantier terminé',
+          body: `${what} sur <b>${m.p.nom}</b>.` });
+      }
+    }
+    for (const [key, r] of prev.research) {
+      if (!research.has(key)) {
+        notif.add({ type: 'research-done', severity: 'med', key,
+          title: 'Recherche complétée',
+          body: `<b>${r.technologie || r.recherche || r.discipline}</b> → niv ${r.niveau_cible ?? ''}.` });
+      }
+    }
+    for (const [key, m] of incoming) {
+      if (!prev.incoming.has(key)) {
+        const arr = m.f.tick_arrivee || 0;
+        const ticksLeft = Math.max(0, arr - tick);
+        notif.add({ type: 'incoming', severity: 'high', key,
+          title: 'Flotte hostile détectée',
+          body: `<b>${m.from}</b> envoie une <b>${m.f.type_mission}</b> sur <b>${m.dest}</b> · impact dans <b>${ticksLeft} cycle${ticksLeft > 1 ? 's' : ''}</b>.` });
+      }
+    }
+    for (const [key, m] of stockFull) {
+      if (!prev.stockFull.has(key)) {
+        const pct = Math.round(100 * m.r.stock / m.r.capacite);
+        notif.add({ type: 'stock-full', severity: 'low', key: `${key}|${tick}`,
+          title: 'Stockage saturé',
+          body: `<b>${m.res}</b> sur <b>${m.p.nom}</b> à ${pct}% (${fmt(m.r.stock)}/${fmt(m.r.capacite)}).` });
+      }
+    }
+  }
+
+  notifSnap[me] = { tick, chantiers, research, incoming, stockFull };
+  refreshNotifUI();
+}
+
+function notifTimeAgo(ts) {
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return `il y a ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `il y a ${m}min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `il y a ${h}h`;
+  return `il y a ${Math.floor(h / 24)}j`;
+}
+
+function refreshNotifUI() {
+  const bell = document.getElementById('bellBtn');
+  const dot = document.getElementById('bellDot');
+  if (bell && dot) {
+    const n = notif.unread();
+    if (n === 0) { bell.classList.add('silent'); dot.textContent = '0'; }
+    else { bell.classList.remove('silent'); dot.textContent = n > 99 ? '99+' : String(n); }
+  }
+  const list = document.getElementById('notifList');
+  if (list) {
+    if (!notif.list.length) {
+      list.innerHTML = `<div class="empty">aucune alerte</div>`;
+    } else {
+      list.innerHTML = notif.list.map(n => `
+        <div class="notif-item ${n.read ? '' : 'unread'} ${n.severity || ''}">
+          <div class="nti">${escapeHtml(n.title)}</div>
+          <div class="nbo">${n.body}</div>
+          <div class="nts">${notifTimeAgo(n.ts)}</div>
+        </div>`).join('');
+    }
+  }
+  const ps = document.getElementById('notifPushState');
+  if (ps) {
+    const pushLabels = {
+      granted: 'push activé',
+      denied: 'push refusé par le navigateur',
+      default: 'push désactivé',
+      unsupported: 'push indisponible',
+    };
+    ps.textContent = pushLabels[notif.pushPerm] || notif.pushPerm;
+  }
+  const pb = document.getElementById('notifPushBtn');
+  if (pb) pb.style.display = (notif.pushPerm === 'default') ? '' : 'none';
+}
+
+(function setupNotifPanel() {
+  const bell = document.getElementById('bellBtn');
+  const panel = document.getElementById('notifPanel');
+  const clearBtn = document.getElementById('notifClearBtn');
+  const pushBtn = document.getElementById('notifPushBtn');
+  if (!bell || !panel) return;
+
+  bell.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const opening = !panel.classList.contains('on');
+    panel.classList.toggle('on');
+    if (opening) {
+      refreshNotifUI();
+      setTimeout(() => notif.markAllRead(), 1200);
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!panel.classList.contains('on')) return;
+    if (e.target.closest('#notifPanel') || e.target.closest('#bellBtn')) return;
+    panel.classList.remove('on');
+  });
+  if (clearBtn) clearBtn.addEventListener('click', () => notif.clearAll());
+  if (pushBtn) pushBtn.addEventListener('click', () => notif.requestPush());
+
+  setInterval(() => {
+    if (panel.classList.contains('on')) refreshNotifUI();
+  }, 30000);
+})();
+
+notif.load();
+refreshNotifUI();
 
 /* boot */
 load();

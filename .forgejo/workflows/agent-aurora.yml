@@ -8,8 +8,8 @@ name: agent-aurora
 # fonctionnent pas fiablement sur Forgejo Actions actuel.
 
 on:
-  schedule:
-    - cron: "5,20,35,50 * * * *"
+  # schedule:
+  #   - cron: "5,20,35,50 * * * *"  # mis en pause — relancer via workflow_dispatch
   workflow_dispatch: {}
 
 concurrency:

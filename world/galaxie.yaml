@@ -54,5 +54,5 @@ systemes:
       11: { type: planete, proprietaire: null, classe: gazeuse }
       12: { type: planete, proprietaire: null, classe: glacee }
       13: { type: asteroide }
-      14: { type: planete, proprietaire: null, classe: tellurique }
+      14: { type: planete, proprietaire: aurora, nom: aurora-prima, classe: tellurique }
       15: { type: asteroide }

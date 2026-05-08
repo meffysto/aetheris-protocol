@@ -1,0 +1,13 @@
+version: 1
+joueur: aurora
+tick_cible: 32
+nonce: b1def7
+ordres:
+- type: chantier
+  planete: aurora-prima
+  batiment: mine_ferrum
+  niveau_cible: 1
+- type: recherche
+  technologie: robotique
+  niveau_cible: 1
+signature: ed25519:d3yj4yoIcVC3x86tGDNLrImP/Jvmb9HKwNWtxyCA7dUpEvinFw72OPAO02idcwQA/spbM/YmfeTJKLDiny49Bw==

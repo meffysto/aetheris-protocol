@@ -1938,7 +1938,8 @@ function renderResourceStrip(p) {
     const pct = info.capacite ? (info.stock / info.capacite) * 100 : 0;
     const warn = pct >= 90;
     const prod = info.production_par_utj || 0;
-    html += `<div class="res" data-r="${r.k}">
+    const tip = resourceTooltip(r.k, info);
+    html += `<div class="res" data-r="${r.k}" data-tip="${escapeHtml(tip)}">
       <div class="ico">${icons[r.k]}</div>
       <div class="nm">${r.l}</div>
       <div class="stock">${fmtCompact(info.stock)}</div>
@@ -1947,7 +1948,8 @@ function renderResourceStrip(p) {
   }
   const en = p?.energie || { production: 0, consommation: 0 };
   const balance = (en.production || 0) - (en.consommation || 0);
-  html += `<div class="res" data-r="energie">
+  const enTip = `${descOf('energie')}\nProduction : ${en.production || 0}\nConsommation : ${en.consommation || 0}\nBalance : ${balance >= 0 ? '+' : ''}${balance}`;
+  html += `<div class="res" data-r="energie" data-tip="${escapeHtml(enTip)}">
     <div class="ico">${icons.energie}</div>
     <div class="nm">Énergie</div>
     <div class="stock" style="color:${balance < 0 ? 'var(--phosphor)' : 'var(--bone-2)'}">${balance >= 0 ? '+' : ''}${balance}</div>
@@ -2144,6 +2146,102 @@ function batEffet(k, lvl, p) {
   return null;
 }
 
+// Descriptions des unités, recherches et ressources pour les tooltips.
+const DESCRIPTIONS = {
+  // Ressources
+  ferrum:    'Métal de base. Sert à tout : bâtiments, vaisseaux, défenses.',
+  lumen:     'Cristal énergétique. Indispensable aux technologies avancées et aux vaisseaux.',
+  plasmide:  'Matière organique rare. Requise par les unités lourdes et les recherches de pointe.',
+  energie:   'Surplus = production normale. Déficit = production divisée. Chaque bâtiment consomme.',
+  // Vaisseaux
+  sonde:           'Drone d\'éclairage. Sans valeur militaire. Sert à espionner les voisins.',
+  chasseur_leger:  'Intercepteur économique. Forme l\'épine dorsale de toute flotte. Bonus ×2 vs cargo.',
+  chasseur_lourd:  'Frappe robuste. Bonus ×2 contre chasseurs légers. Coûte plus cher mais encaisse.',
+  croiseur:        'Ligne de bataille. Excellente attaque/cargo. Bonus ×6 vs chasseur léger, ×3 vs lourd.',
+  fregate:         'Frappe rapide. Bonus ×3 contre les croiseurs.',
+  cuirasse:        'Capital ship. Brise les flottes adverses par le poids du nombre. Coque 6000, attaque 1000.',
+  destroyer:       'Capital lourd. Bonus ×2 contre cuirasse. Hyperspatial requis.',
+  dreadnought:     'Super-capital. Requiert une singularité. Détruit tout ce qu\'elle touche.',
+  cargo_lourd:     'Transporteur civil. Cargo 25 000. Pas une unité de combat — protège-le.',
+  recycleur:       'Récupère les débris des épaves après bataille. Cargo 20 000.',
+  vaisseau_colon:  'Permet de coloniser un nouveau monde. Une seule planète par vaisseau.',
+  // Défenses
+  lance_missiles:           'Tir de surface. Bonus ×1.5 contre chasseurs légers.',
+  canon_laser_leger:        'Pièce légère, peu chère. Premier rempart d\'une planète.',
+  canon_laser_lourd:        'Pièce moyenne. Encaisse mieux que le léger.',
+  canon_gauss:              'Pièce lourde. Bonus ×2 vs croiseur, ×1.5 vs cuirasse.',
+  canon_ionique:             'Spécialisé anti-bouclier. Bouclier 500 mais attaque modeste.',
+  canon_plasma:             'Pièce capitale. Bonus ×2 vs cuirasse, ×1.5 vs destroyer.',
+  petit_bouclier_planetaire: 'Bouclier 2 000. Une seule par planète.',
+  grand_bouclier_planetaire: 'Bouclier 10 000. Une seule par planète. Requiert bouclier graviton 6.',
+  // Recherches
+  robotique:                'Accélère la cadence générale. Prérequis usine robotique pour de nombreuses unités.',
+  automation_miniere:       'Améliore les rendements des mines au fil des niveaux.',
+  fusion_controlee:         'Améliore le rendement de la centrale solaire et la consommation des unités.',
+  drives_impulsion:         'Vitesse des chasseurs et croiseurs. Prérequis pour vaisseaux moyens.',
+  drive_hyperspatial:       'Long-courrier. Requis pour cuirasse, recycleur et au-delà.',
+  armement:                 'Augmente l\'attaque des unités et défenses. Prérequis lourd.',
+  bouclier_graviton:        'Augmente les boucliers. Requis pour les boucliers planétaires et le canon ionique.',
+  espionnage_profond:       'Augmente la portée des sondes. Prérequis pour construire des sondes.',
+  cryptographie:            'Réduit la portée d\'espionnage de tes adversaires sur toi.',
+  diplomatie:               'Influence avec les autres empires. Prérequis pour le centre diplomatique.',
+  doctrine_imperiale:       'Cohésion des flottes alliées. Requiert diplomatie 4.',
+  distorsion_subluminique:  'Voyage instantané. Requiert drive hyperspatial 6.',
+};
+
+function descOf(key) { return DESCRIPTIONS[key] || ''; }
+
+// Tooltip riche pour vaisseaux et défenses (mêmes stats).
+function unitTooltip(key, def, qty, kind) {
+  const role = descOf(key);
+  const stats = [
+    def.coque ? `coque ${fmt(def.coque)}` : null,
+    def.bouclier ? `bouclier ${fmt(def.bouclier)}` : null,
+    def.attaque ? `attaque ${fmt(def.attaque)}` : null,
+    def.vitesse ? `vitesse ${fmt(def.vitesse)}` : null,
+    def.cargo ? `cargo ${fmt(def.cargo)}` : null,
+  ].filter(Boolean).join(' · ');
+
+  const cost = Object.entries(def.cout || {})
+    .map(([r, v]) => `${fmtCompact(v)} ${labels[r] || r}`).join(' + ');
+
+  const counters = def.bonus_contre
+    ? 'Efficace contre : ' + Object.entries(def.bonus_contre)
+        .map(([k, m]) => `${labels[k] || k} ×${m}`).join(', ')
+    : '';
+
+  const reqs = def.requiert
+    ? 'Requiert : ' + Object.entries(def.requiert)
+        .map(([k, n]) => `${labels[k] || k} niv ${n}`).join(', ')
+    : '';
+
+  const ownedLine = qty != null ? `${kind === 'vaisseaux' ? 'Possédés' : 'Déployés'} : ${fmt(qty)}` : '';
+  return [role, stats, cost ? `Coût : ${cost}` : '', counters, reqs, ownedLine]
+    .filter(Boolean).join('\n');
+}
+
+// Tooltip recherche.
+function techTooltip(tech, def, lvl) {
+  const role = descOf(tech);
+  const niv = lvl > 0 ? `Niveau actuel : ${lvl}` : 'Non recherché';
+  const reqs = def.requiert
+    ? 'Requiert : ' + Object.entries(def.requiert)
+        .map(([k, n]) => `${labels[k] || k} niv ${n}`).join(', ')
+    : '';
+  return [role, niv, reqs].filter(Boolean).join('\n');
+}
+
+// Tooltip ressource (strip).
+function resourceTooltip(res, info) {
+  const role = descOf(res);
+  const stock = info?.stock != null ? `Stock : ${fmt(info.stock)}` : '';
+  const cap   = info?.capacite ? `Capacité : ${fmt(info.capacite)}` : '';
+  const prod  = info?.production_par_utj != null
+    ? `Production : ${info.production_par_utj > 0 ? '+' : ''}${info.production_par_utj}/utj`
+    : '';
+  return [role, stock, cap, prod].filter(Boolean).join('\n');
+}
+
 // Tooltip plus long pour le hover (attribut title="").
 function batTooltip(k, lvl) {
   const lines = {
@@ -2300,7 +2398,8 @@ function renderRecGrid(emp) {
       }
     }
 
-    return `<div class="bcard ${niveauActuel === 0 ? 'zero' : ''}">
+    const tip = techTooltip(tech, def, niveauActuel);
+    return `<div class="bcard ${niveauActuel === 0 ? 'zero' : ''}" data-tip="${escapeHtml(tip)}">
       <div class="gl">${icons.laboratoire}</div>
       <div class="nm">${labels[tech] || tech}<small>discipline scientifique</small></div>
       <div class="lvl">${niveauActuel}<small>niveau</small></div>
@@ -2412,10 +2511,11 @@ function renderUnitGrid(p, kind) {
     </div>`;
     if (reqBad) footer = `<div class="req">requiert <b>${missing}</b></div>` + footer;
 
-    return `<div class="bcard ${have === 0 ? 'zero' : ''}">
+    const tip = unitTooltip(unite, def, have, kind);
+    return `<div class="bcard ${have === 0 ? 'zero' : ''}" data-tip="${escapeHtml(tip)}">
       <div class="gl">${ico}</div>
       <div class="nm">${labels[unite] || unite}<small>${taglines[unite] || subDefault}</small></div>
-      <div class="lvl">${fmt(have)}<small>possédées</small></div>
+      <div class="lvl">${fmt(have)}<small>${kind === 'vaisseaux' ? 'possédés' : 'déployées'}</small></div>
       ${footer}
     </div>`;
   }).join('');

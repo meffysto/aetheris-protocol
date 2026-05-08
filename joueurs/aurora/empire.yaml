@@ -1,25 +1,28 @@
-# Généré à l'inscription par engine/join.mjs.
+# Généré par engine/tick.mjs — ne pas éditer.
 version: 1
 joueur: aurora
-tick: 31
+tick: 76
 score_total: 0
 points_militaires: 0
 rang: 999
-alliance: ~
+alliance: null
 planetes:
   - nom: aurora-prima
-    coordonnees: [1, 3, 14]
+    coordonnees:
+      - 1
+      - 3
+      - 14
     type: tellurique
     champs:
       utilises: 0
       total: 219
     ressources:
       ferrum:
-        stock: 500
+        stock: 680
         production_par_utj: 30
         capacite: 100000
       lumen:
-        stock: 500
+        stock: 620
         production_par_utj: 20
         capacite: 100000
       plasmide:

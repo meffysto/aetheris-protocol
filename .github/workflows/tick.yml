@@ -31,10 +31,33 @@ jobs:
           git config user.name "aetheris-engine"
           git config user.email "engine@aetheris.local"
           TICK=$(grep '^tick:' world/manifest.yaml | awk '{print $2}')
-          if ! git diff --quiet; then
-            git add -A
-            git commit -m "tick $TICK"
-            git push
-          else
+          if git diff --quiet; then
             echo "Aucun changement — tick vide."
+            exit 0
           fi
+
+          # Sujet de commit varié à partir des events du tick (résumé humain).
+          # Évite des centaines de commits "tick N" identiques qui ressemblent
+          # à du spam pour les heuristiques anti-abuse.
+          TICK_PADDED=$(printf "%04d" "$TICK")
+          EVENT_FILE="world/events/tick-${TICK_PADDED}.md"
+          SUBJECT="tick $TICK"
+          if [ -f "$EVENT_FILE" ]; then
+            COUNT=$(grep -c '^- \*\*' "$EVENT_FILE" || true)
+            FIRST_TYPE=$(grep -m1 '^- \*\*' "$EVENT_FILE" | sed -n 's/^- \*\*\([^*]*\)\*\*.*/\1/p')
+            if [ -n "$FIRST_TYPE" ]; then
+              if [ "$COUNT" -gt 1 ]; then
+                SUBJECT="tick $TICK — $FIRST_TYPE (+$((COUNT - 1)))"
+              else
+                SUBJECT="tick $TICK — $FIRST_TYPE"
+              fi
+            fi
+          fi
+
+          git add -A
+          if [ -f "$EVENT_FILE" ]; then
+            git commit -m "$SUBJECT" -m "$(cat "$EVENT_FILE")"
+          else
+            git commit -m "$SUBJECT"
+          fi
+          git push

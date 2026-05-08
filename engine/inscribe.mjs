@@ -193,7 +193,7 @@ export function buildRevealTx({
   commitTxid,         // string hex
   commitVout = 0,
   commitValue,        // sats
-  commitPayment,      // résultat p2tr (avec .leaves)
+  commitPayment,      // résultat p2tr (avec .leaves, .tapLeafScript)
   leafScript,         // Uint8Array
   senderPubKey,       // Uint8Array (32 bytes)
   recipientAddress,   // string bech32 — reçoit le dust après fees
@@ -204,20 +204,19 @@ export function buildRevealTx({
 }) {
   const { Transaction } = libs;
 
-  const leaf = commitPayment.leaves?.[0];
-  if (!leaf) throw new Error('buildRevealTx: aucun leaf dans commitPayment');
-
-  // Estimation fee reveal : dépend de la taille du witness (leaf script + control block)
-  // Control block ≈ 33 bytes, leaf script variable
-  const witnessSize = 33 + leafScript.length;
-  const estimatedRevealFee = Math.ceil((148 + witnessSize) * feeRateSatVb);
+  // Estimation fee reveal : witness = [sig(64), leafScript, controlBlock(33)]
+  const witnessSize = 64 + leafScript.length + 33;
+  // vsize = (non-witness bytes) * 4 + witness bytes) / 4
+  // Input non-witness: 41 bytes. Output: 43 bytes. Overhead: 10 bytes.
+  const estimatedRevealFee = Math.ceil(((41 + 10 + 43) * 4 + witnessSize + 2) / 4 * feeRateSatVb);
 
   const revealOutput = commitValue - estimatedRevealFee;
   if (revealOutput < dustLimit) {
     throw new Error(`Dust trop bas après fees reveal: ${revealOutput} sats. Augmente le dust limit ou réduis le fee rate.`);
   }
 
-  const tx = new Transaction();
+  // allowUnknownInputs+Outputs nécessaire car notre leaf script est de type "unknown"
+  const tx = new Transaction({ allowUnknownInputs: true, allowUnknownOutputs: true });
   tx.addInput({
     txid: commitTxid,
     index: commitVout,
@@ -226,7 +225,6 @@ export function buildRevealTx({
       amount: BigInt(commitValue),
     },
     tapInternalKey: commitPayment.tapInternalKey,
-    tapMerkleRoot: commitPayment.tapMerkleRoot,
     tapLeafScript: commitPayment.tapLeafScript,
   });
 

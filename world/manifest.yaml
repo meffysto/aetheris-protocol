@@ -2,7 +2,7 @@
 version: 1
 protocol_version: 0.1
 serveur: aetheris-1
-tick: 82
+tick: 83
 seed: 0xf057ddd71510a983
 demarrage_iso: "2026-05-06T21:18:33.928Z"
 duree_tick_min: 15
@@ -11,6 +11,6 @@ parametres:
   systemes_par_galaxie: 3
   positions_par_systeme: 15
   planetes_max_par_joueur: 9
-hash_etat: "sha256:427182c7cbf520d3ffbee56b37c4d436"
-previous_tick_hash: "sha256:abf219d39f17b32d0c1ad02fe066f8067b34d98c043ac90e337c881beeaabd86"
-tick_hash: "sha256:c5de4e4b94ad4cebec8c3b562b6b47852cb7be77c8fea9afa3207591fd0385fe"
+hash_etat: "sha256:8691c2a0b5b1f5572dbb5060d52fee08"
+previous_tick_hash: "sha256:c5de4e4b94ad4cebec8c3b562b6b47852cb7be77c8fea9afa3207591fd0385fe"
+tick_hash: "sha256:96ffd6b746d4cd60cdbf5789c0f497c22c4fb2c4daf4263df8db0522c54ffcd3"

@@ -21,7 +21,7 @@ jobs:
     # Skip si le tick a foiré (workflow_run se déclenche aussi sur failure).
     # workflow_dispatch n'a pas de workflow_run.conclusion → toujours OK.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    runs-on: docker
+    runs-on: codeberg-tiny
     permissions:
       contents: write
     steps:

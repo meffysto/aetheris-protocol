@@ -14,9 +14,9 @@ on:
 
 jobs:
   tick:
-    # Codeberg-hosted runners sont taggés "docker". On garde "ubuntu-latest"
-    # comme alias compatible — Forgejo accepte les deux par défaut.
-    runs-on: docker
+    # Runner hébergé Codeberg (beta) : codeberg-tiny suffit largement
+    # (tick.mjs s'exécute en quelques secondes, on est loin du cap 2 min).
+    runs-on: codeberg-tiny
     permissions:
       contents: write
     steps:

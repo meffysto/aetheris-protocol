@@ -938,13 +938,25 @@ h2.sect .rule {
   position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
   background: var(--ink-2); border: none; border-left: 4px solid var(--phosphor);
   border-radius: 8px;
-  padding: 10px 18px; z-index: 99;
+  padding: 10px 40px 10px 18px; z-index: 99;
   font-family: var(--sans); font-weight: 600; font-size: 12px;
   color: var(--phosphor); letter-spacing: 0;
   box-shadow: var(--shadow-card);
   display: none;
+  max-width: min(560px, calc(100vw - 32px));
+  word-break: break-word;
 }
 .err.on { display: block; }
+.err .close, .toast .close {
+  position: absolute; top: 6px; right: 8px;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border: none; background: none; cursor: pointer;
+  font-family: var(--sans); font-size: 16px; line-height: 1;
+  color: var(--bone-dim); border-radius: 50%;
+  transition: background .15s, color .15s;
+}
+.err .close:hover, .toast .close:hover { background: var(--ink-3); color: var(--bone-2); }
 
 /* ─── improve row on bcard ────────────────────────────────── */
 .bcard .upg {
@@ -1085,10 +1097,12 @@ h2.sect .rule {
   background: var(--ink-2); border: none;
   border-left: 4px solid var(--brass);
   border-radius: 10px;
-  padding: 14px 20px; max-width: 380px;
+  padding: 14px 40px 14px 20px;
+  max-width: min(380px, calc(100vw - 44px));
   font-family: var(--sans); font-size: 13px; font-weight: 500;
   color: var(--bone); box-shadow: var(--shadow-pop);
   display: none; animation: slideIn .25s ease;
+  word-break: break-word;
 }
 .toast.on { display: block; }
 .toast.err { border-left-color: var(--phosphor); color: var(--phosphor); }
@@ -1710,9 +1724,13 @@ async function load() {
     render();
   } catch (e) {
     const err = document.getElementById('err');
-    err.textContent = '⚠ liaison rompue · ' + (e.message || 'erreur');
+    err.innerHTML = `⚠ liaison rompue · ${escapeHtml(e.message || 'erreur')}<button class="close" aria-label="Fermer" onclick="this.parentElement.classList.remove('on')">×</button>`;
     err.classList.add('on');
   }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
 /* ───────────────────────────── Format helpers ───────────────────────────── */
@@ -3152,7 +3170,8 @@ let toastTimer = null;
 function toast(title, msg, isErr) {
   const t = document.getElementById('toast');
   t.className = 'toast on' + (isErr ? ' err' : '');
-  t.innerHTML = `<div class="title">${title}</div><div>${msg}</div>`;
+  t.innerHTML = `<button class="close" aria-label="Fermer" onclick="this.parentElement.classList.remove('on')">×</button>
+    <div class="title">${title}</div><div>${msg}</div>`;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('on'), 6000);
 }

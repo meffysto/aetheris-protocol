@@ -175,75 +175,54 @@ body::after {
 .player-pick select option { background: var(--brass); color: #fff; }
 .player-pick select:focus { outline: 1px solid rgba(255,255,255,0.4); }
 
-/* ─── resource strip ──────────────────────────────────────── */
+/* ─── resource strip (slim 44px) ──────────────────────────── */
 .strip {
   grid-area: strip;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  padding: 18px 22px 14px;
-  background: transparent;
+  display: flex; gap: 0;
+  padding: 0 22px;
+  background: rgba(247, 240, 223, 0.6);
+  border-bottom: 1px solid var(--hairline);
+  height: 44px;
+  align-items: stretch;
 }
 .res {
+  flex: 1;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 18px;
+  border-right: 1px solid var(--hairline);
   position: relative;
-  padding: 14px 18px;
-  background: var(--ink-2);
-  border-radius: var(--r-card);
-  box-shadow: var(--shadow-card);
-  display: grid;
-  grid-template-columns: 40px 1fr auto;
-  grid-template-rows: auto auto;
-  column-gap: 14px;
-  align-items: center;
 }
+.res:last-child { border-right: none; }
 .res .ico {
-  grid-row: 1 / 3;
-  width: 40px; height: 40px;
+  width: 22px; height: 22px;
   display: grid; place-items: center;
   border-radius: 50%;
-  background: var(--ink-3);
-  color: var(--brass);
 }
-.res .ico svg { width: 20px; height: 20px; }
+.res .ico svg { width: 12px; height: 12px; }
 .res .nm {
-  font-family: var(--sans); font-weight: 600; font-size: 10.5px;
-  color: var(--bone-dim); letter-spacing: 0.18em;
+  font-family: var(--sans); font-weight: 600; font-size: 9.5px;
+  color: var(--bone-dim); letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 .res .nm small { display: none; }
 .res .stock {
+  margin-left: auto;
   font-family: var(--display); font-weight: 600;
-  font-size: 22px; color: var(--bone-2);
-  line-height: 1; text-align: right;
+  font-size: 16px; color: var(--bone-2);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  line-height: 1;
 }
 .res .meta {
-  grid-column: 2 / 4;
-  display: flex; justify-content: space-between; align-items: center;
-  font-family: var(--sans); font-size: 11px; font-weight: 500;
-  color: var(--bone-dim);
-  margin-top: 2px;
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  color: var(--green);
+  white-space: nowrap;
 }
-.res .prod { color: var(--green); font-weight: 600; }
-.res .prod.zero { color: var(--bone-dim); font-weight: 500; }
-.res .bar {
-  grid-column: 1 / 4;
-  height: 3px; background: var(--ink-4); position: relative;
-  border-radius: 2px; overflow: hidden;
-  margin-top: 10px;
-}
-.res .bar i {
-  position: absolute; left: 0; top: 0; bottom: 0;
-  background: var(--brass);
-  border-radius: 2px;
-  transition: width 1.2s cubic-bezier(.2,.7,.2,1);
-}
-.res .bar i.warn { background: var(--phosphor); }
-.res[data-r="energie"]   .ico { background: rgba(58,110,150,0.12); color: #3a6e96; border: none; }
-.res[data-r="ferrum"]    .ico { background: rgba(168,58,37,0.10); color: #a83a25; border: none; }
-.res[data-r="lumen"]     .ico { background: rgba(196,148,40,0.14); color: #b88820; border: none; }
-.res[data-r="plasmide"]  .ico { background: rgba(106,90,150,0.12); color: #6a5a96; border: none; }
+.res .meta.warn { color: var(--phosphor); }
+.res .bar { display: none; }
+.res[data-r="ferrum"]    .ico { background: rgba(168,58,37,0.10); color: #a83a25; }
+.res[data-r="lumen"]     .ico { background: rgba(196,148,40,0.16); color: #b88820; }
+.res[data-r="plasmide"]  .ico { background: rgba(106,90,150,0.14); color: #6a5a96; }
+.res[data-r="energie"]   .ico { background: rgba(58,110,150,0.12); color: #3a6e96; }
 
 /* ─── nav rail ────────────────────────────────────────────── */
 .nav {
@@ -354,9 +333,9 @@ body::after {
 
 /* section heading */
 h2.sect {
-  margin: 26px 0 16px;
+  margin: 26px 0 14px;
   font-family: var(--display); font-weight: 600;
-  font-size: 22px; color: var(--bone-2);
+  font-size: 18px; color: var(--bone-2);
   letter-spacing: -0.01em;
   display: flex; align-items: baseline; gap: 12px;
 }
@@ -364,9 +343,168 @@ h2.sect::before { display: none; }
 h2.sect::after { display: none; }
 h2.sect .num {
   font-family: var(--sans); font-weight: 600;
-  font-size: 10px; letter-spacing: 0.2em;
+  font-size: 9.5px; letter-spacing: 0.22em;
   color: var(--brass-dim);
   margin-left: 4px;
+}
+h2.sect .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+  align-self: center;
+  margin-left: 4px;
+}
+
+/* ─── BULLETIN (carte héros parchemin) ────────────────────── */
+.bulletin {
+  background: linear-gradient(180deg, #fffaf0 0%, #f9efd6 100%);
+  color: var(--bone-2);
+  border-radius: var(--r-card);
+  box-shadow: 0 4px 12px rgba(14,29,51,0.10), 0 24px 56px rgba(14,29,51,0.10);
+  border: 1px solid var(--hairline);
+  padding: 26px 30px;
+  position: relative; overflow: hidden;
+  margin-bottom: 22px;
+}
+.bulletin::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><g fill='none' stroke='%230e1d33' stroke-width='0.4' opacity='0.05'><circle cx='320' cy='80' r='40'/><circle cx='340' cy='120' r='80'/><circle cx='100' cy='300' r='60'/></g></svg>");
+  background-size: 400px 400px; pointer-events: none;
+}
+.bulletin > * { position: relative; }
+.bulletin .label {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--phosphor); margin-bottom: 10px;
+}
+.bulletin .planet {
+  font-family: var(--display); font-weight: 600;
+  font-size: 38px; line-height: 1.05; color: var(--bone-2);
+  margin: 0 0 4px; letter-spacing: -0.015em;
+}
+.bulletin .planet .coord {
+  font-family: var(--mono); font-weight: 500;
+  font-size: 18px; color: var(--bone-dim);
+  margin-right: 14px; letter-spacing: 0.04em;
+}
+.bulletin .sub {
+  font-family: var(--sans); font-size: 13px; color: var(--bone-dim);
+  margin-bottom: 22px;
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+}
+.bulletin .sub b { color: var(--bone-2); font-weight: 600; }
+.bulletin .sub .chip {
+  padding: 3px 9px;
+  border: 1px solid var(--hairline); border-radius: var(--r-pill);
+  font-size: 9.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; font-weight: 700;
+  color: var(--bone); background: rgba(14,29,51,0.04);
+}
+.bulletin .sub .chip.tellurique  { color: #3a5a22; border-color: #6a8a3a; background: rgba(106,138,58,0.10); }
+.bulletin .sub .chip.cristalline { color: #1a5a5a; border-color: #4a8a8a; background: rgba(74,138,138,0.10); }
+.bulletin .sub .chip.glacee      { color: #1a4a6a; border-color: #4a7a9a; background: rgba(74,122,154,0.10); }
+.bulletin .sub .chip.volcanique  { color: #8a2818; border-color: #b8503a; background: rgba(184,80,58,0.10); }
+.bulletin .sub .chip.gazeuse     { color: #4a2a6a; border-color: #7a5a9a; background: rgba(122,90,154,0.10); }
+.bulletin .news {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 18px; padding: 18px 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 16px;
+}
+.bulletin .news h3 {
+  font-family: var(--sans); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--bone-dim); margin: 0 0 8px;
+}
+.bulletin .news .item {
+  font-family: var(--display); font-weight: 500;
+  font-size: 19px; color: var(--bone-2);
+  line-height: 1.35; letter-spacing: -0.005em;
+}
+.bulletin .news .item em {
+  font-style: italic; color: var(--phosphor); font-weight: 600;
+}
+.bulletin .news .stamp {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--bone-dim); align-self: end; white-space: nowrap;
+}
+.bulletin .threats {
+  background: rgba(168,58,37,0.08);
+  border: 1px solid rgba(168,58,37,0.32);
+  border-left: 3px solid var(--phosphor);
+  border-radius: 6px;
+  padding: 12px 16px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 14px;
+}
+.bulletin .threats .pulse {
+  width: 8px; height: 8px;
+  background: var(--phosphor-2); border-radius: 50%; flex: none;
+  box-shadow: 0 0 0 0 rgba(198,74,48,0.5);
+  animation: bull-ping 1.8s infinite;
+}
+@keyframes bull-ping {
+  0%   { box-shadow: 0 0 0 0 rgba(198,74,48,0.5); }
+  70%  { box-shadow: 0 0 0 12px rgba(198,74,48,0); }
+  100% { box-shadow: 0 0 0 0 rgba(198,74,48,0); }
+}
+.bulletin .threats .body {
+  flex: 1; font-family: var(--sans); font-size: 13px; font-weight: 500;
+  color: var(--bone-2);
+}
+.bulletin .threats .body b { color: var(--phosphor); font-weight: 700; }
+.bulletin .stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--hairline); padding-top: 16px;
+}
+.bulletin .stats .s {
+  padding: 0 18px; border-right: 1px solid var(--hairline);
+}
+.bulletin .stats .s:first-child { padding-left: 0; }
+.bulletin .stats .s:last-child { border-right: none; padding-right: 0; }
+.bulletin .stats .s .k {
+  font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--bone-dim); font-weight: 700; margin-bottom: 4px;
+}
+.bulletin .stats .s .v {
+  font-family: var(--display); font-weight: 600;
+  font-size: 24px; color: var(--bone-2); line-height: 1.1;
+}
+.bulletin .stats .s .v small {
+  font-family: var(--sans); font-weight: 600;
+  font-size: 11px; color: var(--green); margin-left: 4px;
+  letter-spacing: 0;
+}
+
+/* ─── BELL (alertes header) ───────────────────────────────── */
+.bell {
+  position: relative;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  margin-right: 12px;
+  border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.06);
+  border: none; cursor: pointer;
+  transition: background .15s;
+}
+.bell:hover { background: rgba(255,255,255,0.14); }
+.bell svg { width: 17px; height: 17px; color: rgba(255,255,255,0.85); }
+.bell .dot {
+  position: absolute; top: 4px; right: 4px;
+  min-width: 17px; height: 17px;
+  border-radius: 999px;
+  background: var(--phosphor); color: #fff;
+  font-size: 10px; font-weight: 700;
+  display: grid; place-items: center;
+  box-shadow: 0 0 0 2px var(--brass);
+  padding: 0 5px;
+  font-family: var(--sans);
+  animation: bell-pulse 2.4s infinite;
+}
+.bell.silent .dot { display: none; }
+@keyframes bell-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--brass), 0 0 0 0 rgba(168,58,37,0.6); }
+  50%      { box-shadow: 0 0 0 2px var(--brass), 0 0 0 6px rgba(168,58,37,0); }
 }
 
 /* tab views */
@@ -1169,6 +1307,13 @@ h2.sect .num {
         </div>
         <div class="countdown" id="countdown">prochain · —</div>
       </div>
+      <button class="bell silent" id="bellBtn" title="alertes" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+          <path d="M10 21a2 2 0 0 0 4 0"/>
+        </svg>
+        <span class="dot" id="bellDot">0</span>
+      </button>
       <div class="player-pick">
         <div class="who" id="whoLabel">—<small>commandant</small></div>
         <select id="playerSelect"></select>
@@ -1222,7 +1367,7 @@ h2.sect .num {
 
   <!-- MAIN -->
   <main class="main" id="main">
-    <div class="planet-head" id="planetHead"></div>
+    <div id="planetHead"></div>
 
     <div class="view on" data-v="overview" id="vOverview"></div>
     <div class="view" data-v="batiments" id="vBat"></div>
@@ -1670,64 +1815,157 @@ function renderNavCounts(p, emp) {
 
 function renderResourceStrip(p) {
   const def = [
-    { k: 'ferrum',   l: 'Ferrum',   sub: 'mineralia' },
-    { k: 'lumen',    l: 'Lumen',    sub: 'photonica' },
-    { k: 'plasmide', l: 'Plasmide', sub: 'biomatter' },
+    { k: 'ferrum',   l: 'Ferrum'   },
+    { k: 'lumen',    l: 'Lumen'    },
+    { k: 'plasmide', l: 'Plasmide' },
   ];
   let html = '';
   for (const r of def) {
     const info = p?.ressources?.[r.k] || { stock: 0, production_par_utj: 0, capacite: 0 };
-    const pct = info.capacite ? Math.min(100, (info.stock / info.capacite) * 100) : 0;
+    const pct = info.capacite ? (info.stock / info.capacite) * 100 : 0;
     const warn = pct >= 90;
     const prod = info.production_par_utj || 0;
     html += `<div class="res" data-r="${r.k}">
       <div class="ico">${icons[r.k]}</div>
-      <div class="nm">${r.l}<small>${r.sub}</small></div>
+      <div class="nm">${r.l}</div>
       <div class="stock">${fmtCompact(info.stock)}</div>
-      <div class="bar"><i class="${warn?'warn':''}" style="width:${pct}%"></i></div>
-      <div class="meta">
-        <span class="prod ${prod===0?'zero':''}">${prod>0?'+':''}${prod}/<span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">utj</span></span>
-        <span>${fmtCompact(info.stock)} / ${fmtCompact(info.capacite)}</span>
-      </div>
+      <div class="meta ${warn ? 'warn' : ''} ${prod === 0 ? 'zero' : ''}">${warn ? 'plein' : (prod > 0 ? '+' + prod + '/utj' : '—')}</div>
     </div>`;
   }
-  // énergie
   const en = p?.energie || { production: 0, consommation: 0 };
   const balance = (en.production || 0) - (en.consommation || 0);
-  const enPct = en.production ? Math.min(100, (en.consommation / en.production) * 100) : 0;
   html += `<div class="res" data-r="energie">
     <div class="ico">${icons.energie}</div>
-    <div class="nm">Énergie<small>quanta</small></div>
-    <div class="stock" style="color:${balance < 0 ? 'var(--rust)' : 'var(--phosphor)'}">${balance >= 0 ? '+' : ''}${balance}</div>
-    <div class="bar"><i class="${enPct >= 95 ? 'warn' : ''}" style="width:${enPct}%"></i></div>
-    <div class="meta">
-      <span class="prod">${en.production || 0} prod</span>
-      <span>${en.consommation || 0} cons</span>
-    </div>
+    <div class="nm">Énergie</div>
+    <div class="stock" style="color:${balance < 0 ? 'var(--phosphor)' : 'var(--bone-2)'}">${balance >= 0 ? '+' : ''}${balance}</div>
+    <div class="meta ${balance < 0 ? 'warn' : ''}">${balance < 0 ? 'déficit' : 'stable'}</div>
   </div>`;
   document.getElementById('strip').innerHTML = html;
 }
 
 function renderPlanetHead(p, emp) {
+  // Rebrandé en "Bulletin" — carte héros qui remplace l'ancien planet-head
+  // + les 6 mini-stats §I Synopsis de l'overview.
   const head = document.getElementById('planetHead');
   if (!p) {
-    head.innerHTML = `<div style="grid-column:1/-1" class="empty-stamp">aucune planète attribuée</div>`;
+    head.className = '';
+    head.innerHTML = `<div class="empty-stamp">aucune planète attribuée</div>`;
     return;
   }
+  head.className = 'bulletin';
   const coord = (p.coordonnees || []).join(':');
-  const champs = `${p.champs?.utilises ?? 0}/${p.champs?.total ?? 0}`;
+  const tickCur = state.manifest?.tick ?? 0;
+  const buildings = Object.entries(p.batiments || {});
+  const built = buildings.filter(([, n]) => n > 0).length;
+  const total = buildings.length;
+
+  // News : prochain événement notable (chantier qui finit, recherche, flotte)
+  const news = computeNextEvent(p, emp, tickCur);
+
+  // Threats : flottes hostiles d'autres joueurs en route vers une de mes planètes
+  const threat = computeIncomingThreat(emp, tickCur);
+
+  // Stats : score, rang, ordres scellés en attente
+  const decretsCount = (emp?._ordres?.tick_cible >= tickCur + 1)
+    ? (emp._ordres.ordres || []).length : 0;
+  const rangStr = emp?.rang != null ? `${emp.rang}` : '—';
+  const scoreStr = fmt(emp?.score_total ?? 0);
+
   head.innerHTML = `
-    <div class="planet-glyph">${planetSVG(p.type || 'tellurique')}</div>
-    <div>
-      <h1 class="planet-title"><span class="em">${coord}</span>${p.nom}</h1>
-      <div class="planet-sub">
-        <span class="chip ${p.type}">${p.type}</span>
-        <span>rang <b style="color:var(--bone-2);font-family:var(--display)">#${emp?.rang ?? '?'}</b></span>
-        <span>score <b style="color:var(--bone-2);font-family:var(--display)">${fmt(emp?.score_total ?? 0)}</b></span>
-        <span>militaire <b style="color:var(--bone-2);font-family:var(--display)">${fmt(emp?.points_militaires ?? 0)}</b></span>
-        <span class="fields"><b>${champs}</b> champs occupés</span>
+    <div class="label">Bulletin du Cycle ${tickCur}</div>
+    <h1 class="planet"><span class="coord">${coord}</span>${p.nom}</h1>
+    <div class="sub">
+      <span><b>${built}/${total}</b> ouvrages debout</span>
+      <span class="chip ${p.type || ''}">${p.type || 'planète'}</span>
+      <span>militaire <b>${fmt(emp?.points_militaires ?? 0)}</b></span>
+      <span style="margin-left:auto"><b>${p.champs?.utilises ?? 0}/${p.champs?.total ?? 0}</b> champs</span>
+    </div>
+    <div class="news">
+      <div>
+        <h3>${news.label}</h3>
+        <div class="item">${news.text}</div>
       </div>
+      <div class="stamp">${news.stamp}</div>
+    </div>
+    ${threat ? `
+      <div class="threats">
+        <div class="pulse"></div>
+        <div class="body">${threat}</div>
+      </div>` : ''}
+    <div class="stats">
+      <div class="s"><div class="k">Score impérial</div><div class="v">${scoreStr}</div></div>
+      <div class="s"><div class="k">Rang galactique</div><div class="v">${rangStr}<small>${rangStr === '1' ? 'tête' : ''}</small></div></div>
+      <div class="s"><div class="k">Décrets scellés</div><div class="v">${decretsCount}<small>${decretsCount > 0 ? 'en file' : ''}</small></div></div>
     </div>`;
+
+  updateBell(threat, decretsCount);
+}
+
+function computeNextEvent(p, emp, tickCur) {
+  // 1) Chantier qui s'achève le plus tôt
+  const chantiers = (p.file_chantier || []).slice().sort((a, b) => (a.fin_utj || 0) - (b.fin_utj || 0));
+  if (chantiers[0]) {
+    const c = chantiers[0];
+    const remain = Math.max(0, c.fin_utj || 0);
+    const ticks = Math.max(1, Math.ceil(remain / 6));
+    const tickFin = tickCur + ticks;
+    return {
+      label: 'Prochaine livraison',
+      text: `Vos chantiers livreront <em>${labels[c.batiment] || c.batiment} niveau ${c.niveau_cible}</em> au cycle <em>${tickFin}</em>.`,
+      stamp: `dans ${ticks} cycle${ticks > 1 ? 's' : ''} · tick ${tickFin}`,
+    };
+  }
+  // 2) Flotte en vol
+  const vols = emp?.flottes_en_vol || [];
+  if (vols[0]) {
+    const f = vols[0];
+    const dest = f.vers?.planete || f.vers || '—';
+    return {
+      label: 'Flotte en mission',
+      text: `Mission <em>${f.type_mission || 'reconnaissance'}</em> vers <em>${dest}</em>.`,
+      stamp: f.tick_arrivee ? `arrivée tick ${f.tick_arrivee}` : 'en vol',
+    };
+  }
+  // 3) Sinon, état calme
+  return {
+    label: 'État de l\'Empire',
+    text: `Cycle calme. <em>${emp?.points_militaires ? 'La flotte veille' : 'L\'industrie tourne'}</em>, aucune action urgente.`,
+    stamp: `tick ${tickCur}`,
+  };
+}
+
+function computeIncomingThreat(emp, tickCur) {
+  // Scan toutes les flottes en vol de tous les joueurs pour trouver celles
+  // qui visent une de mes planètes avec une mission hostile.
+  if (!state.players || !emp) return null;
+  const myPlanets = new Set((emp.planetes || []).map(p => p.nom));
+  const me = state.current;
+  const hostile = new Set(['attaque', 'siege', 'pillage', 'bombardement']);
+  let earliest = null;
+  for (const [name, e] of Object.entries(state.players)) {
+    if (name === me) continue;
+    for (const f of (e.flottes_en_vol || [])) {
+      const dest = f.vers?.planete || f.vers;
+      if (!myPlanets.has(dest)) continue;
+      if (!hostile.has((f.type_mission || '').toLowerCase())) continue;
+      const arr = f.tick_arrivee || 0;
+      const ticksLeft = Math.max(0, arr - tickCur);
+      if (!earliest || ticksLeft < earliest.ticksLeft) {
+        earliest = { from: name, dest, ticksLeft, arr, mission: f.type_mission };
+      }
+    }
+  }
+  if (!earliest) return null;
+  return `Flotte <b>${earliest.mission}</b> de <b>${earliest.from}</b> en approche de <b>${earliest.dest}</b> · impact dans <b>${earliest.ticksLeft} cycle${earliest.ticksLeft > 1 ? 's' : ''}</b>.`;
+}
+
+function updateBell(threat, decretsCount) {
+  const bell = document.getElementById('bellBtn');
+  const dot = document.getElementById('bellDot');
+  if (!bell || !dot) return;
+  const count = (threat ? 1 : 0) + (decretsCount > 0 ? 1 : 0);
+  if (count === 0) { bell.classList.add('silent'); dot.textContent = '0'; }
+  else { bell.classList.remove('silent'); dot.textContent = String(count); }
 }
 
 function renderOverview(p, emp) {
@@ -1744,17 +1982,7 @@ function renderOverview(p, emp) {
   const def = Object.values(p.defenses || {}).reduce((a, b) => a + (b||0), 0);
 
   v.innerHTML = `
-    <h2 class="sect">Synopsis <span class="num">§ I</span></h2>
-    <div class="bgrid">
-      ${overviewCard('Infrastructure', `${built}/${total}`, 'bâtiments actifs', icons.usine_robotique)}
-      ${overviewCard('File active', `${queueItems}`, 'ouvrage en cours', icons.chantier_spatial)}
-      ${overviewCard('Sciences', `${research}`, 'disciplines avancées', icons.laboratoire)}
-      ${overviewCard('Flotte', `${fleet}`, 'unités au sol', icons.default_f)}
-      ${overviewCard('Défense', `${def}`, 'pièces déployées', icons.default_d)}
-      ${overviewCard('Champs libres', `${(p.champs?.total||0) - (p.champs?.utilises||0)}`, 'parcelles vacantes', icons.depot)}
-    </div>
-
-    <h2 class="sect">Bâtiments principaux <span class="num">§ II</span></h2>
+    <h2 class="sect">Bâtiments principaux <span class="num">§ I</span> <span class="rule"></span></h2>
     ${renderBatGrid(p, 4)}
   `;
 }
@@ -1826,16 +2054,16 @@ function renderBatGrid(p, max) {
 function renderBatiments(p) {
   const v = document.getElementById('vBat');
   if (!p) { v.innerHTML = `<div class="empty-stamp">néant</div>`; return; }
-  v.innerHTML = `<h2 class="sect">Édifices planétaires <span class="num">§ B</span></h2>${renderBatGrid(p)}`;
+  v.innerHTML = `<h2 class="sect">Édifices planétaires <span class="num">§ B</span> <span class="rule"></span></h2>${renderBatGrid(p)}`;
 }
 
 function renderRecherche(emp) {
   const v = document.getElementById('vRec');
   if (!emp || !state.rules?.recherches) {
-    v.innerHTML = `<h2 class="sect">Sciences <span class="num">§ R</span></h2><div class="empty-stamp">cabinets fermés</div>`;
+    v.innerHTML = `<h2 class="sect">Sciences <span class="num">§ R</span> <span class="rule"></span></h2><div class="empty-stamp">cabinets fermés</div>`;
     return;
   }
-  v.innerHTML = `<h2 class="sect">Sciences <span class="num">§ R</span></h2>${renderRecGrid(emp)}`;
+  v.innerHTML = `<h2 class="sect">Sciences <span class="num">§ R</span> <span class="rule"></span></h2>${renderRecGrid(emp)}`;
 }
 
 function renderRecGrid(emp) {
@@ -1912,19 +2140,19 @@ function renderRecGrid(emp) {
 function renderFlotte(p) {
   const v = document.getElementById('vFlt');
   if (!p || !state.rules?.vaisseaux) {
-    v.innerHTML = `<h2 class="sect">Flotte au sol <span class="num">§ F</span></h2><div class="empty-stamp">silos vides</div>`;
+    v.innerHTML = `<h2 class="sect">Flotte au sol <span class="num">§ F</span> <span class="rule"></span></h2><div class="empty-stamp">silos vides</div>`;
     return;
   }
-  v.innerHTML = `<h2 class="sect">Flotte au sol <span class="num">§ F</span></h2>${renderUnitGrid(p, 'vaisseaux')}`;
+  v.innerHTML = `<h2 class="sect">Flotte au sol <span class="num">§ F</span> <span class="rule"></span></h2>${renderUnitGrid(p, 'vaisseaux')}`;
 }
 
 function renderDefense(p) {
   const v = document.getElementById('vDef');
   if (!p || !state.rules?.defenses) {
-    v.innerHTML = `<h2 class="sect">Défenses <span class="num">§ D</span></h2><div class="empty-stamp">périmètre indéfendu</div>`;
+    v.innerHTML = `<h2 class="sect">Défenses <span class="num">§ D</span> <span class="rule"></span></h2><div class="empty-stamp">périmètre indéfendu</div>`;
     return;
   }
-  v.innerHTML = `<h2 class="sect">Défenses <span class="num">§ D</span></h2>${renderUnitGrid(p, 'defenses')}`;
+  v.innerHTML = `<h2 class="sect">Défenses <span class="num">§ D</span> <span class="rule"></span></h2>${renderUnitGrid(p, 'defenses')}`;
 }
 
 function renderUnitGrid(p, kind) {
@@ -2028,7 +2256,7 @@ function renderGalaxie() {
   const myPlanet = state.players[state.current]?.planetes?.[0];
   const myCoord = myPlanet?.coordonnees ? myPlanet.coordonnees.join(':') : null;
 
-  let html = `<h2 class="sect">Cartographie galactique <span class="num">§ G</span></h2><div class="galaxy">`;
+  let html = `<h2 class="sect">Cartographie galactique <span class="num">§ G</span> <span class="rule"></span></h2><div class="galaxy">`;
   for (const [coord, sys] of Object.entries(g.systemes)) {
     const star = sys.etoile || {};
     html += `<div class="system"><header>
@@ -2086,7 +2314,7 @@ function renderJournal(p, emp) {
       lines.push({ tick: m.tick, txt: `${f.type_mission} · ${f.depuis?.planete} → ${f.vers?.planete || f.vers}`, tone: 'rust' });
     }
   }
-  v.innerHTML = `<h2 class="sect">Journal de bord <span class="num">§ J</span></h2>
+  v.innerHTML = `<h2 class="sect">Journal de bord <span class="num">§ J</span> <span class="rule"></span></h2>
     <div style="font-family:var(--mono);font-size:12px;line-height:2.1">
     ${lines.map(l => `<div style="display:flex;gap:18px;border-bottom:1px dashed var(--hairline);padding:6px 0">
       <span style="color:var(--brass-dim);font-family:var(--display);min-width:60px">T${String(l.tick).padStart(3,'0')}</span>

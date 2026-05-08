@@ -1,16 +1,16 @@
-# Généré depuis la console (2026-05-07T15:49:49.052Z)
+# ═══════════════════════════════════════════════════════════
+#  DÉCRET IMPÉRIAL · Empire de Meff
+#  Cycle 90 · scellé le 2026-05-08
+#  Toute modification post-scellement invalide le sceau.
+# ═══════════════════════════════════════════════════════════
 version: 1
 joueur: meff
-tick_cible: 41
-nonce: 8847b9
+tick_cible: 90
+nonce: c92b11
 
 ordres:
   - type: chantier
     planete: meff-prima
     batiment: extracteur_lumen
     niveau_cible: 2
-  - type: construction
-    planete: meff-prima
-    unite: chasseur_leger
-    quantite: 1
-signature: ed25519:b+Anm228c9GntFUpL38ndxxiXk6+IonCIdQm3dPqpPDL0Trzul0o0EoE1GVP0pbhi5KDMVu3M2523kJxyWsoAQ==
+signature: ed25519:4yDxQ5IFarJs243qRqDZNLqila8uVg0KovgA9wMoxu95uuLTWFZSnnLfi7ToYLCh+W48+eb1jqNe/eNAegASBw==

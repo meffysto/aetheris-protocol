@@ -1,0 +1,3650 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>AETHERIS · console (bitcoin)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..600,0..100&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "@noble/hashes/sha256": "https://esm.sh/@noble/hashes@1.7.2/esm/sha256.js",
+    "@noble/curves/secp256k1": "https://esm.sh/@noble/curves@1.9.7/esm/secp256k1.js",
+    "@scure/btc-signer": "https://esm.sh/@scure/btc-signer@1.6.0",
+    "fflate": "https://esm.sh/fflate@0.8.2"
+  }
+}
+</script>
+<style>
+:root {
+  --ink:        #f4ecdc;   /* cream page */
+  --ink-2:      #ffffff;   /* white cards */
+  --ink-3:      #f7f0df;   /* deeper cream inset */
+  --ink-4:      #e8dcc0;   /* track / inset */
+  --hairline:   #e6d9bd;   /* soft tan rule */
+  --brass:      #0e1d33;   /* deep navy — primary */
+  --brass-2:    #1f3556;   /* mid navy */
+  --brass-dim:  #c4b48a;   /* muted tan accent */
+  --phosphor:   #a83a25;   /* rust — emphasis */
+  --phosphor-2: #c64a30;
+  --phosphor-dim: #d8b09c;
+  --bone:       #2c2014;   /* body ink */
+  --bone-2:     #0d0a06;   /* blackest heading */
+  --bone-dim:   #8a7c64;   /* warm gray */
+  --rust:       #a83a25;
+  --violet:     #5a3a6a;
+  --green:      #5a7a3a;
+
+  --serif:   "Fraunces", Georgia, serif;
+  --sans:    "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --mono:    "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  --display: "Fraunces", Georgia, serif;
+  --caps:    "Plus Jakarta Sans", sans-serif;
+
+  --shadow-card: 0 1px 2px rgba(28,20,8,0.04), 0 8px 22px rgba(28,20,8,0.06);
+  --shadow-pop:  0 2px 6px rgba(28,20,8,0.08), 0 14px 36px rgba(28,20,8,0.10);
+  --r-card: 14px;
+  --r-pill: 999px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+  overflow: hidden;
+  background-image:
+    radial-gradient(ellipse 90% 60% at 15% -5%, rgba(255,250,235,0.7), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168,90,40,0.06), transparent 60%),
+    linear-gradient(180deg, #f6efde 0%, #ece1c6 100%);
+}
+/* very faint cartographic grain */
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><g fill='none' stroke='%23000' stroke-width='0.4' opacity='0.04'><circle cx='150' cy='200' r='80'/><circle cx='450' cy='350' r='120'/><circle cx='300' cy='100' r='60'/><circle cx='100' cy='500' r='100'/><path d='M0 300 Q 150 280 300 320 T 600 300'/><path d='M0 150 Q 200 130 400 170 T 600 150'/></g></svg>");
+  background-size: 700px 700px;
+}
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+  mix-blend-mode: multiply;
+  opacity: 0.10;
+}
+
+/* ─── shell ───────────────────────────────────────────────── */
+.shell {
+  position: relative; z-index: 3;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  grid-template-columns: 220px 1fr 320px;
+  grid-template-areas:
+    "head head head"
+    "strip strip strip"
+    "nav main rail"
+    "foot foot foot";
+  height: 100vh;
+  gap: 0;
+}
+
+/* ─── header ──────────────────────────────────────────────── */
+.head {
+  grid-area: head;
+  display: flex; align-items: stretch;
+  background: var(--brass);
+  color: #fff;
+  position: relative; z-index: 5;
+}
+.brand {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 24px;
+  min-width: 220px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+.brand .mark {
+  width: 34px; height: 34px; flex: none;
+  background: var(--phosphor);
+  border-radius: 8px;
+  display: grid; place-items: center;
+  box-shadow: 0 2px 6px rgba(168,58,37,0.4);
+}
+.brand .mark::after {
+  content: "Æ"; font-family: var(--serif); font-style: italic; font-weight: 600;
+  font-size: 18px; color: #fff;
+}
+.brand .name {
+  font-family: var(--display); font-weight: 600;
+  font-size: 22px; letter-spacing: -0.005em; color: #fff;
+  line-height: 1;
+}
+.brand .name b {
+  font-family: var(--sans); font-weight: 500;
+  color: rgba(255,255,255,0.55); letter-spacing: 0.18em;
+  font-size: 9.5px; display: block; margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.head-meta {
+  flex: 1; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+}
+.tick-block { display: flex; align-items: center; gap: 22px; }
+.tick-block .label {
+  font-family: var(--sans); font-size: 9.5px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: rgba(255,255,255,0.55);
+  font-weight: 500; margin-bottom: 3px;
+}
+.tick-block .value {
+  font-family: var(--display); font-weight: 600;
+  font-size: 26px; color: #fff;
+  line-height: 1; letter-spacing: -0.01em;
+}
+.tick-block .countdown {
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  color: var(--phosphor-2);
+  letter-spacing: 0.04em;
+  padding: 0;
+  background: none; border: none;
+}
+
+.player-pick {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 4px 0 16px;
+  border-left: 1px solid rgba(255,255,255,0.08); height: 100%;
+}
+.player-pick .who {
+  font-family: var(--display); font-weight: 600;
+  font-size: 16px; color: #fff; line-height: 1.1;
+}
+.player-pick .who small {
+  display: block; font-family: var(--sans); font-weight: 500;
+  font-size: 9px; letter-spacing: 0.22em; color: rgba(255,255,255,0.5);
+  text-transform: uppercase; margin-top: 3px;
+}
+.player-pick select {
+  appearance: none; -webkit-appearance: none;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--r-pill);
+  color: #fff; padding: 8px 30px 8px 14px;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, #fff 50%),
+                    linear-gradient(135deg, #fff 50%, transparent 50%);
+  background-position: calc(100% - 14px) center, calc(100% - 9px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.player-pick select option { background: var(--brass); color: #fff; }
+.player-pick select:focus { outline: 1px solid rgba(255,255,255,0.4); }
+
+/* ─── resource strip (slim 44px) ──────────────────────────── */
+.strip {
+  grid-area: strip;
+  display: flex; gap: 0;
+  padding: 0 22px;
+  background: rgba(247, 240, 223, 0.6);
+  border-bottom: 1px solid var(--hairline);
+  height: 44px;
+  align-items: stretch;
+}
+.res {
+  flex: 1;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 18px;
+  border-right: 1px solid var(--hairline);
+  position: relative;
+}
+.res:last-child { border-right: none; }
+.res .ico {
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+}
+.res .ico svg { width: 12px; height: 12px; }
+.res .nm {
+  font-family: var(--sans); font-weight: 600; font-size: 9.5px;
+  color: var(--bone-dim); letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.res .nm small { display: none; }
+.res .stock {
+  margin-left: auto;
+  font-family: var(--display); font-weight: 600;
+  font-size: 16px; color: var(--bone-2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.res .meta {
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  color: var(--green);
+  white-space: nowrap;
+}
+.res .meta.warn { color: var(--phosphor); }
+.res .bar { display: none; }
+.res[data-r="ferrum"]    .ico { background: rgba(168,58,37,0.10); color: #a83a25; }
+.res[data-r="lumen"]     .ico { background: rgba(196,148,40,0.16); color: #b88820; }
+.res[data-r="plasmide"]  .ico { background: rgba(106,90,150,0.14); color: #6a5a96; }
+.res[data-r="energie"]   .ico { background: rgba(58,110,150,0.12); color: #3a6e96; }
+
+/* ─── nav rail ────────────────────────────────────────────── */
+.nav {
+  grid-area: nav;
+  background: transparent;
+  padding: 14px 14px;
+  display: flex; flex-direction: column; gap: 2px;
+  overflow-y: auto;
+}
+.nav .heading {
+  padding: 14px 12px 8px;
+  font-family: var(--sans); font-weight: 600; font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--bone-dim); text-transform: uppercase;
+}
+.nav button {
+  appearance: none; background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-family: var(--sans); font-weight: 500; font-size: 14px;
+  color: var(--bone);
+  position: relative;
+  text-align: left;
+  transition: all .15s;
+}
+.nav button .gl {
+  width: 18px; height: 18px; flex: none;
+  display: grid; place-items: center;
+  color: var(--bone-dim);
+  transition: color .15s;
+}
+.nav button:hover { background: rgba(14,29,51,0.04); color: var(--brass); }
+.nav button:hover .gl { color: var(--brass); }
+.nav button.on { background: var(--brass); color: #fff; font-weight: 600; box-shadow: var(--shadow-card); }
+.nav button.on .gl { color: #fff; }
+.nav button .ct {
+  margin-left: auto;
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  color: var(--bone-dim);
+  background: var(--ink-3);
+  padding: 2px 8px; border-radius: var(--r-pill);
+}
+.nav button.on .ct { color: #fff; background: rgba(255,255,255,0.16); }
+
+/* ─── main panel ──────────────────────────────────────────── */
+.main {
+  grid-area: main;
+  overflow-y: auto;
+  padding: 24px 28px 28px;
+  position: relative;
+}
+
+.planet-head {
+  display: grid; grid-template-columns: 96px 1fr; gap: 24px;
+  align-items: center;
+  padding: 22px 24px;
+  margin-bottom: 22px;
+  background: var(--ink-2);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+.planet-glyph {
+  width: 96px; height: 96px;
+  background: var(--ink-3);
+  border-radius: 50%;
+  display: grid; place-items: center;
+}
+.planet-glyph svg { width: 76px; height: 76px; }
+
+.planet-title {
+  font-family: var(--display); font-weight: 600;
+  font-size: 32px; line-height: 1.05; color: var(--bone-2);
+  letter-spacing: -0.015em;
+  margin: 0 0 10px;
+}
+.planet-title .em {
+  font-family: var(--mono); font-weight: 500;
+  color: var(--bone-dim); font-size: 14px;
+  margin-right: 12px;
+  letter-spacing: 0.04em;
+  text-shadow: none;
+}
+.planet-sub {
+  display: flex; gap: 16px; align-items: center;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  color: var(--bone-dim);
+  flex-wrap: wrap;
+}
+.planet-sub .chip {
+  padding: 4px 10px; border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  color: var(--bone); text-transform: uppercase; letter-spacing: 0.14em;
+  font-size: 9.5px; font-weight: 700;
+}
+.planet-sub .chip.tellurique { color: #3a5a22; border-color: #6a8a3a; background: rgba(106,138,58,0.08); }
+.planet-sub .chip.cristalline { color: #1a5a5a; border-color: #4a8a8a; background: rgba(74,138,138,0.08); }
+.planet-sub .chip.glacee { color: #1a4a6a; border-color: #4a7a9a; background: rgba(74,122,154,0.08); }
+.planet-sub .chip.volcanique { color: #8a2818; border-color: #b8503a; background: rgba(184,80,58,0.08); }
+.planet-sub .chip.gazeuse { color: #4a2a6a; border-color: #7a5a9a; background: rgba(122,90,154,0.08); }
+.planet-sub .fields {
+  display: flex; align-items: center; gap: 8px; margin-left: auto;
+}
+.planet-sub .fields b {
+  font-weight: 700; color: var(--bone-2);
+  font-family: var(--display); font-size: 14px;
+}
+
+/* section heading */
+h2.sect {
+  margin: 26px 0 14px;
+  font-family: var(--display); font-weight: 600;
+  font-size: 18px; color: var(--bone-2);
+  letter-spacing: -0.01em;
+  display: flex; align-items: baseline; gap: 12px;
+}
+h2.sect::before { display: none; }
+h2.sect::after { display: none; }
+h2.sect .num {
+  font-family: var(--sans); font-weight: 600;
+  font-size: 9.5px; letter-spacing: 0.22em;
+  color: var(--brass-dim);
+  margin-left: 4px;
+}
+h2.sect .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+  align-self: center;
+  margin-left: 4px;
+}
+
+/* ─── planet-bar (en-tête compact hors Aperçu) ───────────── */
+.planet-bar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 22px;
+  margin-bottom: 18px;
+  background: var(--ink-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  flex-wrap: wrap;
+}
+.planet-bar .pb-title {
+  font-family: var(--display); font-weight: 600;
+  font-size: 22px; color: var(--bone-2);
+  margin: 0; line-height: 1; letter-spacing: -0.01em;
+}
+.planet-bar .pb-coord {
+  font-family: var(--mono); font-weight: 500;
+  font-size: 13px; color: var(--bone-dim);
+  margin-right: 12px; letter-spacing: 0.04em;
+}
+.planet-bar .pb-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--hairline); border-radius: var(--r-pill);
+  font-family: var(--sans); font-size: 9.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; font-weight: 700;
+  color: var(--bone); background: rgba(14,29,51,0.04);
+}
+.planet-bar .pb-chip.tellurique  { color: #3a5a22; border-color: #6a8a3a; background: rgba(106,138,58,0.10); }
+.planet-bar .pb-chip.cristalline { color: #1a5a5a; border-color: #4a8a8a; background: rgba(74,138,138,0.10); }
+.planet-bar .pb-chip.glacee      { color: #1a4a6a; border-color: #4a7a9a; background: rgba(74,122,154,0.10); }
+.planet-bar .pb-chip.volcanique  { color: #8a2818; border-color: #b8503a; background: rgba(184,80,58,0.10); }
+.planet-bar .pb-chip.gazeuse     { color: #4a2a6a; border-color: #7a5a9a; background: rgba(122,90,154,0.10); }
+.planet-bar .pb-meta {
+  font-family: var(--sans); font-size: 12px; color: var(--bone-dim);
+  font-weight: 500;
+}
+.planet-bar .pb-meta b {
+  color: var(--bone-2); font-weight: 700;
+  font-family: var(--display);
+}
+
+/* ─── BULLETIN (carte héros parchemin) ────────────────────── */
+.bulletin {
+  background: linear-gradient(180deg, #fffaf0 0%, #f9efd6 100%);
+  color: var(--bone-2);
+  border-radius: var(--r-card);
+  box-shadow: 0 4px 12px rgba(14,29,51,0.10), 0 24px 56px rgba(14,29,51,0.10);
+  border: 1px solid var(--hairline);
+  padding: 26px 30px;
+  position: relative; overflow: hidden;
+  margin-bottom: 22px;
+}
+.bulletin::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><g fill='none' stroke='%230e1d33' stroke-width='0.4' opacity='0.05'><circle cx='320' cy='80' r='40'/><circle cx='340' cy='120' r='80'/><circle cx='100' cy='300' r='60'/></g></svg>");
+  background-size: 400px 400px; pointer-events: none;
+}
+.bulletin > * { position: relative; }
+.bulletin .label {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--phosphor); margin-bottom: 10px;
+}
+.bulletin .planet {
+  font-family: var(--display); font-weight: 600;
+  font-size: 38px; line-height: 1.05; color: var(--bone-2);
+  margin: 0 0 4px; letter-spacing: -0.015em;
+}
+.bulletin .planet .coord {
+  font-family: var(--mono); font-weight: 500;
+  font-size: 18px; color: var(--bone-dim);
+  margin-right: 14px; letter-spacing: 0.04em;
+}
+.bulletin .sub {
+  font-family: var(--sans); font-size: 13px; color: var(--bone-dim);
+  margin-bottom: 22px;
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+}
+.bulletin .sub b { color: var(--bone-2); font-weight: 600; }
+.bulletin .sub .chip {
+  padding: 3px 9px;
+  border: 1px solid var(--hairline); border-radius: var(--r-pill);
+  font-size: 9.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; font-weight: 700;
+  color: var(--bone); background: rgba(14,29,51,0.04);
+}
+.bulletin .sub .chip.tellurique  { color: #3a5a22; border-color: #6a8a3a; background: rgba(106,138,58,0.10); }
+.bulletin .sub .chip.cristalline { color: #1a5a5a; border-color: #4a8a8a; background: rgba(74,138,138,0.10); }
+.bulletin .sub .chip.glacee      { color: #1a4a6a; border-color: #4a7a9a; background: rgba(74,122,154,0.10); }
+.bulletin .sub .chip.volcanique  { color: #8a2818; border-color: #b8503a; background: rgba(184,80,58,0.10); }
+.bulletin .sub .chip.gazeuse     { color: #4a2a6a; border-color: #7a5a9a; background: rgba(122,90,154,0.10); }
+.bulletin .news {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 18px; padding: 18px 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 16px;
+}
+.bulletin .news h3 {
+  font-family: var(--sans); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--bone-dim); margin: 0 0 8px;
+}
+.bulletin .news .item {
+  font-family: var(--display); font-weight: 500;
+  font-size: 19px; color: var(--bone-2);
+  line-height: 1.35; letter-spacing: -0.005em;
+}
+.bulletin .news .item em {
+  font-style: italic; color: var(--phosphor); font-weight: 600;
+}
+.bulletin .news .stamp {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--bone-dim); align-self: end; white-space: nowrap;
+}
+.bulletin .threats {
+  background: rgba(168,58,37,0.08);
+  border: 1px solid rgba(168,58,37,0.32);
+  border-left: 3px solid var(--phosphor);
+  border-radius: 6px;
+  padding: 12px 16px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 14px;
+}
+.bulletin .threats .pulse {
+  width: 8px; height: 8px;
+  background: var(--phosphor-2); border-radius: 50%; flex: none;
+  box-shadow: 0 0 0 0 rgba(198,74,48,0.5);
+  animation: bull-ping 1.8s infinite;
+}
+@keyframes bull-ping {
+  0%   { box-shadow: 0 0 0 0 rgba(198,74,48,0.5); }
+  70%  { box-shadow: 0 0 0 12px rgba(198,74,48,0); }
+  100% { box-shadow: 0 0 0 0 rgba(198,74,48,0); }
+}
+.bulletin .threats .body {
+  flex: 1; font-family: var(--sans); font-size: 13px; font-weight: 500;
+  color: var(--bone-2);
+}
+.bulletin .threats .body b { color: var(--phosphor); font-weight: 700; }
+.bulletin .stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--hairline); padding-top: 16px;
+}
+.bulletin .stats .s {
+  padding: 0 18px; border-right: 1px solid var(--hairline);
+}
+.bulletin .stats .s:first-child { padding-left: 0; }
+.bulletin .stats .s:last-child { border-right: none; padding-right: 0; }
+.bulletin .stats .s .k {
+  font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--bone-dim); font-weight: 700; margin-bottom: 4px;
+}
+.bulletin .stats .s .v {
+  font-family: var(--display); font-weight: 600;
+  font-size: 24px; color: var(--bone-2); line-height: 1.1;
+}
+.bulletin .stats .s .v small {
+  font-family: var(--sans); font-weight: 600;
+  font-size: 11px; color: var(--green); margin-left: 4px;
+  letter-spacing: 0;
+}
+
+/* ─── BELL (alertes header) ───────────────────────────────── */
+.bell {
+  position: relative;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  margin-right: 12px;
+  border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.06);
+  border: none; cursor: pointer;
+  transition: background .15s;
+}
+.bell:hover { background: rgba(255,255,255,0.14); }
+.bell svg { width: 17px; height: 17px; color: rgba(255,255,255,0.85); }
+.bell .dot {
+  position: absolute; top: 4px; right: 4px;
+  min-width: 17px; height: 17px;
+  border-radius: 999px;
+  background: var(--phosphor); color: #fff;
+  font-size: 10px; font-weight: 700;
+  display: grid; place-items: center;
+  box-shadow: 0 0 0 2px var(--brass);
+  padding: 0 5px;
+  font-family: var(--sans);
+  animation: bell-pulse 2.4s infinite;
+}
+.bell.silent .dot { display: none; }
+@keyframes bell-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--brass), 0 0 0 0 rgba(168,58,37,0.6); }
+  50%      { box-shadow: 0 0 0 2px var(--brass), 0 0 0 6px rgba(168,58,37,0); }
+}
+
+/* tab views */
+.view { display: none; }
+.view.on { display: block; animation: fade .3s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* building grid */
+.bgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  background: transparent;
+  border: none;
+}
+.bcard {
+  background: var(--ink-2);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 4px 14px;
+  position: relative;
+  transition: transform .15s, box-shadow .15s;
+}
+.bcard:hover { transform: translateY(-1px); box-shadow: var(--shadow-pop); }
+.bcard .gl {
+  grid-row: 1 / 3;
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  color: var(--brass);
+  background: var(--ink-3);
+  border-radius: 50%;
+  border: none;
+}
+.bcard .gl svg { width: 22px; height: 22px; }
+.bcard .nm {
+  font-family: var(--display); font-weight: 600; font-size: 15px;
+  color: var(--bone-2); line-height: 1.1;
+  letter-spacing: -0.005em;
+}
+.bcard .nm small {
+  display: block; font-family: var(--sans); font-weight: 500;
+  font-size: 10px; color: var(--bone-dim); letter-spacing: 0.04em;
+  text-transform: none; margin-top: 4px;
+}
+.bcard .lvl {
+  font-family: var(--display); font-weight: 700; font-size: 26px;
+  color: var(--brass);
+  line-height: 1; text-align: right;
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
+  letter-spacing: -0.015em;
+}
+.bcard .lvl small {
+  display: block; font-family: var(--sans); font-weight: 500; font-size: 9.5px;
+  color: var(--bone-dim); letter-spacing: 0.16em;
+  text-transform: uppercase; margin-top: 4px;
+}
+.bcard.zero .lvl { color: var(--bone-dim); text-shadow: none; }
+.bcard.zero .gl { color: var(--bone-dim); background: var(--ink-3); }
+.bcard .queue {
+  grid-column: 1 / 4;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  color: var(--phosphor); letter-spacing: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  background: rgba(168,58,37,0.07);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+.bcard .queue b { color: var(--phosphor); font-weight: 700; }
+.bcard .queue .pulse {
+  width: 7px; height: 7px; background: var(--phosphor);
+  border-radius: 50%; animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168,58,37,0.5); }
+  50% { box-shadow: 0 0 0 7px rgba(168,58,37,0); }
+}
+
+/* simple table for fleet/research/defense */
+.tbl {
+  width: 100%; border-collapse: collapse;
+  background: var(--ink-2); border-radius: var(--r-card);
+  box-shadow: var(--shadow-card); overflow: hidden;
+}
+.tbl th, .tbl td {
+  text-align: left; padding: 12px 18px;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+}
+.tbl tr:last-child td { border-bottom: none; }
+.tbl th {
+  font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--bone-dim); font-weight: 600;
+  background: var(--ink-3);
+}
+.tbl td.nm { font-family: var(--display); font-weight: 600; font-style: normal; font-size: 14px; color: var(--bone-2); }
+.tbl td.v { font-family: var(--display); font-weight: 700; color: var(--brass); text-align: right; font-size: 16px; }
+.tbl tr:hover td { background: var(--ink-3); }
+
+.empty-stamp {
+  background: var(--ink-2);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 38px 24px;
+  text-align: center;
+  font-family: var(--display); font-weight: 500; font-style: italic;
+  color: var(--bone-dim); font-size: 16px;
+  letter-spacing: 0;
+}
+
+/* galaxy view */
+.galaxy { display: flex; flex-direction: column; gap: 14px; }
+.system {
+  border: none;
+  background: var(--ink-2);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 18px 22px;
+}
+.system header {
+  display: flex; align-items: baseline; gap: 14px;
+  margin-bottom: 14px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+.system .star-name {
+  font-family: var(--display); font-weight: 600; font-size: 18px;
+  color: var(--bone-2);
+}
+.system .star-meta {
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  color: var(--bone-dim); letter-spacing: 0.04em;
+}
+.system .coord {
+  margin-left: auto;
+  font-family: var(--mono); font-weight: 500;
+  font-size: 13px; color: var(--bone-dim);
+  background: var(--ink-3);
+  padding: 3px 10px; border-radius: var(--r-pill);
+}
+.positions {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  gap: 5px;
+}
+.pos {
+  aspect-ratio: 1;
+  background: var(--ink-3);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  display: grid; place-items: center;
+  position: relative;
+  font-family: var(--mono); font-size: 9px;
+  color: var(--bone-dim);
+  cursor: default;
+  transition: all .15s;
+}
+.pos.empty { background: var(--ink-3); }
+.pos.asteroide { background: rgba(196,180,138,0.18); color: var(--brass-dim); }
+.pos.planete { background: var(--ink-2); border-color: var(--hairline); box-shadow: 0 1px 2px rgba(28,20,8,0.05); }
+.pos.planete .dot { width: 8px; height: 8px; border-radius: 50%; }
+.pos.planete[data-c="tellurique"]  .dot { background: #7fa570; box-shadow: 0 0 6px rgba(127,165,112,0.6); }
+.pos.planete[data-c="cristalline"] .dot { background: #3a8a8a; box-shadow: 0 0 6px rgba(58,138,138,0.7); }
+.pos.planete[data-c="glacee"]      .dot { background: #88c8e0; box-shadow: 0 0 6px rgba(136,200,224,0.7); }
+.pos.planete[data-c="volcanique"]  .dot { background: var(--rust); box-shadow: 0 0 6px rgba(232,99,58,0.7); }
+.pos.planete[data-c="gazeuse"]     .dot { background: var(--violet); box-shadow: 0 0 6px rgba(154,134,212,0.7); }
+.pos.mine { border-color: var(--phosphor); background: rgba(168,58,37,0.08); box-shadow: 0 0 0 2px rgba(168,58,37,0.18); }
+.pos.mine .dot { box-shadow: 0 0 0 2px var(--phosphor), 0 0 8px var(--phosphor) !important; }
+.pos .num {
+  position: absolute; top: 3px; left: 5px;
+  font-size: 8.5px; color: var(--bone-dim); font-weight: 600;
+}
+.pos .own {
+  position: absolute; bottom: 2px; left: 4px; right: 4px;
+  font-size: 8.5px; color: var(--brass); font-weight: 600;
+  text-align: center; letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos:hover {
+  border-color: var(--brass); background: rgba(14,29,51,0.05);
+  z-index: 5; transform: translateY(-1px);
+}
+.pos .tip {
+  display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--brass); border: none;
+  border-radius: 8px;
+  padding: 8px 12px; white-space: nowrap;
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  color: #fff; letter-spacing: 0;
+  z-index: 10;
+  box-shadow: var(--shadow-pop);
+}
+.pos:hover .tip { display: block; }
+
+/* ─── right rail / journal ────────────────────────────────── */
+.rail {
+  grid-area: rail;
+  background: transparent;
+  overflow-y: auto;
+  padding: 18px 16px 24px;
+}
+.rail .group {
+  background: var(--ink-2);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+}
+.rail .group + .group { margin-top: 14px; }
+.rail h3 {
+  margin: 0 0 12px;
+  font-family: var(--display); font-weight: 600; font-size: 16px;
+  color: var(--bone-2);
+  display: flex; align-items: center; gap: 10px;
+  letter-spacing: -0.005em;
+}
+.rail h3::before { display: none; }
+.rail h3 .ct {
+  margin-left: auto;
+  font-family: var(--sans); font-weight: 600;
+  font-size: 11px; color: var(--bone-dim);
+  background: var(--ink-3);
+  padding: 2px 8px; border-radius: var(--r-pill);
+  letter-spacing: 0;
+}
+
+.qitem {
+  border: none;
+  background: var(--ink-3);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  position: relative;
+}
+.qitem:last-child { margin-bottom: 0; }
+.qitem.pending {
+  background: var(--ink-2);
+  border: 1px dashed var(--brass-dim);
+}
+.qitem.pending .nm small { color: var(--brass); font-weight: 600; }
+.qitem .top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 12px;
+}
+.qitem .nm {
+  font-family: var(--display); font-weight: 600; font-size: 14px;
+  color: var(--bone-2); line-height: 1.2;
+}
+.qitem .nm small {
+  display: block; font-family: var(--sans); font-weight: 500;
+  font-size: 11px; color: var(--bone-dim); letter-spacing: 0;
+  text-transform: none; margin-top: 2px;
+}
+.qitem .tgt {
+  font-family: var(--display); font-weight: 700; font-size: 22px;
+  color: var(--phosphor); text-shadow: none;
+  letter-spacing: -0.01em; text-align: right;
+}
+.qitem .tprog {
+  height: 3px; background: var(--ink-4);
+  margin-top: 10px; position: relative; overflow: hidden;
+  border-radius: 2px;
+}
+.qitem .tprog i {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: var(--phosphor);
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+.qitem .tmeta {
+  display: flex; justify-content: space-between;
+  margin-top: 8px;
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  color: var(--bone-dim);
+}
+.qitem .tmeta b { font-weight: 700; color: var(--brass); }
+
+.empty-rail {
+  font-family: var(--sans); font-weight: 500;
+  color: var(--bone-dim); font-size: 13px;
+  padding: 6px 0;
+}
+.qitem.pending .cancel-btn {
+  position: absolute; top: 8px; right: 10px;
+  appearance: none; background: none; border: none;
+  color: var(--bone-dim); cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 4px 6px;
+  border-radius: 4px; transition: color .12s, background .12s;
+}
+.qitem.pending .cancel-btn:hover { color: var(--phosphor); background: rgba(168,58,37,0.1); }
+.qitem.pending .cancel-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ─── onboarding modal ────────────────────────────────────── */
+.onboarding-bg {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(14,29,51,0.55);
+  backdrop-filter: blur(6px);
+  display: none; align-items: center; justify-content: center;
+}
+.onboarding-bg.on { display: flex; }
+.onboarding {
+  width: 430px; max-width: 92vw;
+  background: var(--ink-2);
+  border-radius: 18px;
+  box-shadow: 0 28px 90px rgba(14,29,51,0.38);
+  padding: 32px 32px 28px;
+}
+.onboarding h2 {
+  margin: 0 0 8px; font-family: var(--display); font-weight: 600; font-style: normal;
+  font-size: 24px; color: var(--bone-2); letter-spacing: -0.01em;
+}
+.onboarding .ob-sub {
+  margin: 0 0 20px; color: var(--bone-dim); font-size: 14px; line-height: 1.55;
+}
+.onboarding ol {
+  margin: 0 0 24px; padding-left: 0; list-style: none;
+  counter-reset: ob;
+}
+.onboarding ol li {
+  counter-increment: ob;
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 13.5px; line-height: 1.4; color: var(--bone);
+}
+.onboarding ol li:last-child { border-bottom: none; }
+.onboarding ol li::before {
+  content: counter(ob);
+  min-width: 22px; height: 22px;
+  background: var(--brass); color: #fff;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  flex-shrink: 0; margin-top: 1px;
+}
+.onboarding .ob-actions {
+  display: flex; gap: 10px; align-items: center; justify-content: flex-end;
+}
+.onboarding .ob-skip {
+  font-size: 13px; color: var(--bone-dim); cursor: pointer;
+  background: none; border: none; padding: 8px; font-family: var(--sans);
+  transition: color .12s;
+}
+.onboarding .ob-skip:hover { color: var(--bone); }
+.onboarding .ob-go {
+  appearance: none; background: var(--brass); color: #fff;
+  border: none; padding: 11px 20px;
+  border-radius: var(--r-pill);
+  font-family: var(--sans); font-weight: 700;
+  font-size: 13px; cursor: pointer; transition: all .12s;
+}
+.onboarding .ob-go:hover { background: var(--brass-2); transform: translateY(-1px); }
+.onboarding .ob-card {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin: 0 0 18px;
+}
+.onboarding .ob-stat {
+  background: var(--ink-3);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.onboarding .ob-stat .lab {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--bone-dim); display: block; margin-bottom: 4px;
+}
+.onboarding .ob-stat .val {
+  font-family: var(--display); font-weight: 600; font-size: 18px;
+  color: var(--brass); letter-spacing: -0.01em;
+}
+.onboarding .ob-stat .sub {
+  font-family: var(--sans); font-size: 11px; color: var(--bone-dim);
+  margin-top: 2px;
+}
+.onboarding .ob-tick {
+  background: linear-gradient(180deg, var(--brass), var(--brass-2));
+  color: #fff; border-radius: 10px;
+  padding: 12px 16px; margin: 0 0 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.onboarding .ob-tick .lab {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+  text-transform: uppercase; opacity: 0.8;
+}
+.onboarding .ob-tick .val {
+  font-family: var(--mono); font-weight: 600; font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+/* glossary helper used inside onboarding (and reused elsewhere) */
+.gloss {
+  border-bottom: 1px dotted var(--bone-dim);
+  cursor: help;
+}
+
+/* ─── footer ──────────────────────────────────────────────── */
+.foot {
+  grid-area: foot;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 22px;
+  background: transparent;
+  border-top: 1px solid var(--hairline);
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  color: var(--bone-dim); letter-spacing: 0;
+}
+.foot .live {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--green); font-weight: 600;
+}
+.foot .live i {
+  width: 6px; height: 6px; background: var(--green); border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(90,122,58,0.18);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{ opacity:1; } 50%{ opacity:0.5; } }
+.foot .seg { display: flex; gap: 22px; align-items: center; font-family: var(--mono); font-size: 11px; }
+.foot .seg span { color: var(--bone-dim); }
+.foot .seg span b { color: var(--bone); font-weight: 500; }
+
+/* scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brass-dim); }
+
+/* error banner */
+.err {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  background: var(--ink-2); border: none; border-left: 4px solid var(--phosphor);
+  border-radius: 8px;
+  padding: 10px 40px 10px 18px; z-index: 99;
+  font-family: var(--sans); font-weight: 600; font-size: 12px;
+  color: var(--phosphor); letter-spacing: 0;
+  box-shadow: var(--shadow-card);
+  display: none;
+  max-width: min(560px, calc(100vw - 32px));
+  word-break: break-word;
+}
+.err.on { display: block; }
+.err .close, .toast .close {
+  position: absolute; top: 6px; right: 8px;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border: none; background: none; cursor: pointer;
+  font-family: var(--sans); font-size: 16px; line-height: 1;
+  color: var(--bone-dim); border-radius: 50%;
+  transition: background .15s, color .15s;
+}
+.err .close:hover, .toast .close:hover { background: var(--ink-3); color: var(--bone-2); }
+
+/* tooltip global (utilisé par data-tip) */
+.tooltip {
+  position: fixed;
+  z-index: 200;
+  max-width: 320px;
+  padding: 10px 14px;
+  background: var(--brass);
+  color: #fff;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  line-height: 1.45;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(14,29,51,0.25);
+  pointer-events: none;
+  white-space: pre-line;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.tooltip.on {
+  opacity: 1;
+  transform: none;
+}
+
+/* effet courant (ligne dans la bcard, sous le niveau) */
+.bcard .effet {
+  grid-column: 1 / 4;
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(14,29,51,0.04);
+  border-radius: 6px;
+  font-family: var(--sans); font-size: 11.5px; font-weight: 500;
+  color: var(--bone-dim);
+}
+.bcard .effet b {
+  font-family: var(--display); font-weight: 700;
+  color: var(--bone-2);
+  font-size: 13px;
+  letter-spacing: -0.005em;
+}
+.bcard.zero .effet { display: none; }
+
+/* ─── improve row on bcard ────────────────────────────────── */
+.bcard .upg {
+  grid-column: 1 / 4;
+  display: flex; align-items: center; gap: 12px;
+  padding-top: 12px; border-top: 1px solid var(--hairline);
+  margin-top: 6px;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  color: var(--bone-dim);
+}
+.bcard .upg .cost { display: flex; gap: 10px; }
+.bcard .upg .cost b { color: var(--bone-2); font-weight: 700; font-family: var(--display); font-size: 14px; }
+.bcard .upg .cost b.bad { color: var(--phosphor); }
+.bcard .upg .dur {
+  color: var(--bone-dim); margin-left: auto; margin-right: 4px;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+}
+.bcard .upg button {
+  appearance: none; background: var(--brass); color: #fff;
+  border: none; padding: 8px 14px;
+  border-radius: var(--r-pill);
+  font-family: var(--sans); font-style: normal; font-weight: 600;
+  font-size: 12px; letter-spacing: 0.02em;
+  cursor: pointer; transition: all .12s;
+  box-shadow: 0 1px 2px rgba(14,29,51,0.2);
+}
+.bcard .upg button:hover { background: var(--brass-2); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(14,29,51,0.25); }
+.bcard .upg button:disabled {
+  background: var(--ink-3); color: var(--bone-dim);
+  cursor: not-allowed; box-shadow: none; transform: none;
+}
+
+/* ─── settings modal ──────────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(14,29,51,0.45);
+  backdrop-filter: blur(4px);
+  display: none; align-items: center; justify-content: center;
+}
+.modal-bg.on { display: flex; }
+.modal {
+  width: 560px; max-width: 92vw; max-height: 88vh; overflow: auto;
+  background: var(--ink-2);
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(14,29,51,0.35);
+  padding: 28px 32px 24px;
+  position: relative;
+}
+.modal::before { display: none; }
+.modal h2 {
+  margin: 0 0 6px; font-family: var(--display); font-weight: 600; font-style: normal;
+  font-size: 26px; color: var(--bone-2); letter-spacing: -0.01em;
+}
+.modal .lead {
+  margin: 0 0 22px; font-family: var(--sans); font-style: normal;
+  color: var(--bone-dim); font-size: 14px; line-height: 1.5;
+  font-weight: 500;
+}
+.modal label {
+  display: block; margin-top: 16px;
+  font-family: var(--sans); font-weight: 600; font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none; color: var(--bone); margin-bottom: 6px;
+}
+.modal input, .modal textarea {
+  width: 100%; background: var(--ink); color: var(--bone-2);
+  border: 1px solid var(--hairline); padding: 10px 14px;
+  border-radius: 8px;
+  font-family: var(--mono); font-size: 12px;
+  resize: vertical;
+}
+.modal input:focus, .modal textarea:focus {
+  outline: 2px solid var(--brass); outline-offset: -1px;
+  border-color: var(--brass);
+}
+.modal textarea { min-height: 96px; font-size: 11px; line-height: 1.4; }
+.modal .hint {
+  font-family: var(--sans); font-style: normal; font-size: 12px;
+  font-weight: 500;
+  color: var(--bone-dim); margin-top: 6px; line-height: 1.4;
+}
+.modal .hint a { color: var(--brass); text-decoration: underline; }
+.modal .hint code { font-family: var(--mono); font-size: 11px; background: var(--ink-3); padding: 1px 5px; border-radius: 3px; color: var(--bone); }
+.modal .actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  margin-top: 24px; padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+.modal button {
+  appearance: none; cursor: pointer;
+  font-family: var(--sans); font-style: normal; font-weight: 600;
+  font-size: 13px; letter-spacing: 0;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--ink-3); color: var(--bone);
+  transition: all .12s;
+}
+.modal button.primary { background: var(--brass); color: #fff; }
+.modal button.primary:hover { background: var(--brass-2); }
+.modal button.ghost { background: transparent; color: var(--bone-dim); }
+.modal button.ghost:hover { color: var(--bone); background: var(--ink-3); }
+
+/* source toggle */
+.src-btn {
+  appearance: none; background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--r-pill);
+  color: #fff; cursor: pointer;
+  padding: 6px 12px 6px 10px;
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--sans); font-weight: 600; font-size: 11px;
+  letter-spacing: 0.04em;
+  transition: all .12s;
+}
+.src-btn:hover { background: rgba(255,255,255,0.15); }
+.src-btn svg { width: 13px; height: 13px; opacity: 0.7; }
+.src-btn.github { background: var(--phosphor); border-color: var(--phosphor-2); }
+.src-btn.github:hover { background: var(--phosphor-2); }
+.src-btn.github svg { opacity: 1; }
+
+/* gear button */
+.gear-btn {
+  appearance: none; background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 50%;
+  color: #fff; cursor: pointer;
+  width: 36px; height: 36px; display: grid; place-items: center;
+  margin-left: 8px; transition: all .12s;
+}
+.gear-btn:hover { background: rgba(255,255,255,0.15); }
+.gear-btn svg { width: 16px; height: 16px; }
+
+/* toast */
+.toast {
+  position: fixed !important;
+  top: auto !important;
+  left: auto !important;
+  bottom: 24px !important;
+  right: 22px !important;
+  width: auto !important;
+  height: auto !important;
+  z-index: 90;
+  background: var(--ink-2); border: none;
+  border-left: 4px solid var(--brass);
+  border-radius: 10px;
+  padding: 14px 40px 14px 20px;
+  max-width: min(380px, calc(100vw - 44px)) !important;
+  max-height: calc(100vh - 60px);
+  overflow: auto;
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+  color: var(--bone); box-shadow: var(--shadow-pop);
+  display: none; animation: slideIn .25s ease;
+  word-break: break-word;
+}
+.toast.on { display: block; }
+.toast.err { border-left-color: var(--phosphor); color: var(--phosphor); }
+.toast .title {
+  font-family: var(--display); font-style: normal; font-weight: 600;
+  font-size: 15px; color: var(--bone-2); margin-bottom: 4px;
+}
+.toast.err .title { color: var(--phosphor); }
+@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* "needs setup" pill */
+.setup-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 9.5px;
+  color: var(--rust); letter-spacing: 0.18em; text-transform: uppercase;
+  cursor: pointer;
+}
+.setup-pill::before {
+  content: ""; width: 6px; height: 6px; background: var(--rust); border-radius: 50%;
+  animation: blink 1.6s ease-in-out infinite;
+}
+
+/* ─── construction & missions ─── */
+.bcard .upg.qrow { flex-wrap: wrap; gap: 8px; }
+.bcard .upg.qrow .qbtns { display: flex; gap: 6px; margin-left: auto; }
+.bcard .upg.qrow .qbtns button { padding: 7px 11px; font-size: 11.5px; min-width: 44px; }
+.bcard .upg.qrow .qbtns button.sec { background: var(--ink-3); color: var(--bone); box-shadow: none; }
+.bcard .upg.qrow .qbtns button.sec:hover { background: var(--ink-4); }
+.bcard .upg.qrow .qbtns button.sec:disabled { background: var(--ink-3); color: var(--bone-dim); }
+.bcard .req {
+  grid-column: 1 / 4;
+  font-family: var(--mono); font-size: 11px; color: var(--bone-dim);
+  padding: 6px 12px; background: var(--ink-3); border-radius: 8px; margin-top: 6px;
+}
+.bcard .req b { color: var(--phosphor); font-weight: 600; }
+
+/* clickable enemy planets in galaxy */
+.pos.planete.enemy { cursor: pointer; }
+.pos.planete.enemy:hover {
+  background: rgba(168,58,37,0.10);
+  outline: 1px solid var(--phosphor);
+}
+.pos.planete.allyown { cursor: pointer; }
+.pos.planete.allyown:hover {
+  background: rgba(14,29,51,0.06);
+  outline: 1px solid var(--brass);
+}
+.pos.planete.enemy:hover { border-color: var(--phosphor); background: rgba(168,58,37,0.08); box-shadow: 0 0 0 2px rgba(168,58,37,0.18); }
+.pos.planete.enemy:hover .dot { box-shadow: 0 0 0 2px var(--phosphor), 0 0 8px var(--phosphor) !important; }
+
+/* mission modal */
+.mission-modal { width: 620px; }
+.mission-modal .seg-pick { display: flex; gap: 6px; margin-bottom: 4px; }
+.mission-modal .seg-pick button {
+  flex: 1; padding: 10px 8px; border: 1px solid var(--hairline);
+  background: var(--ink); color: var(--bone); border-radius: 8px;
+  font-family: var(--sans); font-weight: 600; font-size: 12px; cursor: pointer;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.mission-modal .seg-pick button.on { background: var(--brass); color: #fff; border-color: var(--brass); }
+.mission-modal .seg-pick button:disabled { opacity: 0.4; cursor: not-allowed; }
+.mission-modal .target {
+  font-family: var(--mono); font-size: 12px; color: var(--bone-dim);
+  background: var(--ink-3); padding: 10px 14px; border-radius: 8px;
+  margin-bottom: 14px;
+}
+.mission-modal .target b { color: var(--phosphor); font-family: var(--display); font-weight: 700; font-size: 14px; }
+.mission-modal select {
+  width: 100%; background: var(--ink); color: var(--bone-2);
+  border: 1px solid var(--hairline); padding: 10px 14px;
+  border-radius: 8px;
+  font-family: var(--mono); font-size: 12px;
+  appearance: none; -webkit-appearance: none;
+}
+.mission-modal .fleetgrid {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 6px 10px;
+  align-items: center; margin-top: 6px;
+}
+.mission-modal .fleetgrid .nm { font-family: var(--sans); font-weight: 600; font-size: 12px; color: var(--bone-2); }
+.mission-modal .fleetgrid .av { font-family: var(--mono); font-size: 11px; color: var(--bone-dim); }
+.mission-modal .fleetgrid input {
+  width: 90px; padding: 6px 10px; font-size: 12px;
+  text-align: right; font-family: var(--mono);
+}
+.mission-modal .cargo {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px;
+}
+.mission-modal .cargo div label { margin-top: 0; }
+.mission-modal .empty-fleet {
+  font-family: var(--display); font-style: italic; color: var(--bone-dim);
+  font-size: 13px; padding: 10px 0;
+}
+/* Indicateur hoverable pour expliquer l'unite UTJ. */
+.utj-help { cursor: help; border-bottom: 1px dotted currentColor; }
+</style>
+</head>
+<body>
+
+<div class="err" id="err"></div>
+<div id="boot-status" style="position:fixed;top:8px;right:8px;background:#1f3556;color:#f4ecdc;padding:6px 12px;border-radius:6px;font:500 12px/1.4 var(--mono);z-index:10000;max-width:340px;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);"></div>
+<div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>Sceau de l'envoyé</h2>
+    <p class="lead">Tes ordres seront signés dans ce navigateur (Ed25519, Web Crypto) puis poussés dans le repo via l'API GitHub. Ces données restent en local.</p>
+
+    <input id="cfgRepo" type="hidden"/>
+    <input id="cfgBranch" type="hidden"/>
+    <input id="cfgPat" type="hidden"/>
+
+    <label>Authentification GitHub</label>
+    <div id="oauthIdle">
+      <button class="primary" id="oauthConnect" type="button">Se connecter à GitHub</button>
+      <div class="hint">Tu seras redirigé pour entrer un code à 8 caractères. Aucun PAT à créer.</div>
+    </div>
+    <div id="oauthFlow" hidden>
+      <div class="hint" style="margin-top:0">Ouvre <a id="oauthUrl" target="_blank" rel="noopener">github.com/login/device</a> et entre le code :</div>
+      <div style="font-family:var(--mono); font-size:22px; letter-spacing:0.3em; color:var(--brass); padding:14px 18px; background:var(--ink-3); border-radius:8px; text-align:center; margin:8px 0; user-select:all"><span id="oauthCode">—</span></div>
+      <div class="hint" id="oauthStatus">En attente de ton autorisation…</div>
+    </div>
+    <div id="oauthDone" hidden>
+      <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--ink-3); border-radius:8px;">
+        <span style="color:var(--green); font-weight:700">✓</span>
+        <span>Connecté en tant que <b id="oauthUser" style="font-family:var(--mono)">—</b></span>
+        <button class="ghost" id="oauthLogout" type="button" style="margin-left:auto; font-size:11px">Déconnecter</button>
+      </div>
+    </div>
+
+    <label>Clé privée Ed25519 (joueurs/&lt;toi&gt;/.key.pem)</label>
+    <textarea id="cfgKey" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" autocomplete="off" spellcheck="false"></textarea>
+    <div class="hint">Colle exactement le contenu du <code>.key.pem</code>. Stocké en localStorage (rappel : pas de protection contre script malveillant).</div>
+
+    <div class="actions">
+      <button class="ghost" id="cfgClear">Effacer</button>
+      <button class="ghost" id="cfgCancel">Fermer</button>
+      <button class="primary" id="cfgSave">Sceller</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="missionBg">
+  <div class="modal mission-modal">
+    <h2>Préparer une mission</h2>
+    <p class="lead">Sélectionne le type, la planète d'origine, et la composition de la flotte. L'ordre sera signé puis poussé sur GitHub.</p>
+
+    <div class="target" id="missionTarget">—</div>
+
+    <label>Type de mission</label>
+    <div class="seg-pick" id="missionType">
+      <button data-mt="espionnage" class="on">Espionnage</button>
+      <button data-mt="attaque">Attaque</button>
+      <button data-mt="transport">Transport</button>
+      <button data-mt="recyclage">Recyclage</button>
+    </div>
+
+    <label>Depuis</label>
+    <select id="missionFrom"></select>
+
+    <label id="missionFleetLabel">Flotte</label>
+    <div id="missionFleet"></div>
+
+    <div id="missionCargoBlock" style="display:none">
+      <label>Cargaison</label>
+      <div class="cargo">
+        <div><label style="font-weight:500;font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--bone-dim)">Ferrum</label><input type="number" min="0" id="cargoFerrum" value="0"/></div>
+        <div><label style="font-weight:500;font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--bone-dim)">Lumen</label><input type="number" min="0" id="cargoLumen" value="0"/></div>
+        <div><label style="font-weight:500;font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--bone-dim)">Plasmide</label><input type="number" min="0" id="cargoPlasmide" value="0"/></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="ghost" id="missionCancel">Annuler</button>
+      <button class="primary" id="missionSubmit">Signer et envoyer</button>
+    </div>
+  </div>
+</div>
+
+<div class="onboarding-bg" id="obBg">
+  <div class="onboarding">
+    <h2>Bienvenue, <span id="ob-name">commandant</span>.</h2>
+    <p class="ob-sub">Tu contrôles <strong id="ob-planet">—</strong>. Aetheris est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.</p>
+
+    <div class="ob-card">
+      <div class="ob-stat">
+        <span class="lab">Coordonnées</span>
+        <span class="val" id="ob-coords">—</span>
+        <div class="sub" id="ob-classe">—</div>
+      </div>
+      <div class="ob-stat">
+        <span class="lab">Champs libres</span>
+        <span class="val" id="ob-champs">—</span>
+        <div class="sub">slots de bâtiments</div>
+      </div>
+    </div>
+
+    <div class="ob-tick">
+      <span class="lab">Prochain tick dans</span>
+      <span class="val" id="ob-countdown">—</span>
+    </div>
+
+    <ol>
+      <li>Ta <span class="gloss" title="Mine de Ferrum : produit du ferrum (mineralia) à chaque tick. Plus le niveau est élevé, plus la production augmente.">Mine de Ferrum</span> est ta première source de revenu — améliore-la</li>
+      <li>L'ordre est signé localement (ta clé ne quitte jamais ton browser) et poussé en PR</li>
+      <li>Le moteur l'auto-merge en ~20s, puis l'applique au tick suivant</li>
+    </ol>
+
+    <div class="ob-actions">
+      <button class="ob-skip" onclick="closeOnboarding(false)">Plus tard</button>
+      <button class="ob-go" id="obGoBtn" onclick="upgradeFirstMine()">Améliorer ma Mine maintenant →</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <!-- HEADER -->
+  <div class="head">
+    <div class="brand">
+      <div class="mark"></div>
+      <div class="name">Aetheris<b>Protocole · canonique</b></div>
+    </div>
+    <div class="head-meta">
+      <div class="tick-block">
+        <div>
+          <div class="label">cycle</div>
+          <div class="value" id="tickValue">—</div>
+        </div>
+        <div class="countdown" id="countdown">prochain · —</div>
+      </div>
+      <button class="bell silent" id="bellBtn" title="alertes" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+          <path d="M10 21a2 2 0 0 0 4 0"/>
+        </svg>
+        <span class="dot" id="bellDot">0</span>
+      </button>
+      <div class="player-pick">
+        <div class="who" id="whoLabel">—<small>commandant</small></div>
+        <select id="playerSelect"></select>
+        <button class="src-btn" id="srcBtn" title="source des données">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4"/></svg>
+          <span id="srcLabel">local</span>
+        </button>
+        <button class="gear-btn" id="gearBtn" title="paramètres scellés">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESOURCE STRIP -->
+  <div class="strip" id="strip"></div>
+
+  <!-- NAV -->
+  <nav class="nav" id="nav">
+    <div class="heading">cockpit</div>
+    <button data-view="overview" class="on">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></span>
+      Aperçu
+    </button>
+    <button data-view="batiments">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-7h6v7"/><path d="M4 13h4M16 13h4"/></svg></span>
+      Bâtiments <span class="ct" id="ctBat">—</span>
+    </button>
+    <button data-view="recherche">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg></span>
+      Recherche <span class="ct" id="ctRec">—</span>
+    </button>
+    <button data-view="flotte">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2l4 7-4 3-4-3 4-7z"/><path d="M8 12l-4 5 4 2 4-2 4 2 4-2-4-5"/></svg></span>
+      Flotte <span class="ct" id="ctFlt">—</span>
+    </button>
+    <button data-view="defense">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2L4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z"/></svg></span>
+      Défenses <span class="ct" id="ctDef">—</span>
+    </button>
+    <button data-view="galaxie">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="2"/><path d="M3 12c5-9 13-9 18 0M21 12c-5 9-13 9-18 0"/></svg></span>
+      Galaxie
+    </button>
+    <div class="heading" style="margin-top:18px">flux</div>
+    <button data-view="journal">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 4h11l3 3v13H5z"/><path d="M9 9h7M9 13h7M9 17h4"/></svg></span>
+      Journal
+    </button>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main" id="main">
+    <div id="planetHead"></div>
+
+    <div class="view on" data-v="overview" id="vOverview"></div>
+    <div class="view" data-v="batiments" id="vBat"></div>
+    <div class="view" data-v="recherche" id="vRec"></div>
+    <div class="view" data-v="flotte" id="vFlt"></div>
+    <div class="view" data-v="defense" id="vDef"></div>
+    <div class="view" data-v="galaxie" id="vGal"></div>
+    <div class="view" data-v="journal" id="vJou"></div>
+  </main>
+
+  <!-- RIGHT RAIL -->
+  <aside class="rail" id="rail">
+    <div class="group">
+      <h3>Chantier <span class="ct" id="qBatCt">—</span></h3>
+      <div id="qBat"></div>
+    </div>
+    <div class="group">
+      <h3>Recherche <span class="ct" id="qRecCt">—</span></h3>
+      <div id="qRec"></div>
+    </div>
+    <div class="group">
+      <h3>Flottes en vol <span class="ct" id="qFltCt">—</span></h3>
+      <div id="qFlt"></div>
+    </div>
+  </aside>
+
+  <!-- FOOTER -->
+  <div class="foot">
+    <div class="live"><i></i> <span>uplink actif · <span id="lastRefresh">—</span></span></div>
+    <div class="seg">
+      <span>protocole <b id="proto">—</b></span>
+      <span>serveur <b id="srv">—</b></span>
+      <span>seed <b id="seed">—</b></span>
+      <span>hash <b id="hash">—</b></span>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Module loader Bitcoin : importe les engines iso et expose des helpers ─── -->
+<script type="module">
+import { bootBitcoin } from './engine/boot-bitcoin.mjs';
+import { inscribe, API_URLS } from './engine/inscribe-core.mjs';
+import { fetchTipHeight } from './engine/scan-bitcoin.mjs';
+import { tickFromBlockHeight } from './engine/tick-core.mjs';
+import { makeBrowserAdapter } from './engine/cache-browser.mjs';
+import { initCache } from './engine/cache.mjs';
+import * as btc from '@scure/btc-signer';
+import { schnorr } from '@noble/curves/secp256k1';
+
+// Init cache IndexedDB une fois.
+const cacheAdapter = await makeBrowserAdapter('aetheris-bitcoin');
+initCache(cacheAdapter);
+
+// Expose au script principal (non-module).
+window.aetherisBitcoin = {
+  bootBitcoin,
+  inscribe,
+  API_URLS,
+  fetchTipHeight,
+  tickFromBlockHeight,
+  btc, schnorr,
+  cacheAdapter,
+  ready: true,
+};
+window.dispatchEvent(new CustomEvent('aetheris-bitcoin-ready'));
+</script>
+
+<script>
+/* ───────────────────────────── YAML mini parser ─────────────────────────── */
+function yparse(text) {
+  const lines = text.split('\n').filter(l => !/^\s*#/.test(l)).map(l => l.replace(/\s+#.*$/, ''));
+  let i = 0;
+  function readBlock(indent) {
+    const out = {}; let firstKey = true;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) { i++; continue; }
+      const ind = line.match(/^ */)[0].length;
+      if (ind < indent) return out;
+      if (ind > indent && firstKey) return readBlock(ind);
+      const m = line.slice(ind).match(/^"?([\w:.\-]+)"?\s*:\s*(.*)$/);
+      if (!m) { i++; continue; }
+      const [, k, rest] = m; i++;
+      if (rest === '') {
+        if (i < lines.length && /^\s*-\s/.test(lines[i])) out[k] = readList(ind + 2);
+        else out[k] = readBlock(ind + 2);
+      } else if (rest.startsWith('[') || rest.startsWith('{')) {
+        out[k] = readInline(rest);
+      } else { out[k] = parseScalar(rest); }
+      firstKey = false;
+    }
+    return out;
+  }
+  function readList(indent) {
+    const out = [];
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) { i++; continue; }
+      const ind = line.match(/^ */)[0].length;
+      if (ind < indent) return out;
+      if (!line.slice(ind).startsWith('- ')) return out;
+      const rest = line.slice(ind + 2); i++;
+      if (rest.includes(':') && !rest.startsWith('{')) {
+        const m = rest.match(/^([\w-]+)\s*:\s*(.*)$/);
+        const item = {};
+        if (m && m[2] === '') item[m[1]] = readBlock(ind + 4);
+        else if (m) item[m[1]] = parseScalar(m[2]);
+        Object.assign(item, readBlock(ind + 2));
+        out.push(item);
+      } else if (rest.startsWith('{')) { out.push(readInline(rest)); }
+      else { out.push(parseScalar(rest)); }
+    }
+    return out;
+  }
+  function splitTopLevel(s, sep) {
+    const out = []; let depth = 0, start = 0;
+    for (let j = 0; j < s.length; j++) {
+      const c = s[j];
+      if (c === '{' || c === '[') depth++;
+      else if (c === '}' || c === ']') depth--;
+      else if (c === sep && depth === 0) { out.push(s.slice(start, j).trim()); start = j + 1; }
+    }
+    const last = s.slice(start).trim();
+    if (last) out.push(last);
+    return out;
+  }
+  function readInline(s) {
+    s = s.trim();
+    if (s.startsWith('[') && s.endsWith(']')) {
+      const inner = s.slice(1, -1).trim(); if (!inner) return [];
+      return splitTopLevel(inner, ',').map(t => parseScalar(t));
+    }
+    if (s.startsWith('{') && s.endsWith('}')) {
+      const inner = s.slice(1, -1).trim(); if (!inner) return {};
+      const out = {};
+      for (const part of splitTopLevel(inner, ',')) {
+        const colon = part.indexOf(':'); if (colon < 0) continue;
+        const k = part.slice(0, colon).trim().replace(/^["']|["']$/g, '');
+        out[k] = parseScalar(part.slice(colon + 1).trim());
+      }
+      return out;
+    }
+    return s;
+  }
+  function parseScalar(s) {
+    s = s.trim();
+    if (s === 'true') return true;
+    if (s === 'false') return false;
+    if (s === 'null' || s === '~' || s === '') return null;
+    if (/^-?\d+$/.test(s)) return parseInt(s, 10);
+    if (/^-?\d*\.\d+$/.test(s)) return parseFloat(s);
+    if (/^["'].*["']$/.test(s)) return s.slice(1, -1);
+    if (s.startsWith('[') || s.startsWith('{')) return readInline(s);
+    return s;
+  }
+  return readBlock(0);
+}
+
+/* ───────────────────────────── State ────────────────────────────────────── */
+const state = {
+  manifest: null,
+  galaxie: null,
+  rules: null,
+  players: {},
+  current: (new URLSearchParams(location.search).get('joueur')) || localStorage.getItem('aetheris.player') || null,
+  view: localStorage.getItem('aetheris.view') || 'overview',
+  source: localStorage.getItem('aetheris.source') || 'local',
+  pending: new Set(),
+};
+// Sync URL-derived player to localStorage pour les refresh suivants.
+if (state.current) localStorage.setItem('aetheris.player', state.current);
+
+// Repo et branche canoniques — hardcodes. Ils ne sont plus exposes dans l'UI
+// pour eviter qu'un joueur pointe par erreur vers son propre fork.
+const UPSTREAM_REPO = 'meffysto/aetheris-protocol';
+const UPSTREAM_BRANCH = 'main';
+// OAuth Device Flow — meme app/proxy que join.html. Le token recu va dans
+// localStorage 'aetheris.gh.pat' (peu importe son origine, c'est un Bearer
+// token GitHub). Plus aucune creation manuelle de PAT exigee du joueur.
+const OAUTH_CLIENT_ID = 'Ov23li7ZHGzhrDKFTeXl';
+const OAUTH_PROXY = 'https://aetheris-oauth-proxy.meffysto.workers.dev';
+const cfg = {
+  get repo()   { return UPSTREAM_REPO; },
+  set repo(_)  { /* hardcode, no-op */ },
+  get branch() { return UPSTREAM_BRANCH; },
+  set branch(_){ /* hardcode, no-op */ },
+  get pat()    { return localStorage.getItem('aetheris.gh.pat')    || ''; },
+  set pat(v)   { v ? localStorage.setItem('aetheris.gh.pat', v)    : localStorage.removeItem('aetheris.gh.pat'); },
+  get key()    { return localStorage.getItem('aetheris.gh.key')    || ''; },
+  set key(v)   { v ? localStorage.setItem('aetheris.gh.key', v)    : localStorage.removeItem('aetheris.gh.key'); },
+  get ready()  { return !!(this.pat && this.key); },
+};
+
+/* ───────────────────────────── Iconography ──────────────────────────────── */
+const icons = {
+  ferrum: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 21l5-5M7 17l-3-3M9 15l5-5M14 10l4 4M14 10l-3-3 4-4 9 9-4 4-3-3"/></svg>`,
+  lumen:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`,
+  plasmide:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 3h6M10 3v5l-4 11a3 3 0 003 4h6a3 3 0 003-4l-4-11V3"/><path d="M7 14h10"/></svg>`,
+  energie: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>`,
+
+  mine_ferrum: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 21l8-8M11 13l3-3-2-2 5-5 4 4-5 5-2-2-3 3M5 21h6"/></svg>`,
+  extracteur_lumen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="9" r="3"/><path d="M12 2v2M5 4l1 1M19 4l-1 1M3 9h2M19 9h2M5 14l1-1M19 14l-1-1M6 17l-2 4M18 17l2 4M9 17l-1 4M15 17l1 4M12 17v4"/></svg>`,
+  synthetiseur_plasmide: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 3h6M10 3v5l-4 11a3 3 0 003 4h6a3 3 0 003-4l-4-11V3"/><circle cx="12" cy="16" r="1.2"/></svg>`,
+  centrale_solaire: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="6" width="18" height="10" rx="1"/><path d="M3 11h18M9 6v10M15 6v10M8 20h8M12 16v4"/></svg>`,
+  depot: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg>`,
+  usine_robotique: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`,
+  chantier_spatial: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2c4 4 6 8 6 12v4l-3-2h-6l-3 2v-4c0-4 2-8 6-12z"/><circle cx="12" cy="11" r="2"/><path d="M9 20l-2 2M15 20l2 2"/></svg>`,
+  laboratoire: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg>`,
+
+  default_b: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="4" y="8" width="16" height="13"/><path d="M4 8l8-5 8 5"/></svg>`,
+  default_f: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2l4 7-4 3-4-3 4-7z"/></svg>`,
+  default_d: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2L4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z"/></svg>`,
+};
+
+const labels = {
+  mine_ferrum: 'Mine de Ferrum',
+  extracteur_lumen: 'Extracteur Lumen',
+  synthetiseur_plasmide: 'Synthétiseur Plasmide',
+  centrale_solaire: 'Centrale Solaire',
+  reacteur_fusion: 'Réacteur à Fusion',
+  depot: 'Dépôt Stratégique',
+  usine_robotique: 'Usine Robotique',
+  chantier_spatial: 'Chantier Spatial',
+  laboratoire: 'Laboratoire',
+  silo_missiles: 'Silo de Missiles',
+  terminal_marchand: 'Terminal Marchand',
+  centre_diplomatique: 'Centre Diplomatique',
+  // vaisseaux
+  sonde: 'Sonde',
+  chasseur_leger: 'Chasseur Léger',
+  chasseur_lourd: 'Chasseur Lourd',
+  croiseur: 'Croiseur',
+  fregate: 'Frégate',
+  cuirasse: 'Cuirassé',
+  destroyer: 'Destroyer',
+  dreadnought: 'Dreadnought',
+  cargo_lourd: 'Cargo Lourd',
+  recycleur: 'Recycleur',
+  vaisseau_colon: 'Vaisseau Colon',
+  // défenses
+  lance_missiles: 'Lance-missiles',
+  canon_laser_leger: 'Canon Laser Léger',
+  canon_laser_lourd: 'Canon Laser Lourd',
+  canon_gauss: 'Canon Gauss',
+  canon_ionique: 'Canon Ionique',
+  canon_plasma: 'Canon Plasma',
+  petit_bouclier_planetaire: 'Petit Bouclier Planétaire',
+  grand_bouclier_planetaire: 'Grand Bouclier Planétaire',
+  // recherches
+  robotique: 'Robotique',
+  automation_miniere: 'Automation Minière',
+  fusion_controlee: 'Fusion Contrôlée',
+  drives_impulsion: 'Drives à Impulsion',
+  drive_hyperspatial: 'Drive Hyperspatial',
+  armement: 'Armement',
+  bouclier_graviton: 'Bouclier Graviton',
+  espionnage_profond: 'Espionnage Profond',
+  cryptographie: 'Cryptographie',
+  diplomatie: 'Diplomatie',
+  doctrine_imperiale: 'Doctrine Impériale',
+  distorsion_subluminique: 'Distorsion Subluminique',
+};
+
+const taglines = {
+  mine_ferrum: 'extrait du Ferrum',
+  extracteur_lumen: 'récolte du Lumen',
+  synthetiseur_plasmide: 'synthétise du Plasmide',
+  centrale_solaire: 'produit de l\'énergie',
+  depot: 'augmente le stockage',
+  usine_robotique: 'accélère les chantiers',
+  chantier_spatial: 'construit la flotte',
+  laboratoire: 'accélère la recherche',
+  silo_missiles: 'stocke les missiles',
+  terminal_marchand: 'commerce inter-empires',
+  centre_diplomatique: 'projette l\'influence',
+  // vaisseaux
+  sonde: 'éclaireur',
+  chasseur_leger: 'intercepteur',
+  chasseur_lourd: 'intercepteur lourd',
+  croiseur: 'ligne de bataille',
+  fregate: 'frappe rapide',
+  cuirasse: 'navire capital',
+  destroyer: 'navire capital lourd',
+  dreadnought: 'super-capital',
+  cargo_lourd: 'transport',
+  recycleur: 'récupérateur de débris',
+  vaisseau_colon: 'colonisation',
+  // défenses
+  lance_missiles: 'pièce légère',
+  canon_laser_leger: 'pièce légère',
+  canon_laser_lourd: 'pièce moyenne',
+  canon_gauss: 'pièce lourde',
+  canon_ionique: 'anti-bouclier',
+  canon_plasma: 'pièce capitale',
+  petit_bouclier_planetaire: 'bouclier (1 max)',
+  grand_bouclier_planetaire: 'bouclier (1 max)',
+};
+
+/* ───────────────────────────── Planet glyph ─────────────────────────────── */
+function planetSVG(classe) {
+  const palettes = {
+    tellurique:  ['#3a5a3e', '#7fa570', '#a8c89a', '#2a3e2c'],
+    cristalline: ['#2a5a5a', '#6fe6e1', '#a8f5f2', '#1a3a3a'],
+    glacee:      ['#3a6a8a', '#88c8e0', '#d0e8f5', '#1e3a4a'],
+    volcanique:  ['#5a2a1a', '#e8633a', '#f0a070', '#3a1a10'],
+    gazeuse:     ['#4a3a6a', '#9a86d4', '#c8b0d8', '#2a1e3a'],
+  };
+  const p = palettes[classe] || palettes.tellurique;
+  return `<svg viewBox="0 0 64 64">
+    <defs>
+      <radialGradient id="pg-${classe}" cx="35%" cy="30%">
+        <stop offset="0%" stop-color="${p[2]}"/>
+        <stop offset="40%" stop-color="${p[1]}"/>
+        <stop offset="80%" stop-color="${p[0]}"/>
+        <stop offset="100%" stop-color="${p[3]}"/>
+      </radialGradient>
+    </defs>
+    <circle cx="32" cy="32" r="26" fill="url(#pg-${classe})"/>
+    <circle cx="32" cy="32" r="26" fill="none" stroke="${p[3]}" stroke-width="0.6" opacity="0.6"/>
+    <ellipse cx="22" cy="24" rx="6" ry="3" fill="${p[0]}" opacity="0.5"/>
+    <ellipse cx="40" cy="38" rx="8" ry="4" fill="${p[3]}" opacity="0.5"/>
+    <circle cx="44" cy="22" r="2.5" fill="${p[2]}" opacity="0.6"/>
+    <circle cx="32" cy="32" r="26" fill="none" stroke="${p[2]}" stroke-width="0.4" opacity="0.3"/>
+  </svg>`;
+}
+
+/* ───────────────────────────── Fetch ────────────────────────────────────── */
+async function fetchText(p) {
+  if (state.source === 'github' && cfg.repo) {
+    const url = `https://api.github.com/repos/${cfg.repo}/contents/${encodeURIComponent(p).replace(/%2F/g, '/')}?ref=${encodeURIComponent(cfg.branch || 'main')}&t=${Date.now()}`;
+    const headers = { Accept: 'application/vnd.github.raw', 'X-GitHub-Api-Version': '2022-11-28' };
+    if (cfg.pat) headers.Authorization = `Bearer ${cfg.pat}`;
+    const r = await fetch(url, { cache: 'no-store', headers });
+    if (!r.ok) throw new Error(p);
+    return r.text();
+  }
+  const r = await fetch(p, { cache: 'no-store' });
+  if (!r.ok) throw new Error(p);
+  return r.text();
+}
+
+async function waitForBitcoinModule() {
+  if (window.aetherisBitcoin?.ready) return;
+  await new Promise(resolve => window.addEventListener('aetheris-bitcoin-ready', resolve, { once: true }));
+}
+
+let _bootStatusHideTimer = null;
+function showStatus(msg, persist = false) {
+  const el = document.getElementById('boot-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+  console.log('[boot]', msg);
+  if (_bootStatusHideTimer) clearTimeout(_bootStatusHideTimer);
+  if (!persist) {
+    _bootStatusHideTimer = setTimeout(() => { el.style.display = 'none'; }, 3500);
+  }
+}
+
+// Boot 100% Bitcoin : scan la chain, replay les ticks, reconstruit l'état.
+// Les fichiers statiques (genesis, rules, galaxie) sont lus depuis le repo
+// (paths relatifs si la console est servie depuis le repo, sinon raw.github).
+async function load() {
+  try {
+    await waitForBitcoinModule();
+    const ab = window.aetherisBitcoin;
+
+    showStatus('▸ chargement genesis / rules / galaxie…');
+    const [genesisYaml, rulesYaml, galaxieYaml] = await Promise.all([
+      fetchText('genesis/genesis.yaml'),
+      fetchText('engine/rules.yaml'),
+      fetchText('world/galaxie.yaml'),
+    ]);
+
+    showStatus('▸ scan Bitcoin…');
+    const result = await ab.bootBitcoin({
+      api: 'https://mutinynet.com/api',
+      genesisYaml, rulesYaml, galaxieYaml,
+      log: (m) => showStatus(m),
+      onProgress: ({ phase, current, total }) => {
+        showStatus(`${phase} ${current}/${total}`);
+      },
+      verifySignature: async (yamlContent, pubB64, sigB64) => {
+        try {
+          const pubBytes = Uint8Array.from(atob(pubB64), c => c.charCodeAt(0));
+          const sigBytes = Uint8Array.from(atob(sigB64), c => c.charCodeAt(0));
+          const key = await crypto.subtle.importKey('spki', pubBytes, { name: 'Ed25519' }, false, ['verify']);
+          const canonical = yamlContent.split('\n').filter(l => !/^signature:\s*/.test(l)).join('\n').trimEnd() + '\n';
+          return await crypto.subtle.verify('Ed25519', key, sigBytes, new TextEncoder().encode(canonical));
+        } catch { return false; }
+      },
+    });
+
+    state.manifest = result.manifest;
+    state.rules = result.rules;
+    state.galaxie = result.galaxie;
+    state.players = result.empires;
+    state.identites = result.identites;
+    state.bitcoin = {
+      tip: result.tip,
+      blocGenesis: result.blocGenesis,
+      blocsParTick: result.blocsParTick,
+      tickCourant: result.tickCourant,
+      joins: result.joins,
+      ordersByTick: result.ordersByTick,
+    };
+
+    // Sélectionne le 1er joueur si rien n'est choisi
+    const playerNames = Object.keys(state.players);
+    if (!state.current || !state.players[state.current]) {
+      state.current = playerNames[0] || null;
+    }
+
+    showStatus(`✓ tick ${state.manifest.tick} · ${playerNames.length} empire(s) · bloc ${state.bitcoin.tip}`);
+    document.getElementById('err').classList.remove('on');
+    render();
+  } catch (e) {
+    const err = document.getElementById('err');
+    err.innerHTML = `⚠ liaison rompue · ${escapeHtml(e.message || 'erreur')}<button class="close" aria-label="Fermer" onclick="this.parentElement.classList.remove('on')">×</button>`;
+    err.classList.add('on');
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+/* ───────────────────────────── Format helpers ───────────────────────────── */
+const fmt = n => (n ?? 0).toLocaleString('fr-FR');
+const fmtCompact = n => {
+  n = n ?? 0;
+  if (n >= 1e9) return (n/1e9).toFixed(1).replace(/\.0$/, '') + 'G';
+  if (n >= 1e6) return (n/1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(n);
+};
+
+// 1 UTJ ≈ duree_tick_min / 6 (6 UTJ par tick par convention engine)
+function utjMin() { return ((state.manifest?.duree_tick_min) || 15) / 6; }
+
+// Le moteur progresse par ticks (6 UTJ par tick). Une duree affichee en UTJ
+// se traduit en N ticks = ceil(UTJ / 6). Toujours +1 tick de queue.
+function utjToTicks(utj) { return Math.max(1, Math.ceil((utj || 0) / 6)); }
+function ticksLabel(n) { return n === 1 ? '1 tick' : `${n} ticks`; }
+// Pour un chantier en file (deja queue), retourne le tick d'arrivee et minutes restantes.
+function chantierETA(remainUtj) {
+  const ticksAv = utjToTicks(remainUtj);
+  const tickArrivee = (state.manifest?.tick ?? 0) + ticksAv;
+  const info = nextTickInfo();
+  const minsToNext = info.secs / 60;
+  const mins = Math.round(minsToNext + (ticksAv - 1) * info.mins);
+  return { tickArrivee, mins };
+}
+
+function nextTickInfo() {
+  const m = state.manifest;
+  const mins = (m?.duree_tick_min) || 15;
+  const dur = mins * 60 * 1000;
+  const now = Date.now();
+  // L'Action tourne sur cron `*/15` UTC — donc xx:00, xx:15, xx:30, xx:45 wall-clock
+  const next = Math.ceil((now + 1) / dur) * dur;
+  const secs = Math.max(0, Math.round((next - now) / 1000));
+  const pct = Math.min(100, Math.max(0, ((dur - (next - now)) / dur) * 100));
+  return { tick: m?.tick ?? 0, secs, pct, mins };
+}
+
+function fmtCountdown(s) {
+  const m = Math.floor(s / 60), sec = s % 60;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+/* ───────────────────────────── Render ───────────────────────────────────── */
+function render() {
+  const m = state.manifest;
+
+  // header
+  document.getElementById('tickValue').textContent = m ? String(m.tick).padStart(3, '0') : '—';
+  document.getElementById('proto').textContent = m ? `v${m.protocol_version}` : '—';
+  document.getElementById('srv').textContent = m ? m.serveur : '—';
+  document.getElementById('seed').textContent = m ? String(m.seed).slice(0, 10) + '…' : '—';
+  document.getElementById('hash').textContent = m && m.hash_etat ? String(m.hash_etat).slice(7, 19) : '—';
+  document.getElementById('whoLabel').innerHTML = state.current
+    ? `${state.current}<small>commandant</small>`
+    : `vacant<small>commandant</small>`;
+
+  // player select
+  const sel = document.getElementById('playerSelect');
+  const names = Object.keys(state.players);
+  sel.innerHTML = names.map(n => `<option value="${n}"${n === state.current ? ' selected' : ''}>${n}</option>`).join('') || '<option>—</option>';
+  sel.onchange = e => {
+    state.current = e.target.value;
+    localStorage.setItem('aetheris.player', state.current);
+    render();
+  };
+
+  const emp = state.players[state.current];
+  const p = emp && (emp.planetes || [])[0];
+
+  renderResourceStrip(p);
+  renderPlanetHead(p, emp);
+  renderOverview(p, emp);
+  renderBatiments(p);
+  renderRecherche(emp);
+  renderFlotte(p);
+  renderDefense(p);
+  renderGalaxie();
+  renderJournal(p, emp);
+  renderRail(p, emp);
+  renderNavCounts(p, emp);
+  applyView();
+
+  document.getElementById('lastRefresh').textContent =
+    new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  if (p) showOnboarding(p.nom);
+}
+
+function renderNavCounts(p, emp) {
+  const numActive = (obj) => obj ? Object.values(obj).filter(v => v && v > 0).length : 0;
+  document.getElementById('ctBat').textContent = p ? numActive(p.batiments) : '—';
+  document.getElementById('ctRec').textContent = emp ? numActive(emp.recherche) : '—';
+  document.getElementById('ctFlt').textContent = p ? numActive(p.flotte_au_sol) : '—';
+  document.getElementById('ctDef').textContent = p ? numActive(p.defenses) : '—';
+}
+
+function renderResourceStrip(p) {
+  const def = [
+    { k: 'ferrum',   l: 'Ferrum'   },
+    { k: 'lumen',    l: 'Lumen'    },
+    { k: 'plasmide', l: 'Plasmide' },
+  ];
+  let html = '';
+  for (const r of def) {
+    const info = p?.ressources?.[r.k] || { stock: 0, production_par_utj: 0, capacite: 0 };
+    const pct = info.capacite ? (info.stock / info.capacite) * 100 : 0;
+    const warn = pct >= 90;
+    const prod = info.production_par_utj || 0;
+    const tip = resourceTooltip(r.k, info);
+    html += `<div class="res" data-r="${r.k}" data-tip="${escapeHtml(tip)}">
+      <div class="ico">${icons[r.k]}</div>
+      <div class="nm">${r.l}</div>
+      <div class="stock">${fmtCompact(info.stock)}</div>
+      <div class="meta ${warn ? 'warn' : ''} ${prod === 0 ? 'zero' : ''}">${warn ? 'plein' : (prod > 0 ? '+' + prod + '/utj' : '—')}</div>
+    </div>`;
+  }
+  const en = p?.energie || { production: 0, consommation: 0 };
+  const balance = (en.production || 0) - (en.consommation || 0);
+  const enTip = `${descOf('energie')}\nProduction : ${en.production || 0}\nConsommation : ${en.consommation || 0}\nBalance : ${balance >= 0 ? '+' : ''}${balance}`;
+  html += `<div class="res" data-r="energie" data-tip="${escapeHtml(enTip)}">
+    <div class="ico">${icons.energie}</div>
+    <div class="nm">Énergie</div>
+    <div class="stock" style="color:${balance < 0 ? 'var(--phosphor)' : 'var(--bone-2)'}">${balance >= 0 ? '+' : ''}${balance}</div>
+    <div class="meta ${balance < 0 ? 'warn' : ''}">${balance < 0 ? 'déficit' : 'stable'}</div>
+  </div>`;
+  document.getElementById('strip').innerHTML = html;
+}
+
+function renderPlanetHead(p, emp) {
+  // Sur Aperçu → carte héros "Bulletin" complète.
+  // Sur les autres vues → barre compacte (nom + coords + chip).
+  const head = document.getElementById('planetHead');
+  if (!p) {
+    head.className = '';
+    head.innerHTML = `<div class="empty-stamp">aucune planète attribuée</div>`;
+    return;
+  }
+  const coord = (p.coordonnees || []).join(':');
+  const tickCur = state.manifest?.tick ?? 0;
+
+  // Vue compacte hors Aperçu — juste l'identité de la planète.
+  if (state.view !== 'overview') {
+    head.className = 'planet-bar';
+    head.innerHTML = `
+      <h1 class="pb-title"><span class="pb-coord">${coord}</span>${p.nom}</h1>
+      <span class="pb-chip ${p.type || ''}">${p.type || 'planète'}</span>
+      <span class="pb-meta">cycle <b>${tickCur}</b></span>
+      <span class="pb-meta">score <b>${fmt(emp?.score_total ?? 0)}</b></span>
+      <span class="pb-meta" style="margin-left:auto">champs <b>${p.champs?.utilises ?? 0}/${p.champs?.total ?? 0}</b></span>`;
+    return;
+  }
+
+  head.className = 'bulletin';
+  const buildings = Object.entries(p.batiments || {});
+  const built = buildings.filter(([, n]) => n > 0).length;
+  const total = buildings.length;
+
+  // News : prochain événement notable (chantier qui finit, recherche, flotte)
+  const news = computeNextEvent(p, emp, tickCur);
+
+  // Threats : flottes hostiles d'autres joueurs en route vers une de mes planètes
+  const threat = computeIncomingThreat(emp, tickCur);
+
+  // Stats : score, rang, ordres scellés en attente
+  const decretsCount = (emp?._ordres?.tick_cible >= tickCur + 1)
+    ? (emp._ordres.ordres || []).length : 0;
+  const rangStr = emp?.rang != null ? `${emp.rang}` : '—';
+  const scoreStr = fmt(emp?.score_total ?? 0);
+
+  head.innerHTML = `
+    <div class="label">Bulletin du Cycle ${tickCur}</div>
+    <h1 class="planet"><span class="coord">${coord}</span>${p.nom}</h1>
+    <div class="sub">
+      <span><b>${built}/${total}</b> ouvrages debout</span>
+      <span class="chip ${p.type || ''}">${p.type || 'planète'}</span>
+      <span>militaire <b>${fmt(emp?.points_militaires ?? 0)}</b></span>
+      <span style="margin-left:auto"><b>${p.champs?.utilises ?? 0}/${p.champs?.total ?? 0}</b> champs</span>
+    </div>
+    <div class="news">
+      <div>
+        <h3>${news.label}</h3>
+        <div class="item">${news.text}</div>
+      </div>
+      <div class="stamp">${news.stamp}</div>
+    </div>
+    ${threat ? `
+      <div class="threats">
+        <div class="pulse"></div>
+        <div class="body">${threat}</div>
+      </div>` : ''}
+    <div class="stats">
+      <div class="s"><div class="k">Score impérial</div><div class="v">${scoreStr}</div></div>
+      <div class="s"><div class="k">Rang galactique</div><div class="v">${rangStr}<small>${rangStr === '1' ? 'tête' : ''}</small></div></div>
+      <div class="s"><div class="k">Décrets scellés</div><div class="v">${decretsCount}<small>${decretsCount > 0 ? 'en file' : ''}</small></div></div>
+    </div>`;
+
+  updateBell(threat, decretsCount);
+}
+
+function computeNextEvent(p, emp, tickCur) {
+  // 1) Chantier qui s'achève le plus tôt
+  const chantiers = (p.file_chantier || []).slice().sort((a, b) => (a.fin_utj || 0) - (b.fin_utj || 0));
+  if (chantiers[0]) {
+    const c = chantiers[0];
+    const remain = Math.max(0, c.fin_utj || 0);
+    const ticks = Math.max(1, Math.ceil(remain / 6));
+    const tickFin = tickCur + ticks;
+    return {
+      label: 'Prochaine livraison',
+      text: `Vos chantiers livreront <em>${labels[c.batiment] || c.batiment} niveau ${c.niveau_cible}</em> au cycle <em>${tickFin}</em>.`,
+      stamp: `dans ${ticks} cycle${ticks > 1 ? 's' : ''} · tick ${tickFin}`,
+    };
+  }
+  // 2) Flotte en vol
+  const vols = emp?.flottes_en_vol || [];
+  if (vols[0]) {
+    const f = vols[0];
+    const dest = f.vers?.planete || f.vers || '—';
+    return {
+      label: 'Flotte en mission',
+      text: `Mission <em>${f.type_mission || 'reconnaissance'}</em> vers <em>${dest}</em>.`,
+      stamp: f.tick_arrivee ? `arrivée tick ${f.tick_arrivee}` : 'en vol',
+    };
+  }
+  // 3) Sinon, état calme
+  return {
+    label: 'État de l\'Empire',
+    text: `Cycle calme. <em>${emp?.points_militaires ? 'La flotte veille' : 'L\'industrie tourne'}</em>, aucune action urgente.`,
+    stamp: `tick ${tickCur}`,
+  };
+}
+
+function computeIncomingThreat(emp, tickCur) {
+  // Scan toutes les flottes en vol de tous les joueurs pour trouver celles
+  // qui visent une de mes planètes avec une mission hostile.
+  if (!state.players || !emp) return null;
+  const myPlanets = new Set((emp.planetes || []).map(p => p.nom));
+  const me = state.current;
+  const hostile = new Set(['attaque', 'siege', 'pillage', 'bombardement']);
+  let earliest = null;
+  for (const [name, e] of Object.entries(state.players)) {
+    if (name === me) continue;
+    for (const f of (e.flottes_en_vol || [])) {
+      const dest = f.vers?.planete || f.vers;
+      if (!myPlanets.has(dest)) continue;
+      if (!hostile.has((f.type_mission || '').toLowerCase())) continue;
+      const arr = f.tick_arrivee || 0;
+      const ticksLeft = Math.max(0, arr - tickCur);
+      if (!earliest || ticksLeft < earliest.ticksLeft) {
+        earliest = { from: name, dest, ticksLeft, arr, mission: f.type_mission };
+      }
+    }
+  }
+  if (!earliest) return null;
+  return `Flotte <b>${earliest.mission}</b> de <b>${earliest.from}</b> en approche de <b>${earliest.dest}</b> · impact dans <b>${earliest.ticksLeft} cycle${earliest.ticksLeft > 1 ? 's' : ''}</b>.`;
+}
+
+function updateBell(threat, decretsCount) {
+  const bell = document.getElementById('bellBtn');
+  const dot = document.getElementById('bellDot');
+  if (!bell || !dot) return;
+  const count = (threat ? 1 : 0) + (decretsCount > 0 ? 1 : 0);
+  if (count === 0) { bell.classList.add('silent'); dot.textContent = '0'; }
+  else { bell.classList.remove('silent'); dot.textContent = String(count); }
+}
+
+function renderOverview(p, emp) {
+  const v = document.getElementById('vOverview');
+  if (!p) { v.innerHTML = `<div class="empty-stamp">en attente d'attribution</div>`; return; }
+
+  const buildings = Object.entries(p.batiments || {});
+  const built = buildings.filter(([,n]) => n > 0).length;
+  const total = buildings.length;
+
+  const queueItems = (p.file_chantier || []).length;
+  const research = Object.values(emp?.recherche || {}).filter(v => v > 0).length;
+  const fleet = Object.values(p.flotte_au_sol || {}).reduce((a, b) => a + (b||0), 0);
+  const def = Object.values(p.defenses || {}).reduce((a, b) => a + (b||0), 0);
+
+  v.innerHTML = `
+    <h2 class="sect">Bâtiments principaux <span class="num">§ I</span> <span class="rule"></span></h2>
+    ${renderBatGrid(p, 4)}
+  `;
+}
+function overviewCard(label, val, sub, ico) {
+  return `<div class="bcard ${val === '0' ? 'zero' : ''}">
+    <div class="gl">${ico}</div>
+    <div class="nm">${label}<small>${sub}</small></div>
+    <div class="lvl">${val}<small>actuel</small></div>
+  </div>`;
+}
+
+// Effet actuel d'un bâtiment au niveau courant — chaîne courte affichée
+// sous le niveau dans la carte. null = pas d'affichage.
+function batEffet(k, lvl, p) {
+  if (lvl === 0) return null;
+  const r = p?.ressources || {};
+  switch (k) {
+    case 'mine_ferrum':         return `<b>+${fmtCompact(r.ferrum?.production_par_utj || 0)}</b> ferrum/utj`;
+    case 'extracteur_lumen':    return `<b>+${fmtCompact(r.lumen?.production_par_utj || 0)}</b> lumen/utj`;
+    case 'synthetiseur_plasmide': return `<b>+${fmtCompact(r.plasmide?.production_par_utj || 0)}</b> plasmide/utj`;
+    case 'centrale_solaire':    return `<b>+${fmtCompact(p.energie?.production || 0)}</b> énergie`;
+    case 'depot': {
+      const cap = (r.ferrum?.capacite || 0) + (r.lumen?.capacite || 0) + (r.plasmide?.capacite || 0);
+      return `cap. <b>${fmtCompact(cap)}</b>`;
+    }
+    case 'usine_robotique':     return `vitesse chantiers <b>+${lvl * 10}%</b>`;
+    case 'chantier_spatial':    return `vitesse flotte <b>+${lvl * 10}%</b>`;
+    case 'laboratoire':         return `recherche <b>+${lvl * 10}%</b>`;
+    case 'silo_missiles':       return `<b>${lvl * 10}</b> missiles max`;
+    case 'terminal_marchand':   return `ratio marché <b>+${(lvl * 5)}%</b>`;
+    case 'centre_diplomatique': return `influence <b>+${(lvl * 0.5).toFixed(1)}</b>/utj`;
+  }
+  return null;
+}
+
+// Descriptions des unités, recherches et ressources pour les tooltips.
+const DESCRIPTIONS = {
+  // Ressources
+  ferrum:    'Métal de base. Sert à tout : bâtiments, vaisseaux, défenses.',
+  lumen:     'Cristal énergétique. Indispensable aux technologies avancées et aux vaisseaux.',
+  plasmide:  'Matière organique rare. Requise par les unités lourdes et les recherches de pointe.',
+  energie:   'Surplus = production normale. Déficit = production divisée. Chaque bâtiment consomme.',
+  // Vaisseaux
+  sonde:           'Drone d\'éclairage. Sans valeur militaire. Sert à espionner les voisins.',
+  chasseur_leger:  'Intercepteur économique. Forme l\'épine dorsale de toute flotte. Bonus ×2 vs cargo.',
+  chasseur_lourd:  'Frappe robuste. Bonus ×2 contre chasseurs légers. Coûte plus cher mais encaisse.',
+  croiseur:        'Ligne de bataille. Excellente attaque/cargo. Bonus ×6 vs chasseur léger, ×3 vs lourd.',
+  fregate:         'Frappe rapide. Bonus ×3 contre les croiseurs.',
+  cuirasse:        'Capital ship. Brise les flottes adverses par le poids du nombre. Coque 6000, attaque 1000.',
+  destroyer:       'Capital lourd. Bonus ×2 contre cuirasse. Hyperspatial requis.',
+  dreadnought:     'Super-capital. Requiert une singularité. Détruit tout ce qu\'elle touche.',
+  cargo_lourd:     'Transporteur civil. Cargo 25 000. Pas une unité de combat — protège-le.',
+  recycleur:       'Récupère les débris des épaves après bataille. Cargo 20 000.',
+  vaisseau_colon:  'Permet de coloniser un nouveau monde. Une seule planète par vaisseau.',
+  // Défenses
+  lance_missiles:           'Tir de surface. Bonus ×1.5 contre chasseurs légers.',
+  canon_laser_leger:        'Pièce légère, peu chère. Premier rempart d\'une planète.',
+  canon_laser_lourd:        'Pièce moyenne. Encaisse mieux que le léger.',
+  canon_gauss:              'Pièce lourde. Bonus ×2 vs croiseur, ×1.5 vs cuirasse.',
+  canon_ionique:             'Spécialisé anti-bouclier. Bouclier 500 mais attaque modeste.',
+  canon_plasma:             'Pièce capitale. Bonus ×2 vs cuirasse, ×1.5 vs destroyer.',
+  petit_bouclier_planetaire: 'Bouclier 2 000. Une seule par planète.',
+  grand_bouclier_planetaire: 'Bouclier 10 000. Une seule par planète. Requiert bouclier graviton 6.',
+  // Recherches
+  robotique:                'Accélère la cadence générale. Prérequis usine robotique pour de nombreuses unités.',
+  automation_miniere:       'Améliore les rendements des mines au fil des niveaux.',
+  fusion_controlee:         'Améliore le rendement de la centrale solaire et la consommation des unités.',
+  drives_impulsion:         'Vitesse des chasseurs et croiseurs. Prérequis pour vaisseaux moyens.',
+  drive_hyperspatial:       'Long-courrier. Requis pour cuirasse, recycleur et au-delà.',
+  armement:                 'Augmente l\'attaque des unités et défenses. Prérequis lourd.',
+  bouclier_graviton:        'Augmente les boucliers. Requis pour les boucliers planétaires et le canon ionique.',
+  espionnage_profond:       'Augmente la portée des sondes. Prérequis pour construire des sondes.',
+  cryptographie:            'Réduit la portée d\'espionnage de tes adversaires sur toi.',
+  diplomatie:               'Influence avec les autres empires. Prérequis pour le centre diplomatique.',
+  doctrine_imperiale:       'Cohésion des flottes alliées. Requiert diplomatie 4.',
+  distorsion_subluminique:  'Voyage instantané. Requiert drive hyperspatial 6.',
+};
+
+function descOf(key) { return DESCRIPTIONS[key] || ''; }
+
+// Tooltip riche pour vaisseaux et défenses (mêmes stats).
+function unitTooltip(key, def, qty, kind) {
+  const role = descOf(key);
+  const stats = [
+    def.coque ? `coque ${fmt(def.coque)}` : null,
+    def.bouclier ? `bouclier ${fmt(def.bouclier)}` : null,
+    def.attaque ? `attaque ${fmt(def.attaque)}` : null,
+    def.vitesse ? `vitesse ${fmt(def.vitesse)}` : null,
+    def.cargo ? `cargo ${fmt(def.cargo)}` : null,
+  ].filter(Boolean).join(' · ');
+
+  const cost = Object.entries(def.cout || {})
+    .map(([r, v]) => `${fmtCompact(v)} ${labels[r] || r}`).join(' + ');
+
+  const counters = def.bonus_contre
+    ? 'Efficace contre : ' + Object.entries(def.bonus_contre)
+        .map(([k, m]) => `${labels[k] || k} ×${m}`).join(', ')
+    : '';
+
+  const reqs = def.requiert
+    ? 'Requiert : ' + Object.entries(def.requiert)
+        .map(([k, n]) => `${labels[k] || k} niv ${n}`).join(', ')
+    : '';
+
+  const ownedLine = qty != null ? `${kind === 'vaisseaux' ? 'Possédés' : 'Déployés'} : ${fmt(qty)}` : '';
+  return [role, stats, cost ? `Coût : ${cost}` : '', counters, reqs, ownedLine]
+    .filter(Boolean).join('\n');
+}
+
+// Tooltip recherche.
+function techTooltip(tech, def, lvl) {
+  const role = descOf(tech);
+  const niv = lvl > 0 ? `Niveau actuel : ${lvl}` : 'Non recherché';
+  const reqs = def.requiert
+    ? 'Requiert : ' + Object.entries(def.requiert)
+        .map(([k, n]) => `${labels[k] || k} niv ${n}`).join(', ')
+    : '';
+  return [role, niv, reqs].filter(Boolean).join('\n');
+}
+
+// Tooltip ressource (strip).
+function resourceTooltip(res, info) {
+  const role = descOf(res);
+  const stock = info?.stock != null ? `Stock : ${fmt(info.stock)}` : '';
+  const cap   = info?.capacite ? `Capacité : ${fmt(info.capacite)}` : '';
+  const prod  = info?.production_par_utj != null
+    ? `Production : ${info.production_par_utj > 0 ? '+' : ''}${info.production_par_utj}/utj`
+    : '';
+  return [role, stock, cap, prod].filter(Boolean).join('\n');
+}
+
+// Tooltip plus long pour le hover (attribut title="").
+function batTooltip(k, lvl) {
+  const lines = {
+    mine_ferrum: 'Extrait du Ferrum, ressource métallique principale. Bonus +30% sur planète tellurique.',
+    extracteur_lumen: 'Récolte des cristaux Lumen. Bonus +30% sur planète cristalline.',
+    synthetiseur_plasmide: 'Synthétise le Plasmide. Bonus +30% sur planète volcanique.',
+    centrale_solaire: 'Génère de l\'énergie consommée par tous les autres bâtiments.',
+    depot: 'Augmente la capacité de stockage de toutes les ressources.',
+    usine_robotique: 'Réduit la durée de construction des bâtiments.',
+    chantier_spatial: 'Réduit la durée de construction des vaisseaux et défenses.',
+    laboratoire: 'Accélère la progression des recherches scientifiques.',
+    silo_missiles: 'Stocke les missiles interplanétaires (offensifs et anti-missiles).',
+    terminal_marchand: 'Améliore le ratio des échanges sur le marché galactique.',
+    centre_diplomatique: 'Projette l\'influence diplomatique sur les voisins. Requiert terminal marchand niv 4.',
+  };
+  const desc = lines[k] || 'Structure planétaire.';
+  const niv = lvl > 0 ? `\nNiveau actuel : ${lvl}` : '\nNon construit';
+  return `${desc}${niv}`;
+}
+
+function renderBatGrid(p, max) {
+  const all = Object.entries(p.batiments || {});
+  const queueMap = {};
+  for (const c of (p.file_chantier || [])) queueMap[c.batiment] = c;
+  const list = max ? all.slice(0, max) : all;
+  if (list.length === 0) return `<div class="empty-stamp">néant</div>`;
+
+  const ICOS = { ferrum: 'Fe', lumen: 'Lu', plasmide: 'Pl' };
+  // Ordres en attente (pas encore traités par le moteur) — on s'en sert pour bloquer les re-clics
+  const emp = state.players[state.current];
+  const tickCur = state.manifest?.tick ?? 0;
+  const pendingMap = {};
+  if (emp?._ordres?.tick_cible >= tickCur + 1) {
+    for (const o of (emp._ordres.ordres || [])) {
+      if (o.type === 'chantier' && o.planete === p.nom) pendingMap[o.batiment] = o;
+    }
+  }
+  return `<div class="bgrid">${list.map(([k, lvl]) => {
+    const q = queueMap[k];
+    const pend = pendingMap[k];
+    const ico = icons[k] || icons.default_b;
+    let footer = '';
+    if (q) {
+      const remain = Math.max(0, q.fin_utj || 0);
+      const eta = chantierETA(remain);
+      footer = `<div class="queue"><span class="pulse"></span>
+        ouvrage · niv ${q.niveau_cible} · <b style="color:var(--phosphor)">fin tick ${eta.tickArrivee}</b> <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
+    } else if (pend) {
+      footer = `<div class="queue" style="background:rgba(196,180,138,0.18);color:var(--brass)">
+        <span class="pulse" style="background:var(--brass);box-shadow:0 0 0 0 rgba(196,180,138,0.6)"></span>
+        ordre signé · niv ${pend.niveau_cible} · <b style="color:var(--brass)">en attente du moteur</b></div>`;
+    } else if (state.rules && batDef(k)) {
+      const cost = nextCost(k, lvl);
+      const dur = nextDureeUtj(k, lvl);
+      const ticks = utjToTicks(dur);
+      const afford = canAfford(p, cost);
+      const pending = state.pending.has(k);
+      const costHtml = Object.entries(cost || {}).map(([res, v]) => {
+        const stock = p.ressources?.[res]?.stock || 0;
+        const bad = stock < v ? ' bad' : '';
+        return `<span><b class="${bad}">${fmtCompact(v)}</b> ${ICOS[res] || res}</span>`;
+      }).join(' ');
+      footer = `<div class="upg">
+        <div class="cost">${costHtml}</div>
+        <span class="dur" title="+1 tick de queue avant demarrage">${ticksLabel(ticks)} <span style="color:var(--bone-dim)">+ queue</span></span>
+        <button data-improve="${k}" ${(!afford || pending) ? 'disabled' : ''}>${pending ? '…' : 'Améliorer'}</button>
+      </div>`;
+    }
+    const effet = batEffet(k, lvl, p);
+    const tip = batTooltip(k, lvl);
+    return `<div class="bcard ${lvl === 0 && !q ? 'zero' : ''}" data-tip="${escapeHtml(tip)}">
+      <div class="gl">${ico}</div>
+      <div class="nm">${labels[k] || k}<small>${taglines[k] || 'structure'}</small></div>
+      <div class="lvl">${lvl}<small>niveau</small></div>
+      ${effet ? `<div class="effet">${effet}</div>` : ''}
+      ${footer}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderBatiments(p) {
+  const v = document.getElementById('vBat');
+  if (!p) { v.innerHTML = `<div class="empty-stamp">néant</div>`; return; }
+  v.innerHTML = `<h2 class="sect">Édifices planétaires <span class="num">§ B</span> <span class="rule"></span></h2>${renderBatGrid(p)}`;
+}
+
+function renderRecherche(emp) {
+  const v = document.getElementById('vRec');
+  if (!emp || !state.rules?.recherches) {
+    v.innerHTML = `<h2 class="sect">Sciences <span class="num">§ R</span> <span class="rule"></span></h2><div class="empty-stamp">cabinets fermés</div>`;
+    return;
+  }
+  v.innerHTML = `<h2 class="sect">Sciences <span class="num">§ R</span> <span class="rule"></span></h2>${renderRecGrid(emp)}`;
+}
+
+function renderRecGrid(emp) {
+  const ICOS = { ferrum: 'Fe', lumen: 'Lu', plasmide: 'Pl' };
+  const recs = state.rules.recherches || {};
+  const queue = emp.file_recherche || [];
+  const queuedTech = queue[0]?.technologie;
+  const tickCur = state.manifest?.tick ?? 0;
+  // Un seul ordre de recherche pending à la fois — détecté par tick_cible
+  const pendingOrder = (emp._ordres?.tick_cible >= tickCur + 1)
+    ? (emp._ordres?.ordres || []).find(o => o.type === 'recherche')
+    : null;
+
+  const cards = Object.entries(recs).map(([tech, def]) => {
+    const niveauActuel = (emp.recherche || {})[tech] || 0;
+    const niveauCible = niveauActuel + 1;
+    const cost = nextRecCost(tech, niveauActuel);
+    const dur = nextRecDureeUtj(tech, niveauActuel);
+    const mins = Math.round((dur || 0) * utjMin());
+    const afford = canAffordEmp(emp, cost);
+    // Vérifier requiert (sur les recherches uniquement, simple : requiert: { tech: niv })
+    let missing = null;
+    if (def.requiert) {
+      for (const [rk, rv] of Object.entries(def.requiert)) {
+        if ((emp.recherche?.[rk] || 0) < rv) { missing = `${labels[rk] || rk} niv ${rv}`; break; }
+      }
+    }
+    const isQueued = queuedTech === tech;
+    const isPending = state.pending.has('rec:' + tech);
+    const orderPending = pendingOrder && pendingOrder.technologie === tech;
+    const anyOrder = !!pendingOrder; // un seul slot recherche
+
+    const costHtml = Object.entries(cost || {}).map(([res, vv]) => {
+      const stock = (emp.planetes || []).reduce((a, pl) => a + (pl.ressources?.[res]?.stock || 0), 0);
+      const bad = stock < vv ? ' bad' : '';
+      return `<span><b class="${bad}">${fmtCompact(vv)}</b> ${ICOS[res] || res}</span>`;
+    }).join(' ');
+
+    let footer;
+    if (isQueued) {
+      const q = queue[0];
+      const remain = Math.max(0, q.fin_utj || 0);
+      const eta = chantierETA(remain);
+      footer = `<div class="queue"><span class="pulse"></span>en cours · niv ${q.niveau_cible} · <b>fin tick ${eta.tickArrivee}</b> <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
+    } else if (orderPending) {
+      footer = `<div class="queue" style="background:rgba(196,180,138,0.18);color:var(--brass)">
+        <span class="pulse" style="background:var(--brass);box-shadow:0 0 0 0 rgba(196,180,138,0.6)"></span>
+        ordre signé · niv ${pendingOrder.niveau_cible} · <b style="color:var(--brass)">en attente</b></div>`;
+    } else {
+      const reqBad = !!missing;
+      const blocked = reqBad || !afford || isPending || anyOrder;
+      const btnLbl = isPending ? '…' : 'Lancer';
+      const title = reqBad ? `requiert ${missing}` : (anyOrder ? 'un autre ordre recherche est déjà signé' : '');
+      footer = `<div class="upg">
+        <div class="cost">${costHtml}</div>
+        <span class="dur" title="+1 tick de queue avant demarrage">${ticksLabel(utjToTicks(dur))} <span style="color:var(--bone-dim)">+ queue</span></span>
+        <button data-research="${tech}" ${blocked ? 'disabled' : ''} title="${title}">${btnLbl}</button>
+      </div>`;
+      if (reqBad) {
+        footer = `<div class="req">requiert <b>${missing}</b></div>` + footer;
+      }
+    }
+
+    const tip = techTooltip(tech, def, niveauActuel);
+    return `<div class="bcard ${niveauActuel === 0 ? 'zero' : ''}" data-tip="${escapeHtml(tip)}">
+      <div class="gl">${icons.laboratoire}</div>
+      <div class="nm">${labels[tech] || tech}<small>discipline scientifique</small></div>
+      <div class="lvl">${niveauActuel}<small>niveau</small></div>
+      ${footer}
+    </div>`;
+  }).join('');
+  return `<div class="bgrid">${cards}</div>`;
+}
+
+function renderFlotte(p) {
+  const v = document.getElementById('vFlt');
+  if (!p || !state.rules?.vaisseaux) {
+    v.innerHTML = `<h2 class="sect">Flotte au sol <span class="num">§ F</span> <span class="rule"></span></h2><div class="empty-stamp">silos vides</div>`;
+    return;
+  }
+  v.innerHTML = `<h2 class="sect">Flotte au sol <span class="num">§ F</span> <span class="rule"></span></h2>${renderUnitGrid(p, 'vaisseaux')}`;
+}
+
+function renderDefense(p) {
+  const v = document.getElementById('vDef');
+  if (!p || !state.rules?.defenses) {
+    v.innerHTML = `<h2 class="sect">Défenses <span class="num">§ D</span> <span class="rule"></span></h2><div class="empty-stamp">périmètre indéfendu</div>`;
+    return;
+  }
+  v.innerHTML = `<h2 class="sect">Défenses <span class="num">§ D</span> <span class="rule"></span></h2>${renderUnitGrid(p, 'defenses')}`;
+}
+
+function renderUnitGrid(p, kind) {
+  const ICOS = { ferrum: 'Fe', lumen: 'Lu', plasmide: 'Pl' };
+  const defs = state.rules[kind] || {};
+  const owned = (kind === 'vaisseaux' ? (p.flotte_au_sol || {}) : (p.defenses || {}));
+  const ico = kind === 'vaisseaux' ? icons.default_f : icons.default_d;
+  const subDefault = kind === 'vaisseaux' ? 'unité spatiale' : 'pièce défensive';
+
+  const queueMap = {};
+  for (const c of (p.file_construction || [])) {
+    if (!queueMap[c.unite]) queueMap[c.unite] = { qty: 0, fin_utj: 0 };
+    queueMap[c.unite].qty += c.quantite || 0;
+    queueMap[c.unite].fin_utj = Math.max(queueMap[c.unite].fin_utj, c.fin_utj || 0);
+  }
+
+  // Ordres pending (construction) — agréger qty par unité
+  const emp = state.players[state.current];
+  const tickCur = state.manifest?.tick ?? 0;
+  const pendMap = {};
+  if (emp?._ordres?.tick_cible >= tickCur + 1) {
+    for (const o of (emp._ordres.ordres || [])) {
+      if (o.type === 'construction' && o.planete === p.nom) {
+        pendMap[o.unite] = (pendMap[o.unite] || 0) + (o.quantite || 0);
+      }
+    }
+  }
+
+  const empRes = (emp?.recherche || {});
+  const cards = Object.entries(defs).map(([unite, def]) => {
+    const have = owned[unite] || 0;
+    const cost = def.cout || {};
+    const dur = def.duree_utj || 0;
+    let missing = null;
+    if (def.requiert) {
+      for (const [rk, rv] of Object.entries(def.requiert)) {
+        if ((empRes[rk] || 0) < rv) { missing = `${labels[rk] || rk} niv ${rv}`; break; }
+      }
+    }
+    const costHtml = Object.entries(cost).map(([res, vv]) => {
+      const stock = p.ressources?.[res]?.stock || 0;
+      const bad = stock < vv ? ' bad' : '';
+      return `<span><b class="${bad}">${fmtCompact(vv)}</b> ${ICOS[res] || res}</span>`;
+    }).join(' ');
+
+    const q = queueMap[unite];
+    const pendQty = pendMap[unite] || 0;
+    const pendingKey = `construction:${unite}`;
+    const isPending = state.pending.has(pendingKey);
+
+    let footer = '';
+    if (q) {
+      const remain = q.fin_utj;
+      const eta = chantierETA(remain);
+      footer += `<div class="queue"><span class="pulse"></span>en construction · <b>${q.qty} unités</b> · fin tick ${eta.tickArrivee} <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
+    }
+    if (pendQty > 0) {
+      footer += `<div class="queue" style="background:rgba(196,180,138,0.18);color:var(--brass)">
+        <span class="pulse" style="background:var(--brass);box-shadow:0 0 0 0 rgba(196,180,138,0.6)"></span>
+        ordre signé · <b style="color:var(--brass)">${pendQty} unités</b> · en attente</div>`;
+    }
+
+    const max1 = def.max_par_planete === 1;
+    const reqBad = !!missing;
+    const baseDisabled = reqBad || isPending;
+
+    const mkBtn = (n, sec) => {
+      const totalCost = {};
+      for (const [k, v] of Object.entries(cost)) totalCost[k] = v * n;
+      const afford = canAfford(p, totalCost);
+      const overMax = max1 && (have + pendQty + (q?.qty || 0) + n > 1);
+      const dis = baseDisabled || !afford || overMax;
+      return `<button class="${sec ? 'sec' : ''}" data-construct="${unite}" data-qty="${n}" ${dis ? 'disabled' : ''}>+${n}</button>`;
+    };
+
+    const buttons = max1
+      ? mkBtn(1, false)
+      : `${mkBtn(1, true)}${mkBtn(10, true)}${mkBtn(100, false)}`;
+
+    footer += `<div class="upg qrow">
+      <div class="cost">${costHtml}</div>
+      <span class="dur">${dur} <span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Coût en UTJ par unite ; multiplie par la quantite construite.">UTJ</span>/u</span>
+      <div class="qbtns">${isPending ? '<button disabled>…</button>' : buttons}</div>
+    </div>`;
+    if (reqBad) footer = `<div class="req">requiert <b>${missing}</b></div>` + footer;
+
+    const tip = unitTooltip(unite, def, have, kind);
+    return `<div class="bcard ${have === 0 ? 'zero' : ''}" data-tip="${escapeHtml(tip)}">
+      <div class="gl">${ico}</div>
+      <div class="nm">${labels[unite] || unite}<small>${taglines[unite] || subDefault}</small></div>
+      <div class="lvl">${fmt(have)}<small>${kind === 'vaisseaux' ? 'possédés' : 'déployées'}</small></div>
+      ${footer}
+    </div>`;
+  }).join('');
+  return `<div class="bgrid">${cards}</div>`;
+}
+
+function renderGalaxie() {
+  const v = document.getElementById('vGal');
+  const g = state.galaxie;
+  if (!g || !g.systemes) { v.innerHTML = `<h2 class="sect">Galaxie</h2><div class="empty-stamp">cartographie indisponible</div>`; return; }
+  const myPlanet = state.players[state.current]?.planetes?.[0];
+  const myCoord = myPlanet?.coordonnees ? myPlanet.coordonnees.join(':') : null;
+
+  let html = `<h2 class="sect">Cartographie galactique <span class="num">§ G</span> <span class="rule"></span></h2><div class="galaxy">`;
+  for (const [coord, sys] of Object.entries(g.systemes)) {
+    const star = sys.etoile || {};
+    html += `<div class="system"><header>
+      <span class="star-name">${star.nom || '—'}</span>
+      <span class="star-meta">type ${star.type || '?'} · ${star.temperature_k || '?'}K</span>
+      <span class="coord">${coord}</span>
+    </header><div class="positions">`;
+    for (let i = 1; i <= 15; i++) {
+      const pos = sys.positions?.[i] || { type: 'empty' };
+      const t = pos.type;
+      const cls = pos.classe;
+      const owner = pos.proprietaire;
+      const fullCoord = `${coord}:${i}`;
+      const isMine = fullCoord === myCoord;
+      let dot = '';
+      let kind = t;
+      if (t === 'planete') {
+        dot = `<span class="dot"></span>`;
+      }
+      const isEnemy = t === 'planete' && owner && owner !== state.current && !isMine;
+      // Une planète à moi (pas la courante) = cible valide pour transport interne.
+      const isAllyOwn = t === 'planete' && owner === state.current && !isMine;
+      const isMissionTarget = isEnemy || isAllyOwn;
+      let tip = '';
+      if (t === 'planete') {
+        tip = `${pos.nom || 'planète'} · ${cls || '?'}${owner ? ' · ' + owner : ' · libre'}`;
+        if (isEnemy) tip += ' · clic → mission';
+        else if (isAllyOwn) tip += ' · clic → transport';
+      } else if (t === 'asteroide') {
+        tip = `astéroïde`;
+      } else { tip = `vide`; }
+      const dataAttrs = isMissionTarget
+        ? ` data-mission-target="${owner}|${pos.nom || ''}"`
+        : '';
+      html += `<div class="pos ${kind} ${isMine?'mine':''} ${isEnemy?'enemy':''} ${isAllyOwn?'allyown':''}" data-c="${cls||''}"${dataAttrs}>
+        <span class="num">${i}</span>${dot}
+        ${owner ? `<span class="own">${owner.slice(0,5)}</span>` : ''}
+        <span class="tip">${tip}</span>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+  html += `</div>`;
+  v.innerHTML = html;
+}
+
+function renderJournal(p, emp) {
+  const v = document.getElementById('vJou');
+  const m = state.manifest;
+  const lines = [];
+  lines.push({ tick: m?.tick ?? 0, txt: 'lecture du protocole', tone: 'phos' });
+  if (p?.file_chantier?.length) {
+    for (const c of p.file_chantier) {
+      lines.push({ tick: m.tick, txt: `chantier · ${labels[c.batiment] || c.batiment} → niv ${c.niveau_cible} (${Math.max(0, c.fin_utj || 0)} UTJ restants)`, tone: 'brass' });
+    }
+  }
+  if (emp?.flottes_en_vol?.length) {
+    for (const f of emp.flottes_en_vol) {
+      lines.push({ tick: m.tick, txt: `${f.type_mission} · ${f.depuis?.planete} → ${f.vers?.planete || f.vers}`, tone: 'rust' });
+    }
+  }
+  v.innerHTML = `<h2 class="sect">Journal de bord <span class="num">§ J</span> <span class="rule"></span></h2>
+    <div style="font-family:var(--mono);font-size:12px;line-height:2.1">
+    ${lines.map(l => `<div style="display:flex;gap:18px;border-bottom:1px dashed var(--hairline);padding:6px 0">
+      <span style="color:var(--brass-dim);font-family:var(--display);min-width:60px">T${String(l.tick).padStart(3,'0')}</span>
+      <span style="color:${l.tone==='phos'?'var(--phosphor)':l.tone==='rust'?'var(--rust)':'var(--bone)'}">${l.txt}</span>
+    </div>`).join('')}
+    </div>`;
+}
+
+function renderRail(p, emp) {
+  // Chantier — combine ordres en attente (depuis ordres.yaml) + chantiers actifs (file_chantier)
+  const queue = p?.file_chantier || [];
+  const tickCur = state.manifest?.tick ?? 0;
+  const pendingAll = (emp?._ordres?.ordres || []).filter(o => o.type === 'chantier');
+  const tickCible = emp?._ordres?.tick_cible;
+  const pending = (tickCible && tickCible >= tickCur + 1) ? pendingAll : [];
+
+  document.getElementById('qBatCt').textContent = (pending.length + queue.length) || '—';
+  let html = '';
+
+  // Ordres en attente (pas encore traités par le moteur)
+  const cancelLocked = state.pending.has('cancelOrder');
+  for (let pi = 0; pi < pending.length; pi++) {
+    const o = pending[pi];
+    html += `<div class="qitem pending">
+      <button class="cancel-btn" data-cancel-idx="${pi}" ${cancelLocked ? 'disabled' : ''} title="Retirer cet ordre">✕</button>
+      <div class="top">
+        <div class="nm">${labels[o.batiment] || o.batiment}<small>niveau ${o.niveau_cible} · en attente</small></div>
+        <div class="tgt" style="color:var(--brass)">∙∙∙<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase">tick ${tickCible}</small></div>
+      </div>
+      <div class="tmeta"><span>signé · attend le moteur</span><span>${state.source === 'github' ? 'distant' : 'local'}</span></div>
+    </div>`;
+  }
+
+  // Chantiers actifs
+  for (const c of queue) {
+    const remain = Math.max(0, c.fin_utj || 0);
+    const mins = Math.round(remain * utjMin());
+    html += `<div class="qitem">
+      <div class="top">
+        <div class="nm">${labels[c.batiment] || c.batiment}<small>niveau ${c.niveau_cible}</small></div>
+        <div class="tgt">${remain}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
+      </div>
+      <div class="tmeta"><span>≈ <b>${mins}</b> min restantes</span><span>${remain <= 6 ? 'achève au prochain tick' : Math.ceil(remain/6) + ' ticks'}</span></div>
+    </div>`;
+  }
+
+  if (!html) html = `<div class="empty-rail">aucun ouvrage</div>`;
+  document.getElementById('qBat').innerHTML = html;
+
+  // Recherche
+  const rq = emp?.file_recherche || [];
+  document.getElementById('qRecCt').textContent = rq.length || '—';
+  document.getElementById('qRec').innerHTML = rq.length === 0
+    ? `<div class="empty-rail">cabinets vides</div>`
+    : rq.map(r => {
+        const remain = Math.max(0, r.fin_utj || 0);
+        return `<div class="qitem">
+          <div class="top">
+            <div class="nm">${r.recherche || r.discipline || '?'}<small>niv ${r.niveau_cible || '?'}</small></div>
+            <div class="tgt">${remain}<small style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:var(--bone-dim);display:block;margin-top:2px;text-align:right"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
+          </div>
+        </div>`;
+      }).join('');
+
+  // Flottes
+  const f = emp?.flottes_en_vol || [];
+  document.getElementById('qFltCt').textContent = f.length || '—';
+  document.getElementById('qFlt').innerHTML = f.length === 0
+    ? `<div class="empty-rail">aucune sortie</div>`
+    : f.map(x => {
+        const remain = Math.max(0, (x.arrivee_utj || 0));
+        return `<div class="qitem">
+          <div class="top">
+            <div class="nm">${x.type_mission || 'mission'}<small>${(x.depuis?.planete||'?')} → ${(x.vers?.planete||x.vers||'?')}</small></div>
+            <div class="tgt">${remain}<small style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:var(--bone-dim);display:block;margin-top:2px;text-align:right"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
+          </div>
+        </div>`;
+      }).join('');
+}
+
+/* ───────────────────────────── View switching ───────────────────────────── */
+function applyView() {
+  document.querySelectorAll('.nav button').forEach(b => {
+    b.classList.toggle('on', b.dataset.view === state.view);
+  });
+  document.querySelectorAll('.view').forEach(v => {
+    v.classList.toggle('on', v.dataset.v === state.view);
+  });
+  // Le planet-head bascule entre Bulletin (Aperçu) et barre compacte (autres
+  // vues), il faut le re-render à chaque changement de vue sans attendre
+  // le prochain tick de refresh.
+  const emp = state.players[state.current];
+  const p = emp && (emp.planetes || [])[0];
+  if (emp) renderPlanetHead(p, emp);
+}
+document.getElementById('nav').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-view]'); if (!btn) return;
+  state.view = btn.dataset.view;
+  localStorage.setItem('aetheris.view', state.view);
+  applyView();
+});
+
+document.getElementById('main').addEventListener('click', e => {
+  const imp = e.target.closest('button[data-improve]');
+  if (imp) { submitImprove(imp.dataset.improve); return; }
+
+  const con = e.target.closest('button[data-construct]');
+  if (con) {
+    const emp = state.players[state.current];
+    const planete = emp?.planetes?.[0]; if (!planete) return;
+    submitConstruction(planete.nom, con.dataset.construct, parseInt(con.dataset.qty, 10));
+    return;
+  }
+
+  const rec = e.target.closest('button[data-research]');
+  if (rec) {
+    const emp = state.players[state.current]; if (!emp) return;
+    const tech = rec.dataset.research;
+    const niveauActuel = (emp.recherche || {})[tech] || 0;
+    submitRecherche(tech, niveauActuel + 1);
+    return;
+  }
+
+  const tgt = e.target.closest('[data-mission-target]');
+  if (tgt) {
+    const [joueur, planete] = tgt.dataset.missionTarget.split('|');
+    openMission(joueur, planete);
+    return;
+  }
+});
+
+/* ───────────────────────────── Tick countdown ───────────────────────────── */
+function tickCountdown() {
+  const info = nextTickInfo();
+  document.getElementById('countdown').textContent = `prochain · ${fmtCountdown(info.secs)}`;
+  refreshOnboardingTick();
+}
+setInterval(tickCountdown, 1000);
+
+/* ───────────────────────────── Cost / duration ──────────────────────────── */
+function batDef(b) { return state.rules?.batiments?.[b]; }
+
+function nextCost(batiment, niveauActuel) {
+  const def = batDef(batiment); if (!def) return null;
+  const mult = Math.pow(def.multiplicateur_cout || 1.5, niveauActuel);
+  const out = {};
+  for (const [k, v] of Object.entries(def.cout_base || {})) out[k] = Math.floor(v * mult);
+  return out;
+}
+function nextDureeUtj(batiment, niveauActuel) {
+  const def = batDef(batiment); if (!def) return null;
+  return Math.ceil((def.duree_base_utj || 1) * Math.pow(def.multiplicateur_duree || 1.5, niveauActuel));
+}
+function canAfford(planete, cost) {
+  if (!cost) return false;
+  for (const [k, v] of Object.entries(cost)) {
+    if ((planete?.ressources?.[k]?.stock || 0) < v) return false;
+  }
+  return true;
+}
+
+function recDef(t) { return state.rules?.recherches?.[t]; }
+function nextRecCost(tech, niveauActuel) {
+  const def = recDef(tech); if (!def) return null;
+  const mult = Math.pow(def.mult || 2.0, niveauActuel);
+  const out = {};
+  for (const [k, v] of Object.entries(def.cout_base || {})) out[k] = Math.floor(v * mult);
+  return out;
+}
+function nextRecDureeUtj(tech, niveauActuel) {
+  const def = recDef(tech); if (!def) return null;
+  return Math.ceil((def.duree_base || 1) * Math.pow(2, niveauActuel));
+}
+function canAffordEmp(emp, cost) {
+  if (!cost) return false;
+  // Le moteur cherche une planète qui peut payer seule — on vérifie pareil
+  return (emp?.planetes || []).some(pl => canAfford(pl, cost));
+}
+
+/* ───────────────────────────── Signature & GitHub commit ────────────────── */
+function pemToBytes(pem) {
+  const b64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+async function importPrivKey(pem) {
+  const bytes = pemToBytes(pem);
+  return await crypto.subtle.importKey('pkcs8', bytes, { name: 'Ed25519' }, false, ['sign']);
+}
+async function signCanonical(canonical, pem) {
+  const key = await importPrivKey(pem);
+  const sig = await crypto.subtle.sign('Ed25519', key, new TextEncoder().encode(canonical));
+  let bin = '';
+  const u = new Uint8Array(sig);
+  for (let i = 0; i < u.byteLength; i++) bin += String.fromCharCode(u[i]);
+  return btoa(bin);
+}
+
+function buildOrdresYamlOrders({ joueur, tickCible, nonce, orderBlocks }) {
+  // Le nonce est quote pour rester une string YAML — sinon un nonce 100% digits
+  // (ex: "362100") serait parse en number par le validateur et rejete.
+  return `# Généré depuis la console (${new Date().toISOString()})
+version: 1
+joueur: ${joueur}
+tick_cible: ${tickCible}
+nonce: "${nonce}"
+
+ordres:
+${orderBlocks.join('\n')}
+`;
+}
+
+// Serialise un ordre (objet) en bloc YAML pour appender dans ordres.yaml.
+// Inverse de ce que yparse produit ; doit matcher le schema attendu par le moteur.
+function serializeOrder(o) {
+  if (o.type === 'chantier') return `  - type: chantier
+    planete: ${o.planete}
+    batiment: ${o.batiment}
+    niveau_cible: ${o.niveau_cible}`;
+  if (o.type === 'construction') return `  - type: construction
+    planete: ${o.planete}
+    unite: ${o.unite}
+    quantite: ${o.quantite}`;
+  if (o.type === 'recherche') return `  - type: recherche
+    technologie: ${o.technologie}
+    niveau_cible: ${o.niveau_cible}`;
+  if (o.type === 'espionnage') return `  - type: espionnage
+    depuis: ${o.depuis}
+    cible: { joueur: ${o.cible.joueur}, planete: ${o.cible.planete} }
+    nombre_sondes: ${o.nombre_sondes}`;
+  if (o.type === 'attaque') return `  - type: attaque
+    depuis: ${o.depuis}
+    cible: { joueur: ${o.cible.joueur}, planete: ${o.cible.planete} }
+    flotte: ${inlineMap(o.flotte)}`;
+  if (o.type === 'transport') return `  - type: transport
+    depuis: ${o.depuis}
+    cible: { joueur: ${o.cible.joueur}, planete: ${o.cible.planete} }
+    flotte: ${inlineMap(o.flotte)}
+    cargaison: ${inlineMap(o.cargaison || {})}`;
+  throw new Error(`serializeOrder: type inconnu "${o.type}"`);
+}
+
+document.getElementById('rail').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-cancel-idx]'); if (!btn) return;
+  cancelOrder(parseInt(btn.dataset.cancelIdx, 10));
+});
+
+async function cancelOrder(idx) {
+  const emp = state.players[state.current];
+  if (!emp?._ordres) return;
+  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour modifier les ordres.', true); return; }
+  if (state.pending.has('cancelOrder')) return;
+
+  const tickCible = emp._ordres.tick_cible;
+  const ordres = (emp._ordres.ordres || []).filter((_, i) => i !== idx);
+  const nonce = randomNonce();
+  const orderBlocks = ordres.map(serializeOrder);
+  const body = buildOrdresYamlOrders({ joueur: state.current, tickCible, nonce, orderBlocks });
+
+  state.pending.add('cancelOrder'); render();
+  try {
+    await pushSignedOrder(body, `${state.current}: annule ordre ${idx + 1} (tick ${tickCible})`);
+    emp._ordres = { ...emp._ordres, ordres };
+    toast('Ordre retiré', ordres.length ? `File mise à jour (${ordres.length} ordre${ordres.length > 1 ? 's' : ''} restant).` : 'File vidée.');
+  } catch (e) {
+    toast('Échec', e.message || String(e), true);
+  } finally {
+    state.pending.delete('cancelOrder'); render();
+  }
+}
+
+// Empile un nouvel ordre dans ordres.yaml (ou repart d'une liste vide si l'ancien
+// ordres.yaml ciblait un tick deja consomme), puis push via PR.
+async function appendOrderAndPush(newOrder, message) {
+  const emp = state.players[state.current];
+  if (!emp) throw new Error('aucun joueur actif');
+  const tickCible = (state.manifest?.tick ?? 0) + 1;
+  const existing = emp._ordres && emp._ordres.tick_cible === tickCible ? emp._ordres : null;
+  const ordres = existing ? [...existing.ordres, newOrder] : [newOrder];
+  const nonce = randomNonce();
+  const orderBlocks = ordres.map(serializeOrder);
+  const body = buildOrdresYamlOrders({ joueur: state.current, tickCible, nonce, orderBlocks });
+  await pushSignedOrder(body, message);
+  emp._ordres = { tick_cible: tickCible, ordres };
+}
+
+// Sérialiseur YAML inline pour map { k: v, ... } — n'inclut que les valeurs > 0
+function inlineMap(obj) {
+  const entries = Object.entries(obj || {}).filter(([, v]) => v && v > 0);
+  if (entries.length === 0) return '{}';
+  return '{ ' + entries.map(([k, v]) => `${k}: ${v}`).join(', ') + ' }';
+}
+
+async function ghFetch(path, init = {}) {
+  const headers = {
+    Authorization: `Bearer ${cfg.pat}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'If-None-Match': '',
+    ...(init.headers || {}),
+  };
+  const r = await fetch(`https://api.github.com${path}`, { ...init, headers, cache: 'no-store' });
+  if (!r.ok) {
+    const txt = await r.text();
+    let msg = `${r.status} ${r.statusText}`;
+    try { msg = JSON.parse(txt).message || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+function randomNonce() {
+  const a = new Uint8Array(3); crypto.getRandomValues(a);
+  return [...a].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Pousse un ordre signé : fork, branche orders/<nom>, push fichier, ouvre PR.
+// Le workflow validate-orders verifie la signature et auto-merge dans ~20s.
+// Chaque etape est encapsulee dans `step()` pour que les erreurs API GitHub
+// portent le contexte de l'etape qui a echoue (ex: "[fork] 403 ...").
+async function pushSignedOrder(canonicalBody, message) {
+  const step = async (label, fn) => {
+    try { return await fn(); }
+    catch (e) {
+      const hint = label === 'fork' && /403|404/.test(e.message)
+        ? ' — verifie que ton PAT a le scope `public_repo` (PAT classique) ou Contents+Pull-Requests Read&Write (fine-grained)'
+        : '';
+      throw new Error(`[${label}] ${e.message}${hint}`);
+    }
+  };
+
+  const canonical = canonicalBody.replace(/\s+$/, '') + '\n';
+  const sig = await step('signature', () => signCanonical(canonical, cfg.key));
+  const finalContent = canonical + `signature: ed25519:${sig}\n`;
+  const player = state.current;
+  const [upOwner, upRepo] = cfg.repo.split('/');
+  const baseBranch = cfg.branch || 'main';
+  const branchName = `orders/${player}`;
+
+  // 1. Identite. Si l'user est owner de l'upstream : pas de fork (push direct sur upstream).
+  const me = await step('identite GitHub', () => ghFetch('/user'));
+  const isOwner = me.login.toLowerCase() === upOwner.toLowerCase();
+  const workRepo = isOwner ? `${upOwner}/${upRepo}` : `${me.login}/${upRepo}`;
+
+  if (!isOwner) {
+    // 1b. Fork (idempotent). Necessite PAT avec scope public_repo OU fine-grained "Administration: write".
+    await step('fork', () => ghFetch(`/repos/${upOwner}/${upRepo}/forks`, { method: 'POST', body: JSON.stringify({}) }));
+    await step('attente fork pret', async () => {
+      for (let i = 0; i < 10; i++) {
+        try { return await ghFetch(`/repos/${workRepo}`); }
+        catch (e) { if (i === 9) throw e; await new Promise(r => setTimeout(r, 1500)); }
+      }
+    });
+    try { await ghFetch(`/repos/${workRepo}/merge-upstream`, { method: 'POST', body: JSON.stringify({ branch: baseBranch }) }); } catch {}
+  }
+
+  // 2. Reset (ou cree) orders/<nom> sur le tip de baseBranch.
+  const baseRef = await step(`lecture ${baseBranch}`, () => ghFetch(`/repos/${workRepo}/git/ref/heads/${baseBranch}`));
+  const baseSha = baseRef.object.sha;
+  await step(`branche ${branchName}`, async () => {
+    try {
+      return await ghFetch(`/repos/${workRepo}/git/refs`, { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: baseSha }) });
+    } catch {
+      return await ghFetch(`/repos/${workRepo}/git/refs/heads/${branchName}`, { method: 'PATCH', body: JSON.stringify({ sha: baseSha, force: true }) });
+    }
+  });
+
+  // 3. Push le fichier signe sur cette branche.
+  const path = `joueurs/${player}/ordres.yaml`;
+  let currentSha = null;
+  try { currentSha = (await ghFetch(`/repos/${workRepo}/contents/${path}?ref=${branchName}`)).sha; } catch {}
+  const utf8 = new TextEncoder().encode(finalContent);
+  let bin = ''; for (let i = 0; i < utf8.byteLength; i++) bin += String.fromCharCode(utf8[i]);
+  const b64 = btoa(bin);
+  await step('push ordres.yaml', () => ghFetch(`/repos/${workRepo}/contents/${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, branch: branchName, content: b64, ...(currentSha ? { sha: currentSha } : {}) }),
+  }));
+
+  // 4. Ouvre PR (head = "branchName" si meme repo, "user:branchName" si fork).
+  try {
+    await ghFetch(`/repos/${upOwner}/${upRepo}/pulls`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: message,
+        head: isOwner ? branchName : `${me.login}:${branchName}`,
+        base: baseBranch,
+        body: `Ordre signe depuis la console pour **${player}**.\n\nValide automatiquement par \`validate-orders\`. Auto-merge si signature et tick OK.`,
+        maintainer_can_modify: true,
+      }),
+    });
+  } catch (e) {
+    // 422 = PR deja ouverte — synchronize re-trigger le workflow, pas besoin d'agir.
+    if (!/already exists|422/i.test(e.message)) throw e;
+  }
+}
+
+async function submitImprove(batiment) {
+  if (state.pending.has(batiment)) return;
+  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour signer un ordre.', true); return; }
+
+  const emp = state.players[state.current];
+  const planete = emp?.planetes?.[0]; if (!planete) return;
+  const niveauActuel = planete.batiments?.[batiment] || 0;
+  const niveauCible = niveauActuel + 1;
+  const cost = nextCost(batiment, niveauActuel);
+  if (!canAfford(planete, cost)) { toast('Ressources insuffisantes', `${batiment} niv ${niveauCible} requiert plus que tes stocks.`, true); return; }
+
+  const tickCible = (state.manifest?.tick ?? 0) + 1;
+
+  state.pending.add(batiment); render();
+  try {
+    const message = `${state.current}: chantier ${batiment} → niv ${niveauCible} (tick ${tickCible})`;
+    await appendOrderAndPush({ type: 'chantier', planete: planete.nom, batiment, niveau_cible: niveauCible }, message);
+    toast('Ordre scellé', `${labels[batiment] || batiment} → niveau ${niveauCible}. Le moteur le traitera au tick ${tickCible}.`);
+  } catch (e) {
+    toast('Échec', e.message || String(e), true);
+  } finally {
+    state.pending.delete(batiment); render();
+  }
+}
+
+async function submitConstruction(planeteNom, unite, quantite) {
+  const pendingKey = `construction:${unite}`;
+  if (state.pending.has(pendingKey)) return;
+  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour signer un ordre.', true); return; }
+  if (!quantite || quantite <= 0) return;
+
+  const emp = state.players[state.current];
+  const planete = (emp?.planetes || []).find(p => p.nom === planeteNom); if (!planete) return;
+  const def = state.rules?.vaisseaux?.[unite] || state.rules?.defenses?.[unite];
+  if (!def) { toast('Inconnu', `Unité ${unite} introuvable dans les règles.`, true); return; }
+
+  const totalCost = {};
+  for (const [k, v] of Object.entries(def.cout || {})) totalCost[k] = v * quantite;
+  if (!canAfford(planete, totalCost)) { toast('Ressources insuffisantes', `${quantite}× ${unite} dépasse tes stocks.`, true); return; }
+
+  const tickCible = (state.manifest?.tick ?? 0) + 1;
+
+  state.pending.add(pendingKey); render();
+  try {
+    const message = `${state.current}: construction ${quantite}× ${unite} sur ${planeteNom} (tick ${tickCible})`;
+    await appendOrderAndPush({ type: 'construction', planete: planeteNom, unite, quantite }, message);
+    toast('Ordre scellé', `${quantite}× ${labels[unite] || unite} en construction sur ${planeteNom}.`);
+  } catch (e) {
+    toast('Échec', e.message || String(e), true);
+  } finally {
+    state.pending.delete(pendingKey); render();
+  }
+}
+
+async function submitRecherche(technologie, niveauCible) {
+  const pendingKey = 'rec:' + technologie;
+  if (state.pending.has(pendingKey)) return;
+  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour signer un ordre.', true); return; }
+
+  const emp = state.players[state.current]; if (!emp) return;
+  const niveauActuel = (emp.recherche || {})[technologie] || 0;
+  if (niveauCible !== niveauActuel + 1) return;
+  const cost = nextRecCost(technologie, niveauActuel);
+  if (!canAffordEmp(emp, cost)) { toast('Ressources insuffisantes', `Aucune planète ne peut payer ${technologie} niv ${niveauCible}.`, true); return; }
+
+  const tickCible = (state.manifest?.tick ?? 0) + 1;
+
+  state.pending.add(pendingKey); render();
+  try {
+    const message = `${state.current}: recherche ${technologie} → niv ${niveauCible} (tick ${tickCible})`;
+    await appendOrderAndPush({ type: 'recherche', technologie, niveau_cible: niveauCible }, message);
+    toast('Ordre scellé', `${labels[technologie] || technologie} → niveau ${niveauCible}.`);
+  } catch (e) {
+    toast('Échec', e.message || String(e), true);
+  } finally {
+    state.pending.delete(pendingKey); render();
+  }
+}
+
+async function submitMission({ type, depuis, cibleJoueur, ciblePlanete, flotte, cargaison, nombreSondes }) {
+  const pendingKey = `mission:${type}:${depuis}:${cibleJoueur}:${ciblePlanete}`;
+  if (state.pending.has(pendingKey)) return;
+  if (!cfg.ready) { openSettings(); toast('Paramètres requis', 'Renseigne PAT, repo et clé pour signer un ordre.', true); return; }
+
+  const tickCible = (state.manifest?.tick ?? 0) + 1;
+
+  // Validation et construction de l'ordre objet selon le type.
+  const cibleObj = { joueur: cibleJoueur, planete: ciblePlanete };
+  let orderObj;
+  if (type === 'espionnage') {
+    if (!nombreSondes || nombreSondes <= 0) { toast('Sondes requises', 'Au moins 1 sonde nécessaire.', true); return; }
+    orderObj = { type, depuis, cible: cibleObj, nombre_sondes: nombreSondes };
+  } else if (type === 'attaque') {
+    if (inlineMap(flotte) === '{}') { toast('Flotte vide', 'Inclus au moins 1 vaisseau dans la composition.', true); return; }
+    orderObj = { type, depuis, cible: cibleObj, flotte: { ...flotte } };
+  } else if (type === 'transport') {
+    if (inlineMap(flotte) === '{}') { toast('Flotte vide', 'Au moins 1 vaisseau de transport est requis.', true); return; }
+    orderObj = { type, depuis, cible: cibleObj, flotte: { ...flotte }, cargaison: { ...(cargaison || {}) } };
+  } else if (type === 'recyclage') {
+    if (!flotte || (flotte.recycleur || 0) <= 0) { toast('Recycleurs requis', 'Au moins 1 recycleur nécessaire.', true); return; }
+    orderObj = { type, depuis, cible: cibleObj, flotte: { recycleur: flotte.recycleur } };
+  } else {
+    toast('Type inconnu', type, true); return;
+  }
+
+  state.pending.add(pendingKey); render();
+  try {
+    const message = `${state.current}: ${type} ${depuis} → ${cibleJoueur}/${ciblePlanete} (tick ${tickCible})`;
+    await appendOrderAndPush(orderObj, message);
+    toast('Mission scellée', `${type} · ${depuis} → ${cibleJoueur}/${ciblePlanete}.`);
+    closeMission();
+  } catch (e) {
+    toast('Échec', e.message || String(e), true);
+  } finally {
+    state.pending.delete(pendingKey); render();
+  }
+}
+
+/* ───────────────────────────── OAuth Device Flow ────────────────────────── */
+// Reutilise l'OAuth App + worker proxy de join.html. Le token recu remplace
+// le PAT manuel, mais est stocke sous la meme cle (cfg.pat) — c'est juste
+// un Bearer token aux yeux de l'API GitHub.
+
+let oauthPolling = false;
+
+async function refreshOauthUI() {
+  const idle = document.getElementById('oauthIdle');
+  const flow = document.getElementById('oauthFlow');
+  const done = document.getElementById('oauthDone');
+  if (!cfg.pat) {
+    idle.hidden = false; flow.hidden = true; done.hidden = true;
+    return;
+  }
+  // Token present — verifier qu'il marche encore et recuperer le login.
+  try {
+    const r = await fetch('https://api.github.com/user', {
+      headers: { Authorization: `Bearer ${cfg.pat}`, Accept: 'application/vnd.github+json' },
+    });
+    if (r.ok) {
+      const me = await r.json();
+      document.getElementById('oauthUser').textContent = me.login;
+      idle.hidden = true; flow.hidden = true; done.hidden = false;
+      return;
+    }
+  } catch {}
+  // Token expire/revoque — reset
+  cfg.pat = '';
+  idle.hidden = false; flow.hidden = true; done.hidden = true;
+}
+
+async function oauthDeviceFlow() {
+  if (oauthPolling) return;
+  oauthPolling = true;
+  const idle = document.getElementById('oauthIdle');
+  const flow = document.getElementById('oauthFlow');
+  const status = document.getElementById('oauthStatus');
+  try {
+    const r1 = await fetch(`${OAUTH_PROXY}/login/device/code`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: OAUTH_CLIENT_ID, scope: 'public_repo' }),
+    });
+    if (!r1.ok) throw new Error(`device/code HTTP ${r1.status}`);
+    const dev = await r1.json();
+
+    idle.hidden = true;
+    flow.hidden = false;
+    document.getElementById('oauthUrl').href = dev.verification_uri;
+    document.getElementById('oauthUrl').textContent = dev.verification_uri.replace(/^https?:\/\//, '');
+    document.getElementById('oauthCode').textContent = dev.user_code;
+    status.textContent = 'En attente de ton autorisation…';
+    window.open(dev.verification_uri, '_blank', 'noopener');
+
+    const interval = (dev.interval || 5) * 1000;
+    const deadline = Date.now() + (dev.expires_in || 900) * 1000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, interval));
+      const r2 = await fetch(`${OAUTH_PROXY}/login/oauth/access_token`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: OAUTH_CLIENT_ID,
+          device_code: dev.device_code,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        }),
+      });
+      const data = await r2.json();
+      if (data.access_token) {
+        cfg.pat = data.access_token;
+        await refreshOauthUI();
+        toast('Connecté à GitHub', 'Tu peux maintenant signer et pousser des ordres.');
+        render();
+        return;
+      }
+      if (data.error === 'authorization_pending' || data.error === 'slow_down') {
+        status.textContent = 'En attente de ton autorisation…';
+        continue;
+      }
+      throw new Error(`OAuth: ${data.error}${data.error_description ? ' — ' + data.error_description : ''}`);
+    }
+    throw new Error('Code expire avant autorisation. Re-clique pour recommencer.');
+  } catch (e) {
+    status.textContent = '';
+    flow.hidden = true;
+    idle.hidden = false;
+    toast('Connexion échouée', e.message || String(e), true);
+  } finally {
+    oauthPolling = false;
+  }
+}
+
+document.getElementById('oauthConnect').onclick = oauthDeviceFlow;
+document.getElementById('oauthLogout').onclick = () => {
+  cfg.pat = '';
+  refreshOauthUI();
+  toast('Déconnecté', 'Tu devras te reconnecter pour signer un nouvel ordre.');
+  render();
+};
+
+/* ───────────────────────────── Settings modal ───────────────────────────── */
+function openSettings() {
+  document.getElementById('cfgRepo').value = cfg.repo;
+  document.getElementById('cfgBranch').value = cfg.branch;
+  document.getElementById('cfgPat').value = cfg.pat;
+  document.getElementById('cfgKey').value = cfg.key;
+  refreshOauthUI();
+  document.getElementById('modalBg').classList.add('on');
+}
+function closeSettings() { document.getElementById('modalBg').classList.remove('on'); }
+function applySrcUI() {
+  const btn = document.getElementById('srcBtn');
+  const lbl = document.getElementById('srcLabel');
+  btn.classList.toggle('github', state.source === 'github');
+  lbl.textContent = state.source === 'github' ? `github · ${cfg.branch || 'main'}` : 'local';
+  btn.title = state.source === 'github'
+    ? `Source : repo distant (${cfg.repo || '?'}). Clique pour repasser au disque local.`
+    : 'Source : disque local. Clique pour lire le repo distant à la place.';
+}
+document.getElementById('srcBtn').onclick = () => {
+  state.source = state.source === 'local' ? 'github' : 'local';
+  localStorage.setItem('aetheris.source', state.source);
+  applySrcUI();
+  load();
+};
+applySrcUI();
+
+document.getElementById('gearBtn').onclick = openSettings;
+document.getElementById('cfgCancel').onclick = closeSettings;
+document.getElementById('modalBg').onclick = e => { if (e.target.id === 'modalBg') closeSettings(); };
+document.getElementById('cfgSave').onclick = () => {
+  // Le PAT/access_token est gere par le bloc OAuth — on ne sauvegarde que la cle.
+  cfg.key = document.getElementById('cfgKey').value.trim();
+  closeSettings();
+  if (cfg.ready) {
+    toast('Sceau apposé', 'Tu peux maintenant donner des ordres depuis la console.');
+  } else if (!cfg.pat) {
+    toast('Connexion GitHub requise', 'Clique "Se connecter à GitHub" pour pouvoir signer.', true);
+  } else {
+    toast('Clé manquante', 'Colle ton .key.pem pour activer la signature.', true);
+  }
+  render();
+};
+document.getElementById('cfgClear').onclick = () => {
+  if (!confirm('Effacer connexion GitHub, clé et pseudo de ce navigateur ?')) return;
+  cfg.pat = ''; cfg.key = '';
+  localStorage.removeItem('aetheris.player');
+  localStorage.removeItem('aetheris.onboarding.done');
+  state.current = null;
+  openSettings();
+};
+
+/* ───────────────────────────── Mission modal ────────────────────────────── */
+const mission = { type: 'espionnage', cibleJoueur: null, ciblePlanete: null, depuis: null };
+
+function openMission(joueurCible, planeteCible) {
+  const emp = state.players[state.current];
+  if (!emp || !(emp.planetes || []).length) {
+    toast('Pas de planète', 'Tu n\'as aucune planète d\'origine pour lancer une mission.', true);
+    return;
+  }
+  mission.cibleJoueur = joueurCible;
+  mission.ciblePlanete = planeteCible;
+  // Si la cible est une de mes propres planètes, on ne sélectionne pas
+  // celle-ci comme source par défaut (transport sur soi-même = no-op).
+  const isOwnTarget = joueurCible === state.current;
+  const others = emp.planetes.filter(p => p.nom !== planeteCible);
+  mission.depuis = (isOwnTarget && others.length > 0 ? others[0] : emp.planetes[0]).nom;
+  mission.type = isOwnTarget ? 'transport' : 'espionnage';
+
+  document.getElementById('missionTarget').innerHTML =
+    isOwnTarget
+      ? `transport interne vers <b>${planeteCible}</b>`
+      : `cible : <b>${planeteCible}</b> · ${joueurCible}`;
+
+  // Détecte un éventuel champ de débris sur la planète cible (uniquement
+  // si elle est à toi : on lit empire.yaml).
+  const targetPlanet = isOwnTarget
+    ? (emp.planetes || []).find(p => p.nom === planeteCible)
+    : null;
+  const debris = targetPlanet?.champ_debris;
+  const totalDebris = (debris?.ferrum || 0) + (debris?.lumen || 0);
+
+  // Désactive les types incompatibles avec une cible alliée et le
+  // recyclage si pas de débris à ramasser.
+  document.querySelectorAll('#missionType button').forEach(b => {
+    const mt = b.dataset.mt;
+    let dis = false, why = '';
+    if (isOwnTarget && (mt === 'espionnage' || mt === 'attaque')) {
+      dis = true; why = 'Pas de mission hostile sur tes propres planètes';
+    }
+    if (mt === 'recyclage' && (!isOwnTarget || totalDebris === 0)) {
+      dis = true;
+      why = !isOwnTarget
+        ? 'Recyclage v1 limité à tes propres planètes'
+        : 'Aucun débris à recycler ici';
+    }
+    b.disabled = dis;
+    b.title = why;
+    if (mt === 'recyclage' && totalDebris > 0) {
+      b.textContent = `Recyclage (${fmtCompact(totalDebris)})`;
+    } else if (mt === 'recyclage') {
+      b.textContent = 'Recyclage';
+    }
+  });
+
+  // dropdown source
+  const fromSel = document.getElementById('missionFrom');
+  fromSel.innerHTML = emp.planetes.map(p =>
+    `<option value="${p.nom}">${p.nom} · ${(p.coordonnees||[]).join(':')}</option>`
+  ).join('');
+  fromSel.value = mission.depuis;
+  fromSel.onchange = () => { mission.depuis = fromSel.value; renderMissionFleet(); };
+
+  // segmented buttons
+  document.querySelectorAll('#missionType button').forEach(b => {
+    b.classList.toggle('on', b.dataset.mt === mission.type);
+    b.onclick = () => {
+      mission.type = b.dataset.mt;
+      document.querySelectorAll('#missionType button').forEach(x => x.classList.toggle('on', x.dataset.mt === mission.type));
+      renderMissionFleet();
+    };
+  });
+
+  renderMissionFleet();
+  document.getElementById('missionBg').classList.add('on');
+}
+
+function closeMission() { document.getElementById('missionBg').classList.remove('on'); }
+
+function renderMissionFleet() {
+  const emp = state.players[state.current];
+  const planete = (emp?.planetes || []).find(p => p.nom === mission.depuis);
+  const owned = planete?.flotte_au_sol || {};
+  const lblEl = document.getElementById('missionFleetLabel');
+  const wrap = document.getElementById('missionFleet');
+  const cargoBlock = document.getElementById('missionCargoBlock');
+
+  if (mission.type === 'espionnage') {
+    lblEl.textContent = 'Sondes';
+    cargoBlock.style.display = 'none';
+    const have = owned.sonde || 0;
+    const initial = Math.min(Math.max(1, have), Math.max(1, have));
+    wrap.innerHTML = `<div class="fleetgrid">
+      <span class="nm">Sonde</span>
+      <span class="av">${have} dispo</span>
+      <input type="number" min="1" max="${Math.max(1, have)}" value="${have > 0 ? Math.min(1, have) : 1}" data-ship="sonde"/>
+    </div>`;
+    if (have === 0) {
+      wrap.innerHTML += `<div class="empty-fleet">Aucune sonde sur ${mission.depuis}. Construis-en avant de lancer une mission d'espionnage.</div>`;
+    }
+  } else if (mission.type === 'attaque') {
+    lblEl.textContent = 'Composition de la flotte';
+    cargoBlock.style.display = 'none';
+    const ships = Object.entries(owned).filter(([k, n]) => n > 0 && state.rules?.vaisseaux?.[k]);
+    if (ships.length === 0) {
+      wrap.innerHTML = `<div class="empty-fleet">Aucun vaisseau disponible sur ${mission.depuis}.</div>`;
+      return;
+    }
+    wrap.innerHTML = `<div class="fleetgrid">${ships.map(([k, n]) => `
+      <span class="nm">${labels[k] || k}</span>
+      <span class="av">${fmt(n)} dispo</span>
+      <input type="number" min="0" max="${n}" value="0" data-ship="${k}"/>
+    `).join('')}</div>`;
+  } else if (mission.type === 'transport') {
+    lblEl.textContent = 'Flotte de transport';
+    cargoBlock.style.display = '';
+    const ships = Object.entries(owned).filter(([k, n]) => n > 0 && state.rules?.vaisseaux?.[k]);
+    if (ships.length === 0) {
+      wrap.innerHTML = `<div class="empty-fleet">Aucun vaisseau disponible sur ${mission.depuis}.</div>`;
+      return;
+    }
+    wrap.innerHTML = `<div class="fleetgrid">${ships.map(([k, n]) => `
+      <span class="nm">${labels[k] || k}</span>
+      <span class="av">${fmt(n)} dispo · cargo ${state.rules.vaisseaux[k]?.cargo || 0}</span>
+      <input type="number" min="0" max="${n}" value="${k === 'cargo_lourd' ? Math.min(1, n) : 0}" data-ship="${k}"/>
+    `).join('')}</div>`;
+    // pré-remplir cargaison à 0
+    document.getElementById('cargoFerrum').value = 0;
+    document.getElementById('cargoLumen').value = 0;
+    document.getElementById('cargoPlasmide').value = 0;
+  } else if (mission.type === 'recyclage') {
+    lblEl.textContent = 'Recycleurs à envoyer';
+    cargoBlock.style.display = 'none';
+    const have = owned.recycleur || 0;
+    const cargoUnit = state.rules.vaisseaux?.recycleur?.cargo || 20000;
+    wrap.innerHTML = `<div class="fleetgrid">
+      <span class="nm">Recycleur</span>
+      <span class="av">${fmt(have)} dispo · cargo ${fmtCompact(cargoUnit)}/u</span>
+      <input type="number" min="0" max="${have}" value="${Math.min(1, have)}" data-ship="recycleur"/>
+    </div>`;
+    if (have === 0) {
+      wrap.innerHTML += `<div class="empty-fleet">Aucun recycleur sur ${mission.depuis}. Construis-en un (chantier spatial).</div>`;
+    }
+  }
+}
+
+document.getElementById('missionCancel').onclick = closeMission;
+document.getElementById('missionBg').onclick = e => { if (e.target.id === 'missionBg') closeMission(); };
+document.getElementById('missionSubmit').onclick = () => {
+  const flotte = {};
+  document.querySelectorAll('#missionFleet input[data-ship]').forEach(inp => {
+    const n = parseInt(inp.value, 10) || 0;
+    if (n > 0) flotte[inp.dataset.ship] = n;
+  });
+  const payload = {
+    type: mission.type,
+    depuis: mission.depuis,
+    cibleJoueur: mission.cibleJoueur,
+    ciblePlanete: mission.ciblePlanete,
+  };
+  if (mission.type === 'espionnage') {
+    payload.nombreSondes = flotte.sonde || 0;
+  } else if (mission.type === 'attaque') {
+    payload.flotte = flotte;
+  } else if (mission.type === 'transport') {
+    payload.flotte = flotte;
+    payload.cargaison = {
+      ferrum: parseInt(document.getElementById('cargoFerrum').value, 10) || 0,
+      lumen: parseInt(document.getElementById('cargoLumen').value, 10) || 0,
+      plasmide: parseInt(document.getElementById('cargoPlasmide').value, 10) || 0,
+    };
+  } else if (mission.type === 'recyclage') {
+    payload.flotte = flotte;
+  }
+  submitMission(payload);
+};
+
+/* ───────────────────────────── Onboarding ──────────────────────────────── */
+function showOnboarding(planetName) {
+  if (localStorage.getItem('aetheris.onboarding.done')) return;
+  if (!cfg.ready) return; // attend que la connexion + cle soient prets
+  const emp = state.players[state.current];
+  const p = emp?.planetes?.[0];
+  if (!p) return;
+  document.getElementById('ob-name').textContent = state.current || 'commandant';
+  document.getElementById('ob-planet').textContent = planetName;
+  document.getElementById('ob-coords').textContent = (p.coordonnees || []).join(':') || '—';
+  document.getElementById('ob-classe').textContent = p.type || '—';
+  const ch = p.champs || {};
+  document.getElementById('ob-champs').textContent = `${(ch.total || 0) - (ch.utilises || 0)} / ${ch.total || 0}`;
+  // bouton direct desactive si pas de regles chargees ou pas de Mine constructible
+  const goBtn = document.getElementById('obGoBtn');
+  const niv = p.batiments?.mine_ferrum || 0;
+  goBtn.textContent = niv === 0
+    ? 'Construire ma Mine de Ferrum →'
+    : `Améliorer ma Mine (niv ${niv} → ${niv + 1}) →`;
+  document.getElementById('obBg').classList.add('on');
+  refreshOnboardingTick();
+}
+function refreshOnboardingTick() {
+  const el = document.getElementById('ob-countdown');
+  if (!el || !document.getElementById('obBg').classList.contains('on')) return;
+  const info = nextTickInfo();
+  const m = Math.floor(info.secs / 60);
+  const s = info.secs % 60;
+  el.textContent = `${m}m ${String(s).padStart(2,'0')}s`;
+}
+function closeOnboarding(goToBat) {
+  localStorage.setItem('aetheris.onboarding.done', '1');
+  document.getElementById('obBg').classList.remove('on');
+  if (goToBat) {
+    state.view = 'batiments';
+    localStorage.setItem('aetheris.view', 'batiments');
+    applyView();
+  }
+}
+async function upgradeFirstMine() {
+  // Ferme le modal, bascule sur la vue Batiments pour que le joueur voie
+  // l'ordre apparaitre dans le rail droit, puis declenche l'amelioration.
+  closeOnboarding(true);
+  await submitImprove('mine_ferrum');
+}
+
+/* ───────────────────────────── Toast ────────────────────────────────────── */
+let toastTimer = null;
+function toast(title, msg, isErr) {
+  const t = document.getElementById('toast');
+  t.className = 'toast on' + (isErr ? ' err' : '');
+  t.innerHTML = `<button class="close" aria-label="Fermer" onclick="this.parentElement.classList.remove('on')">×</button>
+    <div class="title">${title}</div><div>${msg}</div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 6000);
+}
+
+/* tooltip global — délégué sur tout élément avec data-tip */
+(function setupTooltip() {
+  const tip = document.createElement('div');
+  tip.className = 'tooltip';
+  document.body.appendChild(tip);
+  let target = null;
+
+  function show(el) {
+    target = el;
+    tip.textContent = el.getAttribute('data-tip') || '';
+    tip.classList.add('on');
+    position(el);
+  }
+  function hide() {
+    target = null;
+    tip.classList.remove('on');
+  }
+  function position(el) {
+    const r = el.getBoundingClientRect();
+    // Affiche tooltip de préférence à droite, sinon à gauche, sinon en bas
+    const tipR = tip.getBoundingClientRect();
+    const margin = 8;
+    let left = r.right + margin;
+    let top  = r.top;
+    if (left + tipR.width > window.innerWidth - 8) {
+      left = r.left - tipR.width - margin;
+    }
+    if (left < 8) {
+      left = Math.min(window.innerWidth - tipR.width - 8, Math.max(8, r.left));
+      top = r.bottom + margin;
+    }
+    if (top + tipR.height > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - tipR.height - 8);
+    }
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+  }
+
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-tip]');
+    if (el && el !== target) show(el);
+  });
+  document.addEventListener('mouseout', e => {
+    const el = e.target.closest('[data-tip]');
+    if (!el) return;
+    if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+    hide();
+  });
+  window.addEventListener('scroll', hide, true);
+})();
+
+/* boot */
+load();
+setInterval(load, 5000);
+tickCountdown();
+</script>
+</body>
+</html>

@@ -2,11 +2,11 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"/>
-<title>CITADEL · join (bitcoin)</title>
+<title>CITADEL · S'inscrire</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <script type="importmap">
 {
   "imports": {
@@ -21,93 +21,453 @@
 }
 </script>
 <style>
-  :root {
-    --ink: #f4ecdc; --ink-2: #ffffff; --hairline: #e6d9bd;
-    --brass: #0e1d33; --brass-2: #1f3556; --phosphor: #a83a25;
-    --bone: #2c2014; --bone-dim: #8a7c64;
-    --serif: "Fraunces", Georgia, serif;
-    --sans: "Plus Jakarta Sans", system-ui, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, monospace;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; min-height: 100%; background: var(--ink); color: var(--bone); font-family: var(--sans); }
-  body { padding: 40px 20px; }
-  .wrap { max-width: 640px; margin: 0 auto; background: var(--ink-2); border: 1px solid var(--hairline); border-radius: 14px; padding: 32px; box-shadow: 0 8px 22px rgba(28,20,8,0.06); }
-  h1 { font-family: var(--serif); font-size: 30px; margin: 0 0 6px; color: var(--brass); }
-  .sub { color: var(--bone-dim); font-size: 14px; margin: 0 0 28px; }
-  h2 { font-family: var(--serif); font-size: 20px; margin: 0 0 12px; color: var(--brass); }
-  .step { display: none; }
-  .step.on { display: block; }
-  label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--bone-dim); margin: 16px 0 6px; }
-  input[type=text] { width: 100%; padding: 10px 14px; font-family: var(--mono); font-size: 14px; border: 1px solid var(--hairline); border-radius: 8px; background: #fafaf6; }
-  button { background: var(--brass); color: var(--ink); border: none; padding: 10px 20px; font-family: var(--sans); font-weight: 600; font-size: 14px; border-radius: 8px; cursor: pointer; margin: 12px 8px 0 0; }
-  button:hover { background: var(--brass-2); }
-  button:disabled { background: #8a7c64; cursor: not-allowed; }
-  button.alt { background: var(--phosphor); }
-  code { font-family: var(--mono); font-size: 13px; background: #f7f0df; padding: 2px 8px; border-radius: 4px; word-break: break-all; }
-  .code-block { display: block; padding: 12px; background: #f7f0df; border-radius: 8px; margin: 8px 0; font-family: var(--mono); font-size: 12px; word-break: break-all; line-height: 1.5; }
-  .status { font-family: var(--mono); font-size: 13px; padding: 10px 14px; background: #fafaf6; border-left: 3px solid var(--brass); margin: 12px 0; white-space: pre-wrap; }
-  .status.err { border-left-color: var(--phosphor); color: var(--phosphor); }
-  .status.ok { border-left-color: #5a7a3a; }
-  a { color: var(--phosphor); }
-  .hint { font-size: 12px; color: var(--bone-dim); margin: 6px 0 0; line-height: 1.5; }
+:root {
+  --bg-0: #05070d;
+  --bg-1: #0a0e1a;
+  --bg-2: #111728;
+  --line: rgba(120, 160, 220, 0.12);
+  --line-strong: rgba(120, 180, 240, 0.28);
+  --ink: #e6ecf5;
+  --ink-dim: #8a96b0;
+  --ink-faint: #525c75;
+  --cyan: #5ee0ff;
+  --cyan-dim: #2a90b8;
+  --violet: #a875ff;
+  --gold: #e8c062;
+  --green: #4be58a;
+  --red: #f06161;
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-serif: 'Cormorant Garamond', serif;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; min-height: 100%;
+  background: var(--bg-0);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(94, 224, 255, 0.07), transparent 60%),
+    radial-gradient(ellipse 60% 80% at 100% 100%, rgba(168, 117, 255, 0.05), transparent 60%),
+    var(--bg-0);
+  min-height: 100vh;
+  padding: 32px 20px 80px;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.5) 50%, transparent),
+    radial-gradient(1px 1px at 67% 42%, rgba(255,255,255,0.4) 50%, transparent),
+    radial-gradient(1px 1px at 89% 73%, rgba(255,255,255,0.5) 50%, transparent),
+    radial-gradient(1px 1px at 31% 87%, rgba(255,255,255,0.3) 50%, transparent),
+    radial-gradient(1px 1px at 54% 12%, rgba(255,255,255,0.4) 50%, transparent);
+  background-size: 800px 800px;
+  opacity: 0.5;
+}
+main { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; }
+
+/* ─── topbar ──────────────────────────────────────────────── */
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 56px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.topbar a {
+  color: var(--ink-dim);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.topbar a:hover { color: var(--cyan); }
+.topbar .brand { color: var(--cyan); letter-spacing: 0.2em; }
+
+/* ─── stepper ─────────────────────────────────────────────── */
+.stepper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 48px;
+  padding: 0 4px;
+}
+.stepper-item {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  flex: 1;
+  position: relative;
+}
+.stepper-item:not(:last-child)::after {
+  content: ""; position: absolute;
+  top: 14px; left: calc(50% + 16px); right: calc(-50% + 16px);
+  height: 1px;
+  background: var(--line);
+}
+.stepper-item.done:not(:last-child)::after { background: var(--cyan-dim); }
+.stepper-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--bg-1);
+  border: 1px solid var(--line-strong);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--ink-faint);
+  transition: all 0.3s;
+}
+.stepper-item.active .stepper-dot {
+  background: var(--bg-2);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 0 4px rgba(94, 224, 255, 0.1);
+}
+.stepper-item.done .stepper-dot {
+  background: var(--cyan-dim);
+  border-color: var(--cyan-dim);
+  color: var(--bg-0);
+}
+.stepper-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.stepper-item.active .stepper-label { color: var(--ink); }
+.stepper-item.done .stepper-label { color: var(--ink-dim); }
+
+/* ─── hero ────────────────────────────────────────────────── */
+.hero {
+  margin-bottom: 48px;
+}
+.hero .label {
+  font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--cyan-dim);
+  display: inline-block;
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+.hero h1 {
+  font-family: var(--font-serif);
+  font-size: 44px; font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+  color: var(--ink);
+}
+.hero h1 em { font-style: italic; color: var(--cyan); }
+.hero p {
+  color: var(--ink-dim);
+  font-size: 15px;
+  max-width: 540px;
+  margin: 0;
+}
+
+/* ─── card (step content) ─────────────────────────────────── */
+.card {
+  background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 32px;
+  display: none;
+  animation: fadeIn 0.4s ease;
+}
+.card.on { display: block; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card h2 {
+  font-family: var(--font-serif);
+  font-size: 24px; font-weight: 500;
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+.card .lead {
+  color: var(--ink-dim);
+  font-size: 14px;
+  margin: 0 0 28px;
+  max-width: 540px;
+}
+.card label {
+  display: block;
+  font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 24px 0 10px;
+}
+.card label:first-child, .card .lead + label { margin-top: 0; }
+
+/* ─── inputs & code ──────────────────────────────────────── */
+input[type=text], input[type=password] {
+  width: 100%;
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  background: var(--bg-0);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input[type=text]:focus, input[type=password]:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(94, 224, 255, 0.08);
+}
+.code-block {
+  display: block;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--cyan);
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  word-break: break-all;
+  margin: 0;
+}
+.code-block.warm { color: var(--gold); border-color: rgba(232, 192, 98, 0.2); }
+
+/* ─── status banners ─────────────────────────────────────── */
+.status {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 14px 18px;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cyan);
+  border-radius: 6px;
+  margin: 16px 0 24px;
+  white-space: pre-wrap;
+  color: var(--ink-dim);
+  line-height: 1.55;
+}
+.status.ok {
+  border-left-color: var(--green);
+  color: var(--ink);
+}
+.status.err {
+  border-left-color: var(--red);
+  color: var(--red);
+}
+.status .pulse {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  margin-right: 8px;
+  animation: pulse 1.6s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+/* ─── hint warnings ──────────────────────────────────────── */
+.hint {
+  color: var(--ink-faint);
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin: 8px 0 0;
+}
+.hint code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--gold);
+  background: rgba(232, 192, 98, 0.08);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.warn {
+  display: flex; gap: 12px;
+  padding: 14px 18px;
+  background: rgba(232, 192, 98, 0.05);
+  border: 1px solid rgba(232, 192, 98, 0.2);
+  border-radius: 8px;
+  margin: 16px 0 24px;
+  color: var(--gold);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.warn::before {
+  content: "⚠";
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+/* ─── buttons ────────────────────────────────────────────── */
+.btn-row {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  margin-top: 28px;
+}
+button, .btn {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 22px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; gap: 8px;
+  text-decoration: none;
+}
+button.primary, .btn.primary {
+  background: var(--cyan);
+  color: var(--bg-0);
+}
+button.primary:hover, .btn.primary:hover {
+  background: #7eeaff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(94, 224, 255, 0.25);
+}
+button.ghost, .btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+button.ghost:hover, .btn.ghost:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+button:disabled {
+  background: var(--bg-2) !important;
+  color: var(--ink-faint) !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.arrow { transition: transform 0.2s; }
+button:hover .arrow, .btn:hover .arrow { transform: translateX(2px); }
+
+/* ─── responsive ─────────────────────────────────────────── */
+@media (max-width: 600px) {
+  body { padding: 20px 16px 60px; }
+  .topbar { margin-bottom: 32px; font-size: 10px; }
+  .stepper { margin-bottom: 32px; }
+  .stepper-label { font-size: 8.5px; }
+  .hero h1 { font-size: 30px; }
+  .card { padding: 22px; }
+  .card h2 { font-size: 20px; }
+  .stepper-item:not(:last-child)::after { left: calc(50% + 14px); right: calc(-50% + 14px); }
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>CITADEL — Inscription Bitcoin</h1>
-  <p class="sub">Génère tes clés, fonde ton wallet sur Mutinynet, et inscris ton empire on-chain.</p>
+<main>
+  <div class="topbar">
+    <span class="brand">Citadel // Protocol</span>
+    <nav><a href="./index.html">← Accueil</a></nav>
+  </div>
 
-  <div class="step on" data-step="name">
-    <label>Nom de joueur (2-16 chars, [a-z0-9-])</label>
+  <section class="hero">
+    <div class="label">S'inscrire — 4 étapes</div>
+    <h1>Forge ton <em>empire</em>,<br>scelle-le on-chain.</h1>
+    <p>Génération de clé locale, faucet Mutinynet gratuit, inscription Bitcoin. Aucun service externe sauf Bitcoin lui-même.</p>
+  </section>
+
+  <div class="stepper" id="stepper">
+    <div class="stepper-item" data-stepper="name"><div class="stepper-dot">1</div><div class="stepper-label">Identité</div></div>
+    <div class="stepper-item" data-stepper="keys"><div class="stepper-dot">2</div><div class="stepper-label">Wallet</div></div>
+    <div class="stepper-item" data-stepper="faucet"><div class="stepper-dot">3</div><div class="stepper-label">Faucet</div></div>
+    <div class="stepper-item" data-stepper="inscribe"><div class="stepper-dot">4</div><div class="stepper-label">Inscrire</div></div>
+  </div>
+
+  <!-- Étape 1 — Nom -->
+  <div class="card on" data-step="name">
+    <h2>Choisis un nom de joueur</h2>
+    <p class="lead">Public, permanent, et lié à la pubkey Schnorr de ton wallet on-chain. C'est l'étiquette de ton empire dans la galaxie.</p>
+
+    <label>Nom (2–16 caractères, [a-z0-9-])</label>
     <input id="playerName" type="text" placeholder="ex: aurora" autofocus>
-    <p class="hint">Ce nom est public et permanent. Il identifie ton empire dans la chaîne Bitcoin.</p>
-    <button id="btnGenerate">Générer mes clés</button>
+
+    <p class="hint">Une fois inscrit sur Bitcoin, le nom ne peut plus être changé sans une nouvelle inscription (= un nouvel empire).</p>
+
+    <div class="btn-row">
+      <button class="primary" id="btnGenerate">Générer mes clés <span class="arrow">→</span></button>
+    </div>
   </div>
 
-  <div class="step" data-step="keys">
-    <h2>Sauvegarde ton wallet avant de continuer</h2>
-    <p class="hint">Ton wallet Bitcoin est ta seule clé : c'est lui qui te permet de broadcaster tes ordres ET il sert d'identité (ta pubkey Schnorr authentifie tes inscriptions). Si tu le perds, ton empire est inaccessible.</p>
+  <!-- Étape 2 — Wallet -->
+  <div class="card" data-step="keys">
+    <h2>Sauvegarde ton wallet</h2>
+    <p class="lead">Ton wallet Bitcoin est ta seule clé. Il signe la TX qui te broadcaste tes ordres, et sa pubkey Schnorr est ton identité on-chain. Si tu le perds, ton empire est inaccessible.</p>
 
-    <label>Adresse Bitcoin (Mutinynet)</label>
-    <code class="code-block" id="walletAddr"></code>
+    <label>Adresse Bitcoin Mutinynet</label>
+    <code class="code-block" id="walletAddr">—</code>
 
-    <label>Mnemonic BIP-39 (12 mots) — sauvegarde-le ailleurs</label>
-    <code class="code-block" id="walletMnemonic"></code>
+    <label>Mnemonic BIP-39 (12 mots — sauvegarde-le ailleurs)</label>
+    <code class="code-block warm" id="walletMnemonic">—</code>
 
-    <button id="btnDownloadBtc">Télécharger .btc-key (JSON)</button>
-    <button id="btnNextFaucet" class="alt">J'ai sauvegardé mon wallet →</button>
+    <div class="warn">
+      Ces 12 mots <strong>contrôlent</strong> ton wallet. Quiconque les a peut signer à ta place. Sauvegarde-les sur papier, dans un gestionnaire de mots de passe, ou les deux. Ne les colle jamais en ligne.
+    </div>
+
+    <div class="btn-row">
+      <button class="ghost" id="btnDownloadBtc">Télécharger .btc-key (JSON)</button>
+      <button class="primary" id="btnNextFaucet">J'ai sauvegardé mon wallet <span class="arrow">→</span></button>
+    </div>
   </div>
 
-  <div class="step" data-step="faucet">
-    <h2>Fonde ton wallet sur Mutinynet</h2>
-    <p class="hint">Le faucet donne ~10 000 sats gratuits, suffisant pour plusieurs inscriptions.</p>
+  <!-- Étape 3 — Faucet -->
+  <div class="card" data-step="faucet">
+    <h2>Fonde ton wallet</h2>
+    <p class="lead">Le faucet Mutinynet donne ~10 000 sats gratuits. Largement assez pour plusieurs inscriptions (chacune coûte ~2 000 sats).</p>
 
-    <label>Ton adresse</label>
-    <code class="code-block" id="faucetAddr"></code>
+    <label>Ton adresse à fonder</label>
+    <code class="code-block" id="faucetAddr">—</code>
 
-    <button id="btnFaucetCopy">Copier l'adresse</button>
-    <a id="faucetLink" href="https://faucet.mutinynet.com" target="_blank"><button>Ouvrir le faucet ↗</button></a>
+    <div class="btn-row" style="margin-top: 16px">
+      <button class="ghost" id="btnFaucetCopy">Copier l'adresse</button>
+      <a class="btn ghost" id="faucetLink" href="https://faucet.mutinynet.com" target="_blank" rel="noopener">Ouvrir le faucet ↗</a>
+    </div>
 
-    <div class="status" id="utxoStatus">Vérification du solde…</div>
-    <button id="btnNextInscribe" disabled>Continuer →</button>
+    <label>État du wallet</label>
+    <div class="status" id="utxoStatus"><span class="pulse"></span>Vérification du solde…</div>
+
+    <div class="btn-row">
+      <button class="primary" id="btnNextInscribe" disabled>Inscrire mon empire <span class="arrow">→</span></button>
+    </div>
   </div>
 
-  <div class="step" data-step="inscribe">
-    <h2>Inscrire ton empire sur Bitcoin</h2>
-    <p class="hint">Commit + reveal sur Mutinynet. ~30 secondes pour confirmation.</p>
+  <!-- Étape 4 — Inscription -->
+  <div class="card" data-step="inscribe">
+    <h2>Sceller ton empire dans Bitcoin</h2>
+    <p class="lead">Deux transactions Mutinynet (commit + reveal) qui inscrivent ton join dans le tapscript. La pubkey du witness te lie à ce join — elle authentifiera tous tes ordres futurs.</p>
 
     <div class="status" id="inscribeStatus">Prêt à inscrire.</div>
-    <button id="btnInscribe">Inscrire mon empire</button>
+
+    <div class="btn-row">
+      <button class="primary" id="btnInscribe">Inscrire mon empire <span class="arrow">→</span></button>
+    </div>
   </div>
 
-  <div class="step" data-step="done">
-    <h2>✓ Bienvenue dans Citadel</h2>
-    <p>Ton join est inscrit sur Bitcoin. Une fois confirmé (~30s), tu apparaîtras dans la console et ton empire sera spawné par le moteur.</p>
-    <p>Garde le contenu de <code>.btc-key</code> (JSON) à portée pour le coller dans la console quand elle demandera.</p>
-    <a href="./console-live-bitcoin.html"><button>Ouvrir la console</button></a>
+  <!-- Étape 5 — Done -->
+  <div class="card" data-step="done">
+    <h2>✦ Bienvenue, commandant.</h2>
+    <p class="lead">Ton join est broadcast sur Mutinynet. Une fois confirmé (~30 secondes), tu apparaîtras dans la console et le moteur spawnera ton empire à coordonnées libres.</p>
+
+    <div class="warn">
+      Garde le contenu de ton <code>.btc-key</code> (JSON) à portée. La console te le redemandera la première fois que tu soumettras un ordre — tu peux le coller en sécurité dans le champ wallet des paramètres (chiffré AES-GCM avec un password de ton choix).
+    </div>
+
+    <div class="btn-row">
+      <a class="btn primary" href="./console-live-bitcoin.html">Ouvrir la console <span class="arrow">→</span></a>
+    </div>
   </div>
-</div>
+</main>
 
 <script type="module">
 import { generateWallet } from './engine/wallet-init-core.mjs';
@@ -116,20 +476,29 @@ import * as btc from '@scure/btc-signer';
 import { schnorr } from '@noble/curves/secp256k1';
 
 // Identité Bitcoin-native : la pubkey Schnorr de la TX d'inscription.
-// Plus besoin de générer une paire Ed25519 séparée — le wallet taproot
-// est à la fois la clé de broadcast ET l'identité du joueur.
+// Une seule clé sert à la fois pour broadcaster ET pour identifier le joueur.
 
 const $ = sel => document.querySelector(sel);
+const STEPS = ['name', 'keys', 'faucet', 'inscribe', 'done'];
+
 function showStep(name) {
-  document.querySelectorAll('.step').forEach(s => s.classList.toggle('on', s.dataset.step === name));
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('on', c.dataset.step === name));
+  // Stepper : marque les steps précédents comme done, le courant comme active
+  const idx = STEPS.indexOf(name);
+  document.querySelectorAll('.stepper-item').forEach(item => {
+    const i = STEPS.indexOf(item.dataset.stepper);
+    item.classList.toggle('done', i >= 0 && i < idx);
+    item.classList.toggle('active', i === idx);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function setStatus(id, msg, cls = '') {
   const el = $('#' + id);
-  el.textContent = msg;
+  el.innerHTML = msg;
   el.className = 'status' + (cls ? ' ' + cls : '');
 }
 function download(filename, content) {
-  const blob = new Blob([content], { type: 'text/plain' });
+  const blob = new Blob([content], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -137,24 +506,23 @@ function download(filename, content) {
   URL.revokeObjectURL(a.href);
 }
 
-const session = {
-  name: null,
-  wallet: null,         // { taprootAddress, privateKeyWIF, pubKeyHex, mnemonic, ... }
-};
+const session = { name: null, wallet: null };
 
-// ─── Étape 1 — nom + génération wallet ────────────────────────────────────────
+// Initial : marque step 1 actif
+showStep('name');
 
+// ─── Étape 1 — nom + génération wallet ──────────────────────
 $('#btnGenerate').onclick = async () => {
   const name = $('#playerName').value.trim().toLowerCase();
   if (!/^[a-z][a-z0-9-]{1,15}$/.test(name)) {
-    alert('Nom invalide. 2-16 chars, [a-z0-9-], commence par une lettre.');
+    alert('Nom invalide. 2–16 caractères, lettres/chiffres/tiret, doit commencer par une lettre.');
     return;
   }
   session.name = name;
   $('#btnGenerate').disabled = true;
-  $('#btnGenerate').textContent = 'Génération…';
+  $('#btnGenerate').innerHTML = 'Génération…';
 
-  // Wallet Bitcoin BIP-86 — c'est ta seule clé.
+  // Wallet Bitcoin BIP-86
   session.wallet = generateWallet({ network: 'mutinynet' });
 
   $('#walletAddr').textContent = session.wallet.taprootAddress;
@@ -162,10 +530,15 @@ $('#btnGenerate').onclick = async () => {
   showStep('keys');
 };
 
-// ─── Étape 2 — téléchargement du wallet ───────────────────────────────────────
+$('#playerName').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('#btnGenerate').click();
+});
 
+// ─── Étape 2 — téléchargement du wallet ─────────────────────
 $('#btnDownloadBtc').onclick = () => {
   download(`${session.name}-btc-key.json`, JSON.stringify(session.wallet, null, 2));
+  $('#btnDownloadBtc').textContent = 'Téléchargé ✓';
+  setTimeout(() => { $('#btnDownloadBtc').textContent = 'Télécharger .btc-key (JSON)'; }, 2500);
 };
 $('#btnNextFaucet').onclick = () => {
   $('#faucetAddr').textContent = session.wallet.taprootAddress;
@@ -173,8 +546,7 @@ $('#btnNextFaucet').onclick = () => {
   pollUtxo();
 };
 
-// ─── Étape 3 — faucet + poll UTXOs ────────────────────────────────────────────
-
+// ─── Étape 3 — faucet + poll UTXOs ──────────────────────────
 $('#btnFaucetCopy').onclick = async () => {
   await navigator.clipboard.writeText(session.wallet.taprootAddress);
   $('#btnFaucetCopy').textContent = 'Copié ✓';
@@ -189,14 +561,14 @@ async function pollUtxo() {
     const utxos = await r.json();
     const total = utxos.reduce((a, u) => a + u.value, 0);
     if (total > 0) {
-      setStatus('utxoStatus', `✓ ${total} sats disponibles (${utxos.length} UTXO)`, 'ok');
+      setStatus('utxoStatus', `<span style="color:var(--green)">●</span> ${total.toLocaleString('fr-FR')} sats disponibles  ·  ${utxos.length} UTXO`, 'ok');
       $('#btnNextInscribe').disabled = false;
     } else {
-      setStatus('utxoStatus', 'Attente de fonds… (vérifie toutes les 5s)');
+      setStatus('utxoStatus', '<span class="pulse"></span>En attente de fonds Mutinynet… (vérification toutes les 5 s)');
       pollTimer = setTimeout(pollUtxo, 5000);
     }
   } catch (e) {
-    setStatus('utxoStatus', `Erreur: ${e.message}`, 'err');
+    setStatus('utxoStatus', `Erreur Mutinynet : ${e.message}`, 'err');
     pollTimer = setTimeout(pollUtxo, 10000);
   }
 }
@@ -206,14 +578,12 @@ $('#btnNextInscribe').onclick = () => {
   showStep('inscribe');
 };
 
-// ─── Étape 4 — inscription join ───────────────────────────────────────────────
-
+// ─── Étape 4 — inscription join ─────────────────────────────
 $('#btnInscribe').onclick = async () => {
   $('#btnInscribe').disabled = true;
-  setStatus('inscribeStatus', '▸ construction du YAML…');
+  setStatus('inscribeStatus', '<span class="pulse"></span>Construction du YAML…');
 
-  // YAML join minimal — la pubkey Schnorr de la TX authentifie l'inscripteur.
-  // Pas de cle_publique embarquée, pas de signature applicative.
+  // YAML join minimal — la pubkey Schnorr du witness Bitcoin authentifie l'inscripteur.
   const finalYaml = [
     '# Citadel Protocol — Join inscription',
     'version: 1',
@@ -223,7 +593,7 @@ $('#btnInscribe').onclick = async () => {
     `date_inscription: ${new Date().toISOString()}`,
   ].join('\n') + '\n';
 
-  setStatus('inscribeStatus', '▸ inscription Bitcoin (commit + reveal)…');
+  setStatus('inscribeStatus', '<span class="pulse"></span>Inscription Bitcoin (commit + reveal)…');
   try {
     const result = await inscribe({
       yamlText: finalYaml,
@@ -231,10 +601,10 @@ $('#btnInscribe').onclick = async () => {
       networkName: 'mutinynet',
       feeRate: 1,
       libs: { btc, schnorr },
-      log: (m) => setStatus('inscribeStatus', m),
+      log: (m) => setStatus('inscribeStatus', `<span class="pulse"></span>${m}`),
     });
     setStatus('inscribeStatus',
-      `✓ inscrit\n  commit  : ${result.commitTxid}\n  reveal  : ${result.revealTxid}\n  explorer : https://mutinynet.com/tx/${result.revealTxid}`,
+      `<span style="color:var(--green)">●</span> Inscrit on-chain\n\n  commit  : <span style="color:var(--cyan)">${result.commitTxid}</span>\n  reveal  : <span style="color:var(--cyan)">${result.revealTxid}</span>\n  explorer : <a href="https://mutinynet.com/tx/${result.revealTxid}" target="_blank" rel="noopener" style="color:var(--cyan)">mutinynet.com/tx/${result.revealTxid.slice(0,16)}…</a>`,
       'ok');
     setTimeout(() => showStep('done'), 1500);
   } catch (e) {

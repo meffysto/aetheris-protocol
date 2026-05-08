@@ -2,11 +2,11 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>CITADEL // PROTOCOL — Un 4X spatial dans Git</title>
+<title>CITADEL // PROTOCOL — Un 4X spatial qui vit dans Bitcoin</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="MMO 4X spatial qui vit dans un dépôt Git. Pas de serveur, pas de comptes, pas de tricherie possible. Jouable par humains, scripts et IA.">
+<meta name="description" content="MMO 4X spatial inscrit on-chain sur Bitcoin. Pas de serveur, pas de base de données, pas de comptes. Une pubkey Schnorr = un empire.">
 <meta property="og:title" content="CITADEL // PROTOCOL">
-<meta property="og:description" content="Un MMO 4X qui vit dans un dépôt Git. Pas de serveur. Une clé Ed25519 = un empire.">
+<meta property="og:description" content="Un MMO 4X qui vit dans Bitcoin. Pas de serveur. Une pubkey Schnorr = un empire. Tick = bloc.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -181,121 +181,116 @@
   <div class="topbar">
     <span>Citadel // Protocol</span>
     <nav>
-      <a href="https://github.com/meffysto/aetheris-protocol" target="_blank" rel="noopener">Repo</a>
+      <a href="https://codeberg.org/meffysto/aetheris-protocol/src/branch/pages" target="_blank" rel="noopener">Repo</a>
       <a href="Citadel - Concept.html">Concept</a>
-      <a href="https://github.com/meffysto/aetheris-protocol/blob/main/engine/PROTOCOL.md" target="_blank" rel="noopener">Protocole</a>
+      <a href="https://mutinynet.com/tx/b6a5e25bb67ca9aaefabdb9ef692928d9d4053dfc145f5034271859e3ccd8430" target="_blank" rel="noopener">Genesis on-chain</a>
     </nav>
   </div>
 
   <section class="hero">
-    <div class="label">Alpha · serveur ouvert</div>
-    <h1>Un 4X spatial<br>qui vit dans Git.</h1>
+    <div class="label">Alpha · Mutinynet · serveur ouvert</div>
+    <h1>Un 4X spatial<br>qui vit dans Bitcoin.</h1>
     <p class="lead">
       Pas de serveur. Pas de base de données. Pas de comptes.<br>
-      <em>Une clé Ed25519 = un empire</em>. Tout l'état du jeu est public, auditable, et déterministe.
+      <em>Une pubkey Schnorr = un empire</em>. Le tick = un bloc Bitcoin.
+      Tout l'état est inscrit on-chain, déterministe, vérifiable par n'importe qui.
     </p>
     <div class="cta-row">
-      <a class="cta-primary" href="join.html">
+      <a class="cta-primary" href="join-bitcoin.html">
         S'inscrire <span class="arrow">→</span>
       </a>
-      <a class="cta-secondary" href="console-live.html">
-        Voir la console live
+      <a class="cta-secondary" href="console-live-bitcoin.html">
+        Ouvrir la console
       </a>
     </div>
   </section>
 
   <div class="status" id="status">
     <div class="item">
-      <div class="lbl">Tick courant</div>
+      <div class="lbl">Cycle courant</div>
       <div class="val" id="status-tick">—</div>
     </div>
     <div class="item">
-      <div class="lbl">Cycle</div>
-      <div class="val dim" id="status-cycle">15 min</div>
+      <div class="lbl">Bloc Mutinynet</div>
+      <div class="val dim" id="status-block">—</div>
     </div>
     <div class="item">
-      <div class="lbl">Empires actifs</div>
-      <div class="val" id="status-players">—</div>
+      <div class="lbl">Cycle = 1 bloc</div>
+      <div class="val dim">≈ 30 s</div>
     </div>
     <div class="item">
-      <div class="lbl">Âge de l'univers</div>
-      <div class="val dim" id="status-age">—</div>
+      <div class="lbl">Genesis</div>
+      <div class="val dim">3 084 991</div>
     </div>
   </div>
 
   <section class="pillars">
     <div class="pillar">
       <h3><span class="num">01</span>Sans serveur</h3>
-      <p>Le résolveur (<code>engine/tick.mjs</code>) est un script Node de 600 lignes, déterministe à partir d'un seed. N'importe qui peut tourner un tick localement et obtenir le même résultat. Donc personne ne peut tricher sans qu'on le voie.</p>
+      <p>Le moteur (<code>engine/tick-core.mjs</code>) est une fonction pure déterministe. Il tourne dans <em>chaque</em> navigateur — chaque joueur reconstruit l'état complet en rejouant les inscriptions Bitcoin depuis la genesis. Personne au milieu, personne à corrompre.</p>
     </div>
     <div class="pillar">
       <h3><span class="num">02</span>Sans compte</h3>
-      <p>Une paire de clés Ed25519 générée dans ton browser. Tu signes tes ordres avec la clé privée. Aucun email, aucun mot de passe, aucune session. Si tu perds ta clé, tu perds ton empire.</p>
+      <p>Un wallet taproot BIP-86 généré dans ton navigateur. La pubkey Schnorr qui signe ton inscription Bitcoin <em>est</em> ton identité — vérifiable on-chain. Aucun email, aucun mot de passe, aucune session. Si tu perds ta clé, tu perds ton empire.</p>
     </div>
     <div class="pillar">
-      <h3><span class="num">03</span>IA-native</h3>
-      <p>Un agent lit <code>empire.md</code>, raisonne, écrit <code>ordres.yaml</code>, commit. Ce n'est pas un bolt-on : c'est l'API. Ton agent peut être un script Python de 50 lignes ou un harnais LLM full-context.</p>
+      <h3><span class="num">03</span>Bitcoin-native</h3>
+      <p>Tes ordres deviennent des inscriptions tapscript (commit + reveal). Un agent qui sait broadcaster une TX Bitcoin peut jouer. La surface est la même que pour un humain — un wallet, un bloc, une intention scellée.</p>
     </div>
   </section>
 
   <section class="paths">
     <h2>Trois façons de jouer.</h2>
-    <p class="sub">Le cycle est toujours le même : <em>lire</em> son empire, <em>donner des ordres</em>, <em>attendre le tick</em>. Choisis ton style.</p>
+    <p class="sub">Le cycle est toujours le même : <em>lire</em> son empire, <em>donner des ordres</em>, <em>attendre le bloc</em>. Choisis ton style.</p>
     <div class="grid">
       <div class="path-card">
         <h4>Confort</h4>
         <div class="name">Console web</div>
-        <p>Une UI qui te montre ta planète, te laisse cliquer "construire", "rechercher", "envoyer une flotte". Aucun fichier à éditer. Voie par défaut après l'inscription.</p>
+        <p>Une UI qui te montre ta planète, te laisse cliquer "construire", "rechercher", "envoyer une flotte". L'inscription Bitcoin se fait toute seule. Voie par défaut après l'inscription.</p>
       </div>
       <div class="path-card">
         <h4>Puriste</h4>
-        <div class="name">YAML brut</div>
-        <p>Pour les tatoués : <code>vim joueurs/&lt;toi&gt;/ordres.yaml</code>, <code>node engine/sign.mjs</code>, <code>git push</code>. Le repo <em>est</em> le client.</p>
+        <div class="name">CLI Node</div>
+        <p>Pour les tatoués : <code>vim ordres.yaml</code>, <code>node engine/inscribe.mjs ordres.yaml</code>. Le wallet taproot signe, broadcast direct sur Mutinynet. Le bloc est ton merge.</p>
       </div>
       <div class="path-card">
         <h4>Avenir</h4>
-        <div class="name">Agent IA</div>
-        <p>Tu codes un script qui lit <code>empire.md</code>, raisonne, écrit <code>ordres.yaml</code>, commit. La surface est la même que pour un humain — c'est volontaire.</p>
+        <div class="name">Agent autonome</div>
+        <p>Un script qui scanne les blocs, raisonne, construit un YAML d'ordres, l'inscrit. La pubkey du witness l'authentifie. Pas d'API, pas de proxy — juste Bitcoin.</p>
       </div>
     </div>
   </section>
 
   <footer>
-    <span>Protocole v0.1 · Serveur aetheris-1 · Open source MIT</span>
+    <span>Protocole v0.1 · Serveur citadel-mvp-1 · Mutinynet · Open source</span>
     <div class="links">
-      <a href="https://github.com/meffysto/aetheris-protocol" target="_blank" rel="noopener">GitHub</a>
-      <a href="https://github.com/meffysto/aetheris-protocol/blob/main/engine/PROTOCOL.md" target="_blank" rel="noopener">Spec agent</a>
-      <a href="https://github.com/meffysto/aetheris-protocol/issues" target="_blank" rel="noopener">Bugs</a>
+      <a href="https://codeberg.org/meffysto/aetheris-protocol" target="_blank" rel="noopener">Codeberg</a>
+      <a href="https://mutinynet.com/tx/b6a5e25bb67ca9aaefabdb9ef692928d9d4053dfc145f5034271859e3ccd8430" target="_blank" rel="noopener">Genesis TX</a>
+      <a href="https://faucet.mutinynet.com" target="_blank" rel="noopener">Faucet</a>
     </div>
   </footer>
 </main>
 
 <script>
-// Affiche le tick courant + nombre de joueurs depuis le repo public.
+// Cycle courant CITADEL = (tip Mutinynet - bloc_genesis) / blocs_par_tick
+const BLOC_GENESIS = 3084991;
+const BLOCS_PAR_TICK = 1;
+
 async function loadStatus() {
   try {
-    const [manifestRes, joueurs] = await Promise.all([
-      fetch('https://raw.githubusercontent.com/meffysto/aetheris-protocol/main/world/manifest.yaml?t=' + Date.now()),
-      fetch('https://api.github.com/repos/meffysto/aetheris-protocol/contents/joueurs?ref=main&t=' + Date.now()),
-    ]);
-    const manifestTxt = await manifestRes.text();
-    const tickMatch = manifestTxt.match(/^tick:\s*(\d+)/m);
-    const dateMatch = manifestTxt.match(/^demarrage_iso:\s*"([^"]+)"/m);
-    if (tickMatch) document.getElementById('status-tick').textContent = String(tickMatch[1]).padStart(3, '0');
-    if (dateMatch) {
-      const ms = Date.now() - Date.parse(dateMatch[1]);
-      const d = Math.floor(ms / 86400000);
-      const h = Math.floor((ms % 86400000) / 3600000);
-      document.getElementById('status-age').textContent = d > 0 ? `${d}j ${h}h` : `${h}h`;
+    const r = await fetch('https://mutinynet.com/api/blocks/tip/height', { cache: 'no-store' });
+    const tip = parseInt(await r.text(), 10);
+    if (!isNaN(tip)) {
+      const cycle = Math.max(0, Math.floor((tip - BLOC_GENESIS) / BLOCS_PAR_TICK));
+      document.getElementById('status-tick').textContent = String(cycle).padStart(3, '0');
+      document.getElementById('status-block').textContent = tip.toLocaleString('fr-FR');
     }
-    const dirs = await joueurs.json();
-    const count = Array.isArray(dirs) ? dirs.filter(e => e.type === 'dir').length : 0;
-    document.getElementById('status-players').textContent = count > 0 ? String(count) : '—';
   } catch {
-    // Silently keep dashes — status block stays present, juste pas peuple.
+    // garde les tirets si Mutinynet inaccessible
   }
 }
 loadStatus();
+setInterval(loadStatus, 30000);
 </script>
 </body>
 </html>

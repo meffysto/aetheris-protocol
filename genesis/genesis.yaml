@@ -1,14 +1,16 @@
 # Citadel Protocol — Genesis Block
-# Ce fichier est inscrit sur Bitcoin comme op_type=0x01 (join/genesis) du protocole.
-# Il définit les paramètres de départ du serveur Bitcoin-native.
+# Inscrit sur Bitcoin comme op_type=0x01 (join/genesis).
+# Le `seed` est la pubkey Schnorr du fondateur (= inscripteur de cette TX),
+# ce qui rend la genesis auto-cohérente : le seed peut être vérifié contre
+# le witness de la TX qui contient cette inscription.
 
 version: 1
 type: join
-serveur: bitcoin-mvp-1
+serveur: citadel-mvp-1
 protocol_version: 0.1
 tick: 0
-seed: 0xd34db33fb17cb1tc
-demarrage_iso: 2026-05-08T00:00:00Z
+seed: 0x5cb4da974b1fc38ab710729c6c3fba911bb40ab924bca1103cecace80bd5d6b7
+demarrage_iso: 2026-05-09T00:00:00Z
 reseau: mutinynet
 
 parametres:
@@ -19,11 +21,8 @@ parametres:
   positions_par_systeme: 15
   planetes_max_par_joueur: 9
 
-# Ancrage Bitcoin — bloc où la genesis a été inscrite.
-# La console calcule tick_courant = (tip - bloc_genesis) / blocs_par_tick.
+# Ancrage Bitcoin — sera mis à jour après inscription on-chain.
 ancrage:
-  bloc_genesis: 3084991
-  tx_genesis: 007a7be264fe96549a9d1909c65586ca25308a1db3d02b617ad54236040fbf0e
+  bloc_genesis: 3085121
+  tx_genesis: b6a5e25bb67ca9aaefabdb9ef692928d9d4053dfc145f5034271859e3ccd8430
   reseau_explorer: https://mutinynet.com
-
-signature: genesis

@@ -1,4 +1,4 @@
-# AETHERIS // galaxie canonique — generée par world-init.mjs
+# CITADEL // galaxie canonique — reset au tick 0 (chaque join mute via spawnEmpireFromJoin)
 version: 1
 tick: 0
 systemes:
@@ -8,10 +8,10 @@ systemes:
       1: { type: planete, proprietaire: null, classe: cristalline }
       2: { type: planete, proprietaire: null, classe: cristalline }
       3: { type: asteroide }
-      4: { type: planete, proprietaire: kael, nom: kael-prima, classe: tellurique }
+      4: { type: planete, proprietaire: null, classe: tellurique }
       5: { type: asteroide }
       6: { type: asteroide }
-      7: { type: planete, proprietaire: meff, nom: meff-prima, classe: tellurique }
+      7: { type: planete, proprietaire: null, classe: tellurique }
       8: { type: asteroide }
       9: { type: asteroide }
       10: { type: asteroide }
@@ -30,7 +30,7 @@ systemes:
       5: { type: planete, proprietaire: null, classe: volcanique }
       6: { type: asteroide }
       7: { type: planete, proprietaire: null, classe: gazeuse }
-      8: { type: planete, proprietaire: kcdq, nom: kcdq-prima, classe: tellurique }
+      8: { type: planete, proprietaire: null, classe: tellurique }
       9: { type: asteroide }
       10: { type: asteroide }
       11: { type: planete, proprietaire: null, classe: glacee }
@@ -54,5 +54,5 @@ systemes:
       11: { type: planete, proprietaire: null, classe: gazeuse }
       12: { type: planete, proprietaire: null, classe: glacee }
       13: { type: asteroide }
-      14: { type: planete, proprietaire: aurora, nom: aurora-prima, classe: tellurique }
+      14: { type: planete, proprietaire: null, classe: tellurique }
       15: { type: asteroide }

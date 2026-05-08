@@ -1325,7 +1325,7 @@ h2.sect .rule {
 
     <label>Wallet Bitcoin Mutinynet</label>
     <textarea id="cfgWallet" placeholder='{"network":"mutinynet","privateKeyWIF":"cN...","taprootAddress":"tb1p..."}' autocomplete="off" spellcheck="false" style="min-height:84px"></textarea>
-    <div class="hint" id="walletHint">Colle le JSON complet de ton <code>.btc-key</code>. Mutinynet = test funds — ne jamais y mettre une clé mainnet.</div>
+    <div class="hint" id="walletHint">Colle le JSON complet de ton <code>.btc-key</code>. Chiffré AES-GCM avec un password de ton choix (PBKDF2 200k itérations). Si tu laisses le password vide, stockage en clair.</div>
 
     <div class="actions">
       <button class="ghost" id="cfgResetCache" type="button" title="Vide le cache de scan IndexedDB et force un rescan complet de la chaîne">Vider cache scan</button>
@@ -1676,7 +1676,15 @@ const state = {
   source: 'bitcoin',
   pending: new Set(),
   bitcoin: null,                      // { tip, blocGenesis, tickCourant, ... } setté par load()
-  wallet: (function(){ try { return JSON.parse(localStorage.getItem('aetheris.btc.wallet') || 'null'); } catch { return null; } })(),
+  // Pré-charge un wallet stocké en clair (legacy) ; les wallets chiffrés sont
+  // chargés à la volée via getBitcoinWallet (qui demande le password).
+  wallet: (function(){
+    try {
+      const v = JSON.parse(localStorage.getItem('aetheris.btc.wallet') || 'null');
+      return v && !v.encrypted && v.privateKeyWIF ? v : null;
+    } catch { return null; }
+  })(),
+  walletPassword: null,               // password en mémoire (volatile, ré-demandé chaque session)
   identites: {},
 };
 // Sync URL-derived player to localStorage pour les refresh suivants.
@@ -3034,29 +3042,130 @@ function randomNonce() {
 }
 
 /* ───────────────────────────── Wallet Bitcoin ───────────────────────────── */
-// Stocké en localStorage clair pour le MVP (Mutinynet, test funds uniquement).
-// TODO: encrypt avec password + IndexedDB pour production / mainnet.
+// Chiffré AES-GCM (clé dérivée PBKDF2 SHA-256, 200k itérations). Le password
+// est demandé une fois par session et conservé en mémoire (state.walletPassword).
+// Rétro-compat : un wallet stocké en clair (legacy) est lu directement et migré
+// au prochain save si l'user fournit un password.
 
-function loadBitcoinWallet() {
-  try { return JSON.parse(localStorage.getItem('aetheris.btc.wallet') || 'null'); }
+const WALLET_KEY = 'aetheris.btc.wallet';
+
+function b64encode(bytes) {
+  let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function b64decode(b64) {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+async function deriveWalletKey(password, salt) {
+  const baseKey = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false, ['encrypt', 'decrypt']
+  );
+}
+async function encryptWallet(wallet, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveWalletKey(password, salt);
+  const data = new TextEncoder().encode(JSON.stringify(wallet));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+  return {
+    encrypted: 'aes-gcm-pbkdf2-v1',
+    salt: b64encode(salt),
+    iv: b64encode(iv),
+    ciphertext: b64encode(new Uint8Array(ct)),
+  };
+}
+async function decryptWallet(blob, password) {
+  const salt = b64decode(blob.salt);
+  const iv = b64decode(blob.iv);
+  const ct = b64decode(blob.ciphertext);
+  const key = await deriveWalletKey(password, salt);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+// Lecture brute du localStorage — retourne soit le wallet clair (legacy),
+// soit un blob chiffré { encrypted, salt, iv, ciphertext }.
+function readWalletBlob() {
+  try { return JSON.parse(localStorage.getItem(WALLET_KEY) || 'null'); }
   catch { return null; }
 }
-function saveBitcoinWallet(w) {
-  localStorage.setItem('aetheris.btc.wallet', JSON.stringify(w));
+
+// Wrapper sync pour rétro-compat avec les call sites legacy. Retourne le
+// wallet clair si non chiffré ; sinon retourne null (l'appelant doit utiliser
+// la version async loadBitcoinWalletAsync).
+function loadBitcoinWallet() {
+  const blob = readWalletBlob();
+  if (!blob) return null;
+  if (blob.encrypted) return null; // chiffré → ne peut pas charger sync
+  return blob;
 }
+
+async function loadBitcoinWalletAsync() {
+  const blob = readWalletBlob();
+  if (!blob) return null;
+  if (!blob.encrypted) return blob; // legacy clair
+
+  // Chiffré — demande password (1 fois par session)
+  let password = state.walletPassword;
+  if (!password) {
+    password = window.prompt('🔒 Password pour déchiffrer ton wallet Bitcoin');
+    if (!password) throw new Error('password requis');
+  }
+  try {
+    const wallet = await decryptWallet(blob, password);
+    state.walletPassword = password;
+    return wallet;
+  } catch (e) {
+    state.walletPassword = null;
+    throw new Error('password incorrect ou wallet corrompu');
+  }
+}
+
+async function saveBitcoinWallet(w) {
+  // Demande un password si pas en session (premier setup ou nouveau wallet).
+  let password = state.walletPassword;
+  if (!password) {
+    password = window.prompt(
+      '🔒 Choisis un password pour chiffrer ton wallet localement.\n' +
+      '(laisser vide = stockage en clair, déconseillé)'
+    );
+  }
+  if (!password) {
+    // Stockage en clair (legacy / opt-out)
+    localStorage.setItem(WALLET_KEY, JSON.stringify(w));
+    state.walletPassword = null;
+    return;
+  }
+  const blob = await encryptWallet(w, password);
+  localStorage.setItem(WALLET_KEY, JSON.stringify(blob));
+  state.walletPassword = password;
+}
+
 function clearBitcoinWallet() {
-  localStorage.removeItem('aetheris.btc.wallet');
+  localStorage.removeItem(WALLET_KEY);
   state.wallet = null;
+  state.walletPassword = null;
 }
 
 async function getBitcoinWallet() {
   if (state.wallet?.privateKeyWIF && state.wallet?.taprootAddress) return state.wallet;
-  const cached = loadBitcoinWallet();
+  let cached;
+  try { cached = await loadBitcoinWalletAsync(); }
+  catch (e) {
+    toast('Wallet verrouillé', e.message, true);
+    throw e;
+  }
   if (cached?.privateKeyWIF && cached?.taprootAddress) {
     state.wallet = cached;
     return cached;
   }
-  // Ouvre le modal settings — l'user doit coller son JSON dans le champ wallet.
+  // Pas de wallet stocké — ouvre le modal pour saisir.
   openSettings();
   toast('Wallet Bitcoin requis', 'Colle le contenu de ton .btc-key (JSON) dans le champ wallet, puis sceller.', true);
   throw new Error('wallet bitcoin non configuré');
@@ -3351,8 +3460,8 @@ applySrcUI();
 document.getElementById('gearBtn').onclick = openSettings;
 document.getElementById('cfgCancel').onclick = closeSettings;
 document.getElementById('modalBg').onclick = e => { if (e.target.id === 'modalBg') closeSettings(); };
-document.getElementById('cfgSave').onclick = () => {
-  // Wallet Bitcoin : parse JSON, valide, persiste.
+document.getElementById('cfgSave').onclick = async () => {
+  // Wallet Bitcoin : parse JSON, valide, chiffre avec password, persiste.
   const walletRaw = document.getElementById('cfgWallet').value.trim();
   if (walletRaw) {
     try {
@@ -3361,15 +3470,18 @@ document.getElementById('cfgSave').onclick = () => {
         toast('Wallet invalide', 'Le JSON doit contenir privateKeyWIF et taprootAddress.', true);
         return;
       }
-      saveBitcoinWallet(w);
+      await saveBitcoinWallet(w);
       state.wallet = w;
     } catch (e) {
-      toast('Wallet illisible', 'JSON invalide : ' + e.message, true);
+      toast('Wallet illisible', e.message, true);
       return;
     }
   }
   closeSettings();
-  if (state.wallet) toast('Wallet scellé', `Adresse ${state.wallet.taprootAddress.slice(0,16)}…`);
+  if (state.wallet) {
+    const lock = state.walletPassword ? '🔒 chiffré' : '⚠ en clair';
+    toast('Wallet scellé', `${state.wallet.taprootAddress.slice(0,16)}… (${lock})`);
+  }
   else toast('Wallet manquant', 'Colle ton .btc-key (JSON) pour pouvoir inscrire des ordres.', true);
   render();
 };

@@ -1,7 +1,7 @@
 # Généré par engine/tick.mjs — ne pas éditer.
 version: 1
 joueur: kcdq
-tick: 89
+tick: 90
 score_total: 604
 points_militaires: 0
 rang: 999
@@ -18,15 +18,15 @@ planetes:
       total: 240
     ressources:
       ferrum:
-        stock: 37590
+        stock: 38334
         production_par_utj: 124
         capacite: 100000
       lumen:
-        stock: 14518
+        stock: 14770
         production_par_utj: 42
         capacite: 100000
       plasmide:
-        stock: 3168
+        stock: 3234
         production_par_utj: 11
         capacite: 100000
     energie:

@@ -237,7 +237,7 @@ const galaxie = yparse(rd('world/galaxie.yaml'));
 console.log(`tick courant = ${manifest.tick}`);
 console.log(`seed = ${manifest.seed}`);
 
-const players = ls('joueurs').filter(n => exists(`joueurs/${n}/empire.yaml`));
+const players = ls('joueurs').filter(n => exists(`joueurs/${n}/empire.yaml`)).sort();
 console.log(`joueurs = ${players.length} (${players.join(', ')})`);
 
 const empires = {};
@@ -1063,8 +1063,18 @@ for (const [name, emp] of Object.entries(empires)) {
 console.log(`\n▸ Écriture des fichiers`);
 
 manifest.tick = tickSuivant;
+
+// Sérialisation canonique : clés triées récursivement → hash déterministe
+// indépendamment de l'ordre d'insertion des objets JS.
+function canonicalJSON(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(canonicalJSON).join(',') + ']';
+  const keys = Object.keys(value).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalJSON(value[k])).join(',') + '}';
+}
+
 manifest.hash_etat = 'sha256:' + crypto.createHash('sha256')
-  .update(JSON.stringify(empires) + JSON.stringify(galaxie))
+  .update(canonicalJSON(empires) + canonicalJSON(galaxie))
   .digest('hex').slice(0, 32);
 wr('world/manifest.yaml', '# Généré par engine/tick.mjs — ne pas éditer.\n' + ystringify(manifest));
 

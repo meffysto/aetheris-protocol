@@ -1,0 +1,17 @@
+{
+  "name": "aetheris-protocol-bitcoin",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Aetheris Protocol — Bitcoin MVP (Mutinynet)",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.7.2",
+    "@scure/base": "^1.2.4",
+    "@scure/bip32": "^2.2.0",
+    "@scure/bip39": "^2.2.0",
+    "@scure/btc-signer": "^1.6.0",
+    "fflate": "^0.8.2"
+  }
+}

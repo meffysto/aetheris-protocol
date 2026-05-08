@@ -1,0 +1,81 @@
+name: agent-aurora
+
+# NPC scripté qui joue automatiquement chaque tick (Forgejo / Codeberg).
+# Stratégie : eco-only (cf. agents/baseline.py).
+#
+# Déclenchement : enchaîne après chaque aetheris-tick réussi.
+# Aurora écrit alors ses ordres pour tick+1, qui seront résolus au tick suivant.
+
+on:
+  workflow_run:
+    workflows: ["aetheris-tick"]
+    types: [completed]
+  workflow_dispatch: {}
+
+concurrency:
+  group: agent-aurora
+  cancel-in-progress: false
+
+jobs:
+  play:
+    # Skip si le tick a foiré (workflow_run se déclenche aussi sur failure).
+    # workflow_dispatch n'a pas de workflow_run.conclusion → toujours OK.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: docker
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pyyaml
+        run: pip install pyyaml
+
+      - name: Restore private key from secret
+        env:
+          AURORA_PRIVATE_KEY: ${{ secrets.AURORA_PRIVATE_KEY }}
+        run: |
+          if [ -z "$AURORA_PRIVATE_KEY" ]; then
+            echo "✗ Secret AURORA_PRIVATE_KEY manquant"
+            exit 1
+          fi
+          printf '%s' "$AURORA_PRIVATE_KEY" > joueurs/aurora/.key.pem
+          chmod 600 joueurs/aurora/.key.pem
+
+      - name: Decide & write orders
+        run: python3 agents/baseline.py --player aurora --apply
+
+      - name: Sign orders
+        run: node engine/sign.mjs joueurs/aurora/ordres.yaml
+
+      - name: Wipe private key
+        if: always()
+        run: rm -f joueurs/aurora/.key.pem
+
+      - name: Commit & push
+        run: |
+          git config user.name "aurora-bot"
+          git config user.email "aurora@aetheris.local"
+          if git diff --quiet joueurs/aurora/ordres.yaml; then
+            echo "Aucun changement — pas de commit."
+            exit 0
+          fi
+          git add joueurs/aurora/ordres.yaml
+          TICK=$(grep '^tick_cible:' joueurs/aurora/ordres.yaml | awk '{print $2}')
+          git commit -m "aurora: tour $TICK (baseline)"
+          # Retry avec rebase si le tick worker a poussé entre-temps
+          for i in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "push échoué (essai $i) — rebase et retry"
+            git pull --rebase origin main
+          done
+          exit 1

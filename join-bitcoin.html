@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..600,0..100&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script type="importmap">
 {
   "imports": {
@@ -22,163 +22,170 @@
 </script>
 <style>
 :root {
-  --bg-0: #05070d;
-  --bg-1: #0a0e1a;
-  --bg-2: #111728;
-  --line: rgba(120, 160, 220, 0.12);
-  --line-strong: rgba(120, 180, 240, 0.28);
-  --ink: #e6ecf5;
-  --ink-dim: #8a96b0;
-  --ink-faint: #525c75;
-  --cyan: #5ee0ff;
-  --cyan-dim: #2a90b8;
-  --violet: #a875ff;
-  --gold: #e8c062;
-  --green: #4be58a;
-  --red: #f06161;
-  --font-sans: 'Space Grotesk', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --font-serif: 'Cormorant Garamond', serif;
+  --ink:        #f4ecdc;
+  --ink-2:      #ffffff;
+  --ink-3:      #f7f0df;
+  --ink-4:      #e8dcc0;
+  --hairline:   #e6d9bd;
+  --brass:      #0e1d33;
+  --brass-2:    #1f3556;
+  --brass-dim:  #c4b48a;
+  --phosphor:   #a83a25;
+  --phosphor-2: #c64a30;
+  --bone:       #2c2014;
+  --bone-2:     #0d0a06;
+  --bone-dim:   #8a7c64;
+  --green:      #5a7a3a;
+  --serif:   "Fraunces", Georgia, serif;
+  --sans:    "Plus Jakarta Sans", system-ui, sans-serif;
+  --mono:    "JetBrains Mono", ui-monospace, monospace;
+  --display: "Fraunces", Georgia, serif;
+  --shadow-card: 0 1px 2px rgba(28,20,8,0.04), 0 8px 22px rgba(28,20,8,0.06);
+  --shadow-pop:  0 2px 6px rgba(28,20,8,0.08), 0 14px 36px rgba(28,20,8,0.10);
 }
 * { box-sizing: border-box; }
-html, body {
-  margin: 0; min-height: 100%;
-  background: var(--bg-0);
-  color: var(--ink);
-  font-family: var(--font-sans);
+html, body { margin: 0; }
+body {
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--sans);
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-}
-body {
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(94, 224, 255, 0.07), transparent 60%),
-    radial-gradient(ellipse 60% 80% at 100% 100%, rgba(168, 117, 255, 0.05), transparent 60%),
-    var(--bg-0);
+  text-rendering: geometricPrecision;
+  background-image:
+    radial-gradient(ellipse 90% 60% at 15% -5%, rgba(255,250,235,0.7), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168,90,40,0.06), transparent 60%),
+    linear-gradient(180deg, #f6efde 0%, #ece1c6 100%);
   min-height: 100vh;
   padding: 32px 20px 80px;
 }
 body::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background-image:
-    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.5) 50%, transparent),
-    radial-gradient(1px 1px at 67% 42%, rgba(255,255,255,0.4) 50%, transparent),
-    radial-gradient(1px 1px at 89% 73%, rgba(255,255,255,0.5) 50%, transparent),
-    radial-gradient(1px 1px at 31% 87%, rgba(255,255,255,0.3) 50%, transparent),
-    radial-gradient(1px 1px at 54% 12%, rgba(255,255,255,0.4) 50%, transparent);
-  background-size: 800px 800px;
-  opacity: 0.5;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><g fill='none' stroke='%23000' stroke-width='0.4' opacity='0.04'><circle cx='150' cy='200' r='80'/><circle cx='450' cy='350' r='120'/><circle cx='300' cy='100' r='60'/><circle cx='100' cy='500' r='100'/><path d='M0 300 Q 150 280 300 320 T 600 300'/><path d='M0 150 Q 200 130 400 170 T 600 150'/></g></svg>");
+  background-size: 700px 700px;
 }
-main { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; }
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+  mix-blend-mode: multiply;
+  opacity: 0.10;
+}
+main { position: relative; z-index: 2; max-width: 720px; margin: 0 auto; }
 
 /* ─── topbar ──────────────────────────────────────────────── */
 .topbar {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 56px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--line);
-  font-family: var(--font-mono);
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--bone-dim);
 }
+.topbar .brand { color: var(--brass); letter-spacing: 0.22em; font-weight: 600; }
 .topbar a {
-  color: var(--ink-dim);
+  color: var(--bone-dim);
   text-decoration: none;
   transition: color 0.2s;
 }
-.topbar a:hover { color: var(--cyan); }
-.topbar .brand { color: var(--cyan); letter-spacing: 0.2em; }
+.topbar a:hover { color: var(--phosphor); }
+
+/* ─── hero ────────────────────────────────────────────────── */
+.hero { margin-bottom: 40px; }
+.label {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--phosphor);
+  padding: 5px 14px;
+  border: 1px solid var(--phosphor);
+  border-radius: 999px;
+  margin-bottom: 18px;
+}
+.hero h1 {
+  font-family: var(--display);
+  font-size: 44px;
+  font-weight: 500;
+  font-variation-settings: "SOFT" 50;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  margin: 0 0 14px;
+  color: var(--bone-2);
+}
+.hero h1 em { font-style: italic; color: var(--phosphor); font-weight: 400; }
+.hero .lead {
+  color: var(--bone);
+  font-size: 15px;
+  max-width: 580px;
+  margin: 0;
+}
 
 /* ─── stepper ─────────────────────────────────────────────── */
 .stepper {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin: 0 0 48px;
+  align-items: flex-start;
+  margin: 0 0 40px;
   padding: 0 4px;
 }
 .stepper-item {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
   flex: 1;
   position: relative;
 }
 .stepper-item:not(:last-child)::after {
   content: ""; position: absolute;
-  top: 14px; left: calc(50% + 16px); right: calc(-50% + 16px);
+  top: 14px; left: calc(50% + 18px); right: calc(-50% + 18px);
   height: 1px;
-  background: var(--line);
+  background: var(--hairline);
 }
-.stepper-item.done:not(:last-child)::after { background: var(--cyan-dim); }
+.stepper-item.done:not(:last-child)::after { background: var(--brass); }
 .stepper-dot {
   width: 28px; height: 28px;
   border-radius: 50%;
-  background: var(--bg-1);
-  border: 1px solid var(--line-strong);
+  background: var(--ink-2);
+  border: 1px solid var(--hairline);
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
-  color: var(--ink-faint);
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  color: var(--bone-dim);
   transition: all 0.3s;
+  box-shadow: var(--shadow-card);
 }
 .stepper-item.active .stepper-dot {
-  background: var(--bg-2);
-  border-color: var(--cyan);
-  color: var(--cyan);
-  box-shadow: 0 0 0 4px rgba(94, 224, 255, 0.1);
+  background: var(--ink-2);
+  border-color: var(--brass);
+  color: var(--brass);
+  box-shadow: 0 0 0 4px rgba(14,29,51,0.08), var(--shadow-card);
 }
 .stepper-item.done .stepper-dot {
-  background: var(--cyan-dim);
-  border-color: var(--cyan-dim);
-  color: var(--bg-0);
-}
-.stepper-label {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-.stepper-item.active .stepper-label { color: var(--ink); }
-.stepper-item.done .stepper-label { color: var(--ink-dim); }
-
-/* ─── hero ────────────────────────────────────────────────── */
-.hero {
-  margin-bottom: 48px;
-}
-.hero .label {
-  font-family: var(--font-mono); font-size: 10.5px;
-  letter-spacing: 0.22em; text-transform: uppercase;
-  color: var(--cyan-dim);
-  display: inline-block;
-  padding: 5px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  margin-bottom: 16px;
-}
-.hero h1 {
-  font-family: var(--font-serif);
-  font-size: 44px; font-weight: 500;
-  line-height: 1.05;
-  letter-spacing: -0.01em;
-  margin: 0 0 12px;
+  background: var(--brass);
+  border-color: var(--brass);
   color: var(--ink);
 }
-.hero h1 em { font-style: italic; color: var(--cyan); }
-.hero p {
-  color: var(--ink-dim);
-  font-size: 15px;
-  max-width: 540px;
-  margin: 0;
+.stepper-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+  text-align: center;
 }
+.stepper-item.active .stepper-label { color: var(--brass); }
+.stepper-item.done .stepper-label { color: var(--bone); }
 
-/* ─── card (step content) ─────────────────────────────────── */
+/* ─── card ────────────────────────────────────────────────── */
 .card {
-  background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
-  border: 1px solid var(--line);
+  background: var(--ink-2);
+  border: 1px solid var(--hairline);
   border-radius: 14px;
   padding: 32px;
   display: none;
+  box-shadow: var(--shadow-card);
   animation: fadeIn 0.4s ease;
 }
 .card.on { display: block; }
@@ -187,124 +194,131 @@ main { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; }
   to   { opacity: 1; transform: translateY(0); }
 }
 .card h2 {
-  font-family: var(--font-serif);
-  font-size: 24px; font-weight: 500;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 500;
+  font-variation-settings: "SOFT" 50;
   margin: 0 0 8px;
-  color: var(--ink);
+  color: var(--bone-2);
+  letter-spacing: -0.01em;
 }
 .card .lead {
-  color: var(--ink-dim);
+  color: var(--bone);
   font-size: 14px;
   margin: 0 0 28px;
-  max-width: 540px;
+  max-width: 560px;
 }
 .card label {
   display: block;
-  font-family: var(--font-mono); font-size: 10.5px;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--ink-faint);
-  margin: 24px 0 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+  margin: 22px 0 10px;
+  font-weight: 500;
 }
 .card label:first-child, .card .lead + label { margin-top: 0; }
 
 /* ─── inputs & code ──────────────────────────────────────── */
 input[type=text], input[type=password] {
   width: 100%;
-  padding: 14px 16px;
-  font-family: var(--font-mono);
+  padding: 13px 16px;
+  font-family: var(--mono);
   font-size: 14px;
-  background: var(--bg-0);
-  color: var(--ink);
-  border: 1px solid var(--line-strong);
+  color: var(--bone-2);
+  background: var(--ink-3);
+  border: 1px solid var(--hairline);
   border-radius: 8px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 input[type=text]:focus, input[type=password]:focus {
   outline: none;
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 3px rgba(94, 224, 255, 0.08);
+  border-color: var(--brass);
+  background: var(--ink-2);
+  box-shadow: 0 0 0 3px rgba(14,29,51,0.08);
 }
 .code-block {
   display: block;
   padding: 14px 18px;
-  font-family: var(--font-mono);
+  font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.55;
-  color: var(--cyan);
-  background: var(--bg-0);
-  border: 1px solid var(--line);
+  color: var(--brass);
+  background: var(--ink-3);
+  border: 1px solid var(--hairline);
   border-radius: 8px;
   word-break: break-all;
   margin: 0;
 }
-.code-block.warm { color: var(--gold); border-color: rgba(232, 192, 98, 0.2); }
+.code-block.warm { color: var(--phosphor); border-color: rgba(168,58,37,0.2); background: rgba(168,58,37,0.04); }
 
 /* ─── status banners ─────────────────────────────────────── */
 .status {
-  font-family: var(--font-mono);
+  font-family: var(--mono);
   font-size: 12.5px;
   padding: 14px 18px;
-  background: var(--bg-0);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--cyan);
+  background: var(--ink-3);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--brass);
   border-radius: 6px;
   margin: 16px 0 24px;
   white-space: pre-wrap;
-  color: var(--ink-dim);
-  line-height: 1.55;
+  color: var(--bone);
+  line-height: 1.6;
 }
 .status.ok {
   border-left-color: var(--green);
-  color: var(--ink);
+  background: rgba(90,122,58,0.05);
 }
 .status.err {
-  border-left-color: var(--red);
-  color: var(--red);
+  border-left-color: var(--phosphor);
+  background: rgba(168,58,37,0.05);
+  color: var(--phosphor);
 }
 .status .pulse {
   display: inline-block;
   width: 6px; height: 6px;
   border-radius: 50%;
-  background: var(--cyan);
+  background: var(--brass);
   margin-right: 8px;
   animation: pulse 1.6s infinite;
+  vertical-align: middle;
 }
 @keyframes pulse {
   0%, 100% { opacity: 0.4; }
   50%      { opacity: 1; }
 }
+.status a { color: var(--phosphor); }
 
 /* ─── hint warnings ──────────────────────────────────────── */
 .hint {
-  color: var(--ink-faint);
+  color: var(--bone-dim);
   font-size: 12.5px;
   line-height: 1.55;
   margin: 8px 0 0;
 }
-.hint code {
-  font-family: var(--font-mono);
+.hint code, .warn code {
+  font-family: var(--mono);
   font-size: 12px;
-  color: var(--gold);
-  background: rgba(232, 192, 98, 0.08);
+  color: var(--phosphor);
+  background: rgba(168,58,37,0.06);
   padding: 1px 6px;
   border-radius: 3px;
 }
 .warn {
   display: flex; gap: 12px;
   padding: 14px 18px;
-  background: rgba(232, 192, 98, 0.05);
-  border: 1px solid rgba(232, 192, 98, 0.2);
+  background: rgba(168,58,37,0.05);
+  border: 1px solid rgba(168,58,37,0.2);
   border-radius: 8px;
   margin: 16px 0 24px;
-  color: var(--gold);
+  color: var(--bone);
   font-size: 12.5px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
-.warn::before {
-  content: "⚠";
-  flex-shrink: 0;
-  font-size: 16px;
-}
+.warn::before { content: "⚠"; flex-shrink: 0; font-size: 16px; color: var(--phosphor); }
+.warn strong { color: var(--phosphor); font-weight: 600; }
 
 /* ─── buttons ────────────────────────────────────────────── */
 .btn-row {
@@ -312,7 +326,7 @@ input[type=text]:focus, input[type=password]:focus {
   margin-top: 28px;
 }
 button, .btn {
-  font-family: var(--font-sans);
+  font-family: var(--sans);
   font-size: 13px;
   font-weight: 600;
   padding: 12px 22px;
@@ -325,43 +339,43 @@ button, .btn {
   text-decoration: none;
 }
 button.primary, .btn.primary {
-  background: var(--cyan);
-  color: var(--bg-0);
+  background: var(--brass);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
 }
 button.primary:hover, .btn.primary:hover {
-  background: #7eeaff;
+  background: var(--brass-2);
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(94, 224, 255, 0.25);
+  box-shadow: var(--shadow-pop);
 }
 button.ghost, .btn.ghost {
   background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line-strong);
+  color: var(--brass);
+  border: 1px solid var(--brass);
 }
 button.ghost:hover, .btn.ghost:hover {
-  border-color: var(--cyan);
-  color: var(--cyan);
+  background: var(--brass);
+  color: var(--ink);
 }
 button:disabled {
-  background: var(--bg-2) !important;
-  color: var(--ink-faint) !important;
+  background: var(--ink-4) !important;
+  color: var(--bone-dim) !important;
   cursor: not-allowed !important;
   transform: none !important;
   box-shadow: none !important;
+  border-color: var(--ink-4) !important;
 }
 .arrow { transition: transform 0.2s; }
 button:hover .arrow, .btn:hover .arrow { transform: translateX(2px); }
 
-/* ─── responsive ─────────────────────────────────────────── */
 @media (max-width: 600px) {
   body { padding: 20px 16px 60px; }
-  .topbar { margin-bottom: 32px; font-size: 10px; }
+  .topbar { margin-bottom: 32px; flex-direction: column; align-items: flex-start; gap: 8px; }
   .stepper { margin-bottom: 32px; }
   .stepper-label { font-size: 8.5px; }
-  .hero h1 { font-size: 30px; }
+  .hero h1 { font-size: 32px; }
   .card { padding: 22px; }
-  .card h2 { font-size: 20px; }
-  .stepper-item:not(:last-child)::after { left: calc(50% + 14px); right: calc(-50% + 14px); }
+  .card h2 { font-size: 22px; }
 }
 </style>
 </head>
@@ -369,13 +383,13 @@ button:hover .arrow, .btn:hover .arrow { transform: translateX(2px); }
 <main>
   <div class="topbar">
     <span class="brand">Citadel // Protocol</span>
-    <nav><a href="./index.html">← Accueil</a></nav>
+    <a href="./index.html">← Accueil</a>
   </div>
 
   <section class="hero">
     <div class="label">S'inscrire — 4 étapes</div>
     <h1>Forge ton <em>empire</em>,<br>scelle-le on-chain.</h1>
-    <p>Génération de clé locale, faucet Mutinynet gratuit, inscription Bitcoin. Aucun service externe sauf Bitcoin lui-même.</p>
+    <p class="lead">Génération de clé locale, faucet Mutinynet gratuit, inscription Bitcoin. Aucun service externe sauf Bitcoin lui-même.</p>
   </section>
 
   <div class="stepper" id="stepper">
@@ -385,7 +399,6 @@ button:hover .arrow, .btn:hover .arrow { transform: translateX(2px); }
     <div class="stepper-item" data-stepper="inscribe"><div class="stepper-dot">4</div><div class="stepper-label">Inscrire</div></div>
   </div>
 
-  <!-- Étape 1 — Nom -->
   <div class="card on" data-step="name">
     <h2>Choisis un nom de joueur</h2>
     <p class="lead">Public, permanent, et lié à la pubkey Schnorr de ton wallet on-chain. C'est l'étiquette de ton empire dans la galaxie.</p>
@@ -400,10 +413,9 @@ button:hover .arrow, .btn:hover .arrow { transform: translateX(2px); }
     </div>
   </div>
 
-  <!-- Étape 2 — Wallet -->
   <div class="card" data-step="keys">
     <h2>Sauvegarde ton wallet</h2>
-    <p class="lead">Ton wallet Bitcoin est ta seule clé. Il signe la TX qui te broadcaste tes ordres, et sa pubkey Schnorr est ton identité on-chain. Si tu le perds, ton empire est inaccessible.</p>
+    <p class="lead">Ton wallet Bitcoin est ta seule clé. Il signe la TX qui broadcaste tes ordres, et sa pubkey Schnorr est ton identité on-chain. Si tu le perds, ton empire est inaccessible.</p>
 
     <label>Adresse Bitcoin Mutinynet</label>
     <code class="code-block" id="walletAddr">—</code>
@@ -421,7 +433,6 @@ button:hover .arrow, .btn:hover .arrow { transform: translateX(2px); }
     </div>
   </div>
 
-  <!-- Étape 3 — Faucet -->
   <div class="card" data-step="faucet">
     <h2>Fonde ton wallet</h2>
     <p class="lead">Le faucet Mutinynet donne ~10 000 sats gratuits. Largement assez pour plusieurs inscriptions (chacune coûte ~2 000 sats).</p>
@@ -442,7 +453,6 @@ button:hover .arrow, .btn:hover .arrow { transform: translateX(2px); }
     </div>
   </div>
 
-  <!-- Étape 4 — Inscription -->
   <div class="card" data-step="inscribe">
     <h2>Sceller ton empire dans Bitcoin</h2>
     <p class="lead">Deux transactions Mutinynet (commit + reveal) qui inscrivent ton join dans le tapscript. La pubkey du witness te lie à ce join — elle authentifiera tous tes ordres futurs.</p>
@@ -454,7 +464,6 @@ button:hover .arrow, .btn:hover .arrow { transform: translateX(2px); }
     </div>
   </div>
 
-  <!-- Étape 5 — Done -->
   <div class="card" data-step="done">
     <h2>✦ Bienvenue, commandant.</h2>
     <p class="lead">Ton join est broadcast sur Mutinynet. Une fois confirmé (~30 secondes), tu apparaîtras dans la console et le moteur spawnera ton empire à coordonnées libres.</p>
@@ -475,15 +484,11 @@ import { inscribe } from './engine/inscribe-core.mjs';
 import * as btc from '@scure/btc-signer';
 import { schnorr } from '@noble/curves/secp256k1';
 
-// Identité Bitcoin-native : la pubkey Schnorr de la TX d'inscription.
-// Une seule clé sert à la fois pour broadcaster ET pour identifier le joueur.
-
 const $ = sel => document.querySelector(sel);
 const STEPS = ['name', 'keys', 'faucet', 'inscribe', 'done'];
 
 function showStep(name) {
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('on', c.dataset.step === name));
-  // Stepper : marque les steps précédents comme done, le courant comme active
   const idx = STEPS.indexOf(name);
   document.querySelectorAll('.stepper-item').forEach(item => {
     const i = STEPS.indexOf(item.dataset.stepper);
@@ -507,11 +512,8 @@ function download(filename, content) {
 }
 
 const session = { name: null, wallet: null };
-
-// Initial : marque step 1 actif
 showStep('name');
 
-// ─── Étape 1 — nom + génération wallet ──────────────────────
 $('#btnGenerate').onclick = async () => {
   const name = $('#playerName').value.trim().toLowerCase();
   if (!/^[a-z][a-z0-9-]{1,15}$/.test(name)) {
@@ -522,7 +524,6 @@ $('#btnGenerate').onclick = async () => {
   $('#btnGenerate').disabled = true;
   $('#btnGenerate').innerHTML = 'Génération…';
 
-  // Wallet Bitcoin BIP-86
   session.wallet = generateWallet({ network: 'mutinynet' });
 
   $('#walletAddr').textContent = session.wallet.taprootAddress;
@@ -534,7 +535,6 @@ $('#playerName').addEventListener('keydown', e => {
   if (e.key === 'Enter') $('#btnGenerate').click();
 });
 
-// ─── Étape 2 — téléchargement du wallet ─────────────────────
 $('#btnDownloadBtc').onclick = () => {
   download(`${session.name}-btc-key.json`, JSON.stringify(session.wallet, null, 2));
   $('#btnDownloadBtc').textContent = 'Téléchargé ✓';
@@ -546,7 +546,6 @@ $('#btnNextFaucet').onclick = () => {
   pollUtxo();
 };
 
-// ─── Étape 3 — faucet + poll UTXOs ──────────────────────────
 $('#btnFaucetCopy').onclick = async () => {
   await navigator.clipboard.writeText(session.wallet.taprootAddress);
   $('#btnFaucetCopy').textContent = 'Copié ✓';
@@ -561,7 +560,7 @@ async function pollUtxo() {
     const utxos = await r.json();
     const total = utxos.reduce((a, u) => a + u.value, 0);
     if (total > 0) {
-      setStatus('utxoStatus', `<span style="color:var(--green)">●</span> ${total.toLocaleString('fr-FR')} sats disponibles  ·  ${utxos.length} UTXO`, 'ok');
+      setStatus('utxoStatus', `<span style="color:var(--green);font-weight:600">●</span> ${total.toLocaleString('fr-FR')} sats disponibles  ·  ${utxos.length} UTXO`, 'ok');
       $('#btnNextInscribe').disabled = false;
     } else {
       setStatus('utxoStatus', '<span class="pulse"></span>En attente de fonds Mutinynet… (vérification toutes les 5 s)');
@@ -578,12 +577,10 @@ $('#btnNextInscribe').onclick = () => {
   showStep('inscribe');
 };
 
-// ─── Étape 4 — inscription join ─────────────────────────────
 $('#btnInscribe').onclick = async () => {
   $('#btnInscribe').disabled = true;
   setStatus('inscribeStatus', '<span class="pulse"></span>Construction du YAML…');
 
-  // YAML join minimal — la pubkey Schnorr du witness Bitcoin authentifie l'inscripteur.
   const finalYaml = [
     '# Citadel Protocol — Join inscription',
     'version: 1',
@@ -604,7 +601,7 @@ $('#btnInscribe').onclick = async () => {
       log: (m) => setStatus('inscribeStatus', `<span class="pulse"></span>${m}`),
     });
     setStatus('inscribeStatus',
-      `<span style="color:var(--green)">●</span> Inscrit on-chain\n\n  commit  : <span style="color:var(--cyan)">${result.commitTxid}</span>\n  reveal  : <span style="color:var(--cyan)">${result.revealTxid}</span>\n  explorer : <a href="https://mutinynet.com/tx/${result.revealTxid}" target="_blank" rel="noopener" style="color:var(--cyan)">mutinynet.com/tx/${result.revealTxid.slice(0,16)}…</a>`,
+      `<span style="color:var(--green);font-weight:600">●</span> Inscrit on-chain\n\n  commit  : <span style="color:var(--brass)">${result.commitTxid}</span>\n  reveal  : <span style="color:var(--brass)">${result.revealTxid}</span>\n  explorer : <a href="https://mutinynet.com/tx/${result.revealTxid}" target="_blank" rel="noopener">mutinynet.com/tx/${result.revealTxid.slice(0,16)}…</a>`,
       'ok');
     setTimeout(() => showStep('done'), 1500);
   } catch (e) {

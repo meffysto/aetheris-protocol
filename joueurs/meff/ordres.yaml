@@ -1,16 +1,16 @@
 # ═══════════════════════════════════════════════════════════
 #  DÉCRET IMPÉRIAL · Empire de Meff
-#  Cycle 90 · scellé le 2026-05-08
+#  Cycle 91 · inscrit sur Bitcoin (Mutinynet)
 #  Toute modification post-scellement invalide le sceau.
 # ═══════════════════════════════════════════════════════════
 version: 1
 joueur: meff
-tick_cible: 90
-nonce: c92b11
+tick_cible: 91
+nonce: f4a8e2
 
 ordres:
   - type: chantier
     planete: meff-prima
     batiment: extracteur_lumen
     niveau_cible: 2
-signature: ed25519:4yDxQ5IFarJs243qRqDZNLqila8uVg0KovgA9wMoxu95uuLTWFZSnnLfi7ToYLCh+W48+eb1jqNe/eNAegASBw==
+signature: none

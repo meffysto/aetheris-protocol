@@ -1,6 +1,6 @@
 # Empire de kcdq
 
-> Tick 91 · Score 604 · Alliance —
+> Tick 101 · Score 604 · Alliance —
 
 ## Planètes (1)
 
@@ -8,9 +8,9 @@
 
 | Ressource | Stock | Production/UTJ | Capacité |
 |---|---|---|---|
-| ferrum | 39 078 | +124 | 100 000 |
-| lumen | 15 022 | +42 | 100 000 |
-| plasmide | 3 300 | +11 | 100 000 |
+| ferrum | 46 518 | +124 | 100 000 |
+| lumen | 17 542 | +42 | 100 000 |
+| plasmide | 3 960 | +11 | 100 000 |
 
 **Bâtiments** : mine_ferrum 2, extracteur_lumen 1, synthetiseur_plasmide 1, centrale_solaire 1, depot 1, usine_robotique 0, chantier_spatial 0, laboratoire 0
 

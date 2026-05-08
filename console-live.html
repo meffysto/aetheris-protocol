@@ -1000,6 +1000,24 @@ h2.sect .rule {
 }
 .err .close:hover, .toast .close:hover { background: var(--ink-3); color: var(--bone-2); }
 
+/* effet courant (ligne dans la bcard, sous le niveau) */
+.bcard .effet {
+  grid-column: 1 / 4;
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: rgba(14,29,51,0.04);
+  border-radius: 6px;
+  font-family: var(--sans); font-size: 11.5px; font-weight: 500;
+  color: var(--bone-dim);
+}
+.bcard .effet b {
+  font-family: var(--display); font-weight: 700;
+  color: var(--bone-2);
+  font-size: 13px;
+  letter-spacing: -0.005em;
+}
+.bcard.zero .effet { display: none; }
+
 /* ─── improve row on bcard ────────────────────────────────── */
 .bcard .upg {
   grid-column: 1 / 4;
@@ -1668,14 +1686,17 @@ const labels = {
 };
 
 const taglines = {
-  mine_ferrum: 'extraction métallurgique',
-  extracteur_lumen: 'récolte photonique',
-  synthetiseur_plasmide: 'synthèse plasmidique',
-  centrale_solaire: 'production énergétique',
-  depot: 'capacité de stockage',
-  usine_robotique: 'cadence de construction',
-  chantier_spatial: 'assemblage de flotte',
-  laboratoire: 'progression scientifique',
+  mine_ferrum: 'extrait du Ferrum',
+  extracteur_lumen: 'récolte du Lumen',
+  synthetiseur_plasmide: 'synthétise du Plasmide',
+  centrale_solaire: 'produit de l\'énergie',
+  depot: 'augmente le stockage',
+  usine_robotique: 'accélère les chantiers',
+  chantier_spatial: 'construit la flotte',
+  laboratoire: 'accélère la recherche',
+  silo_missiles: 'stocke les missiles',
+  terminal_marchand: 'commerce inter-empires',
+  centre_diplomatique: 'projette l\'influence',
   // vaisseaux
   sonde: 'éclaireur',
   chasseur_leger: 'intercepteur',
@@ -2076,6 +2097,50 @@ function overviewCard(label, val, sub, ico) {
   </div>`;
 }
 
+// Effet actuel d'un bâtiment au niveau courant — chaîne courte affichée
+// sous le niveau dans la carte. null = pas d'affichage.
+function batEffet(k, lvl, p) {
+  if (lvl === 0) return null;
+  const r = p?.ressources || {};
+  switch (k) {
+    case 'mine_ferrum':         return `<b>+${fmtCompact(r.ferrum?.production_par_utj || 0)}</b> ferrum/utj`;
+    case 'extracteur_lumen':    return `<b>+${fmtCompact(r.lumen?.production_par_utj || 0)}</b> lumen/utj`;
+    case 'synthetiseur_plasmide': return `<b>+${fmtCompact(r.plasmide?.production_par_utj || 0)}</b> plasmide/utj`;
+    case 'centrale_solaire':    return `<b>+${fmtCompact(p.energie?.production || 0)}</b> énergie`;
+    case 'depot': {
+      const cap = (r.ferrum?.capacite || 0) + (r.lumen?.capacite || 0) + (r.plasmide?.capacite || 0);
+      return `cap. <b>${fmtCompact(cap)}</b>`;
+    }
+    case 'usine_robotique':     return `vitesse chantiers <b>+${lvl * 10}%</b>`;
+    case 'chantier_spatial':    return `vitesse flotte <b>+${lvl * 10}%</b>`;
+    case 'laboratoire':         return `recherche <b>+${lvl * 10}%</b>`;
+    case 'silo_missiles':       return `<b>${lvl * 10}</b> missiles max`;
+    case 'terminal_marchand':   return `ratio marché <b>+${(lvl * 5)}%</b>`;
+    case 'centre_diplomatique': return `influence <b>+${(lvl * 0.5).toFixed(1)}</b>/utj`;
+  }
+  return null;
+}
+
+// Tooltip plus long pour le hover (attribut title="").
+function batTooltip(k, lvl) {
+  const lines = {
+    mine_ferrum: 'Extrait du Ferrum, ressource métallique principale. Bonus +30% sur planète tellurique.',
+    extracteur_lumen: 'Récolte des cristaux Lumen. Bonus +30% sur planète cristalline.',
+    synthetiseur_plasmide: 'Synthétise le Plasmide. Bonus +30% sur planète volcanique.',
+    centrale_solaire: 'Génère de l\'énergie consommée par tous les autres bâtiments.',
+    depot: 'Augmente la capacité de stockage de toutes les ressources.',
+    usine_robotique: 'Réduit la durée de construction des bâtiments.',
+    chantier_spatial: 'Réduit la durée de construction des vaisseaux et défenses.',
+    laboratoire: 'Accélère la progression des recherches scientifiques.',
+    silo_missiles: 'Stocke les missiles interplanétaires (offensifs et anti-missiles).',
+    terminal_marchand: 'Améliore le ratio des échanges sur le marché galactique.',
+    centre_diplomatique: 'Projette l\'influence diplomatique sur les voisins. Requiert terminal marchand niv 4.',
+  };
+  const desc = lines[k] || 'Structure planétaire.';
+  const niv = lvl > 0 ? `\nNiveau actuel : ${lvl}` : '\nNon construit';
+  return `${desc}${niv}`;
+}
+
 function renderBatGrid(p, max) {
   const all = Object.entries(p.batiments || {});
   const queueMap = {};
@@ -2124,10 +2189,13 @@ function renderBatGrid(p, max) {
         <button data-improve="${k}" ${(!afford || pending) ? 'disabled' : ''}>${pending ? '…' : 'Améliorer'}</button>
       </div>`;
     }
-    return `<div class="bcard ${lvl === 0 && !q ? 'zero' : ''}">
+    const effet = batEffet(k, lvl, p);
+    const tip = batTooltip(k, lvl);
+    return `<div class="bcard ${lvl === 0 && !q ? 'zero' : ''}" title="${escapeHtml(tip)}">
       <div class="gl">${ico}</div>
       <div class="nm">${labels[k] || k}<small>${taglines[k] || 'structure'}</small></div>
       <div class="lvl">${lvl}<small>niveau</small></div>
+      ${effet ? `<div class="effet">${effet}</div>` : ''}
       ${footer}
     </div>`;
   }).join('')}</div>`;

@@ -66,12 +66,34 @@ jobs:
 
       - name: Auto-merge
         if: steps.validate.outcome == 'success'
+        env:
+          # PAT d'un compte humain (write:repository) — nécessaire car le
+          # `secrets.GITHUB_TOKEN` auto-injecté est rejeté par Forgejo sur
+          # `pull_request_target` ("User 'forgejo-actions' is not allowed
+          # to push"). cf. PR #7, run #34.
+          MERGE_TOKEN: ${{ secrets.MERGE_PAT }}
         run: |
-          BRANCH=$(curl -s -H "Authorization: token $TOKEN" \
+          set -e
+          BRANCH=$(curl -fsS -H "Authorization: token $MERGE_TOKEN" \
             "$API_BASE/repos/$REPO/pulls/$PR_NUM" | jq -r '.head.ref')
-          curl -s -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
-            -d '{"Do":"merge"}' \
-            "$API_BASE/repos/$REPO/pulls/$PR_NUM/merge"
-          # Supprime la branche après merge (cleanup)
-          curl -s -X DELETE -H "Authorization: token $TOKEN" \
+          MERGED=0
+          for i in 1 2 3 4 5; do
+            HTTP=$(curl -s -o /tmp/merge.out -w "%{http_code}" \
+              -X POST -H "Authorization: token $MERGE_TOKEN" -H "Content-Type: application/json" \
+              -d '{"Do":"merge"}' \
+              "$API_BASE/repos/$REPO/pulls/$PR_NUM/merge")
+            echo "merge attempt $i → HTTP $HTTP"
+            if [ "$HTTP" = "200" ]; then MERGED=1; break; fi
+            cat /tmp/merge.out; echo
+            sleep 3
+          done
+          if [ "$MERGED" != "1" ]; then
+            ERR=$(jq -r '.message // "?"' /tmp/merge.out 2>/dev/null | head -c 300)
+            curl -s -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+              -d "{\"body\":\"⚠ Validation OK mais auto-merge a échoué (HTTP $HTTP). Body: $ERR\"}" \
+              "$API_BASE/repos/$REPO/issues/$PR_NUM/comments"
+            exit 1
+          fi
+          # Cleanup branche uniquement si merge OK
+          curl -s -X DELETE -H "Authorization: token $MERGE_TOKEN" \
             "$API_BASE/repos/$REPO/branches/$BRANCH" || true

@@ -1285,6 +1285,68 @@ h2.sect .rule {
 }
 .notif-panel footer .push-state { margin-right: auto; font-family: var(--mono); }
 
+/* onboarding overlay */
+.ob-bg {
+  position: fixed; inset: 0; background: rgba(20, 14, 8, 0.78);
+  backdrop-filter: blur(4px); z-index: 200; display: none;
+  align-items: center; justify-content: center; padding: 24px;
+}
+.ob-bg.on { display: flex; }
+.ob-card {
+  background: var(--bone); color: var(--ink-1);
+  border: 1px solid var(--brass-dim); border-radius: 12px;
+  max-width: 520px; width: 100%; padding: 32px 32px 24px;
+  font-family: var(--sans); box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  position: relative;
+}
+.ob-step-num {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em;
+  color: var(--brass); text-transform: uppercase; margin-bottom: 8px;
+}
+.ob-card h2 {
+  font-family: var(--display); font-weight: 600; font-size: 24px;
+  margin: 0 0 14px; color: var(--ink-1);
+}
+.ob-card p {
+  font-size: 14px; line-height: 1.55; color: var(--ink-2);
+  margin: 0 0 12px;
+}
+.ob-card p b { color: var(--ink-1); }
+.ob-card code {
+  font-family: var(--mono); font-size: 12px;
+  background: rgba(140, 90, 30, 0.1); padding: 1px 6px;
+  border-radius: 3px; color: var(--brass);
+}
+.ob-dots {
+  display: flex; gap: 6px; justify-content: center;
+  margin: 18px 0 6px;
+}
+.ob-dots span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ink-3); opacity: 0.4;
+}
+.ob-dots span.on { background: var(--brass); opacity: 1; }
+.ob-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  margin-top: 18px;
+}
+.ob-actions button {
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+  padding: 8px 18px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--ink-3); background: transparent;
+  color: var(--ink-2);
+}
+.ob-actions button.primary {
+  background: var(--ink-1); color: var(--bone); border-color: var(--ink-1);
+}
+.ob-actions button:hover { border-color: var(--brass); }
+.ob-skip {
+  position: absolute; top: 12px; right: 16px;
+  background: transparent; border: none; cursor: pointer;
+  font-size: 11px; color: var(--ink-3); font-family: var(--sans);
+}
+.ob-skip:hover { color: var(--ink-2); }
+
 /* "needs setup" pill */
 .setup-pill {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1376,6 +1438,20 @@ h2.sect .rule {
 <div class="err" id="err"></div>
 <div id="boot-status" style="position:fixed;top:8px;right:8px;background:#1f3556;color:#f4ecdc;padding:6px 12px;border-radius:6px;font:500 12px/1.4 var(--mono);z-index:10000;max-width:340px;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);"></div>
 <div class="toast" id="toast"></div>
+
+<div class="ob-bg" id="obBg">
+  <div class="ob-card" id="obCard">
+    <button type="button" class="ob-skip" id="obSkip">passer</button>
+    <div class="ob-step-num" id="obStepNum">étape 1 / 4</div>
+    <h2 id="obTitle"></h2>
+    <div id="obBody"></div>
+    <div class="ob-dots" id="obDots"></div>
+    <div class="ob-actions">
+      <button type="button" id="obPrev">Précédent</button>
+      <button type="button" class="primary" id="obNext">Suivant</button>
+    </div>
+  </div>
+</div>
 
 <div class="notif-panel" id="notifPanel">
   <header>
@@ -4211,8 +4287,84 @@ function refreshNotifUI() {
 notif.load();
 refreshNotifUI();
 
+/* ───────────────────────────── Onboarding ───────────────────────────────── */
+const OB_STEPS = [
+  {
+    title: 'Bienvenue dans CITADEL',
+    body: `<p>Tu joues sur <b>Mutinynet</b>, un testnet Bitcoin. Tout l'état du jeu vit on-chain : tes empires, tes ordres, tes batailles.</p>
+<p>Aucun serveur ne détient la vérité — ton navigateur scanne la blockchain et reconstruit l'état localement. Personne ne peut tricher sans qu'on le voie.</p>`,
+  },
+  {
+    title: 'Chaque bloc Bitcoin = un tour',
+    body: `<p>Mutinynet produit un nouveau bloc toutes les <b>~30 secondes à 2 minutes</b>. À chaque bloc, le moteur applique les ordres confirmés et fait avancer le jeu.</p>
+<p>Les ordres que tu inscris au bloc <code>N</code> sont visibles dans l'état au bloc <code>N+1</code>. La console se rafraîchit automatiquement à chaque nouveau bloc.</p>`,
+  },
+  {
+    title: 'Lire ta map',
+    body: `<p>Le panneau central montre tes <b>planètes</b>, tes <b>ressources</b> et tes <b>flottes</b>. Le rail de droite affiche les chantiers, recherches et productions en cours.</p>
+<p>La cloche en haut à droite (<b>🔔</b>) clignote dès qu'une alerte survient : flotte hostile entrante, chantier terminé, stockage saturé.</p>`,
+  },
+  {
+    title: 'Soumettre un ordre',
+    body: `<p>Choisis un bâtiment à construire, une recherche à lancer ou une flotte à envoyer. Clique <b>Inscrire</b> : la console signe une transaction Taproot avec ton wallet et la broadcaste sur Mutinynet.</p>
+<p>Coût : quelques sats du faucet. Confirmation : 1-2 blocs. Une fois confirmé, ton ordre est appliqué au prochain tour.</p>`,
+  },
+];
+
+const onboarding = {
+  step: 0,
+  storageKey: 'aetheris.onboardingDone',
+  isDone() { try { return localStorage.getItem(this.storageKey) === '1'; } catch { return false; } },
+  markDone() { try { localStorage.setItem(this.storageKey, '1'); } catch {} },
+  show() {
+    this.step = 0;
+    this.render();
+    document.getElementById('obBg').classList.add('on');
+  },
+  hide() {
+    document.getElementById('obBg').classList.remove('on');
+    this.markDone();
+  },
+  render() {
+    const s = OB_STEPS[this.step];
+    document.getElementById('obStepNum').textContent = `étape ${this.step + 1} / ${OB_STEPS.length}`;
+    document.getElementById('obTitle').textContent = s.title;
+    document.getElementById('obBody').innerHTML = s.body;
+    document.getElementById('obDots').innerHTML = OB_STEPS
+      .map((_, i) => `<span class="${i === this.step ? 'on' : ''}"></span>`).join('');
+    const prev = document.getElementById('obPrev');
+    const next = document.getElementById('obNext');
+    prev.style.visibility = this.step === 0 ? 'hidden' : '';
+    next.textContent = this.step === OB_STEPS.length - 1 ? 'Terminer' : 'Suivant';
+  },
+  next() {
+    if (this.step < OB_STEPS.length - 1) { this.step++; this.render(); }
+    else this.hide();
+  },
+  prev() { if (this.step > 0) { this.step--; this.render(); } },
+};
+
+(function setupOnboarding() {
+  const bg = document.getElementById('obBg');
+  if (!bg) return;
+  document.getElementById('obNext').addEventListener('click', () => onboarding.next());
+  document.getElementById('obPrev').addEventListener('click', () => onboarding.prev());
+  document.getElementById('obSkip').addEventListener('click', () => onboarding.hide());
+  bg.addEventListener('click', (e) => { if (e.target === bg) onboarding.hide(); });
+  document.addEventListener('keydown', (e) => {
+    if (!bg.classList.contains('on')) return;
+    if (e.key === 'Escape') onboarding.hide();
+    else if (e.key === 'ArrowRight' || e.key === 'Enter') onboarding.next();
+    else if (e.key === 'ArrowLeft') onboarding.prev();
+  });
+})();
+
 /* boot */
-load();
+load().then(() => {
+  if (!onboarding.isDone()) {
+    setTimeout(() => onboarding.show(), 800);
+  }
+});
 tickCountdown();
 
 // Si un wallet chiffré est stocké, demande le password au boot (1 fois)

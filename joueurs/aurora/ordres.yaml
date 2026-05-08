@@ -1,12 +1,12 @@
 # ═══════════════════════════════════════════════════════════
 #  DÉCRET IMPÉRIAL · Empire de Aurora
-#  Cycle 80 · scellé le 2026-05-08
+#  Cycle 82 · scellé le 2026-05-08
 #  Toute modification post-scellement invalide le sceau.
 # ═══════════════════════════════════════════════════════════
 version: 1
 joueur: aurora
-tick_cible: 80
-nonce: 7aab06
+tick_cible: 82
+nonce: 57b537
 ordres:
 - type: chantier
   planete: aurora-prima
@@ -15,4 +15,4 @@ ordres:
 - type: recherche
   technologie: robotique
   niveau_cible: 1
-signature: ed25519:sK6DB4RWRnvUn1dfscoOvSlrV5AzhfcUTTCQFYA8P5AM+R0eIXk2BwrsuSY8+OkIENiBq13GSjBQxlIBbK0mDQ==
+signature: ed25519:ryK5TWh9Y/dhjWjCGvvH+gvClb+H/bV9L+kK9hdQed0ODqV611Y4dpnlbnS+T8eRjZHshWbAccL7KDoAGYUSBg==

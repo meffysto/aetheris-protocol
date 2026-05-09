@@ -4577,7 +4577,7 @@ function showOnboardingStep(step, p, emp) {
     };
   } else if (step === 3) {
     title.textContent = 'Construis ton premier vaisseau';
-    sub.innerHTML = `Avec un <strong>Chantier Spatial</strong> tu peux construire des vaisseaux. Commence par une <strong>Sonde</strong> — c'est l'éclaireur qui révèle les empires voisins.`;
+    sub.innerHTML = `Avec un <strong>Chantier Spatial</strong> (qui requiert Usine Robotique niv 2), tu peux construire des vaisseaux. Le <strong>Chasseur Léger</strong> est l'unité d'entrée — pas de recherche requise, peu cher, polyvalent.`;
     goBtn.textContent = 'Aller à la Flotte →';
     obTour.primaryAction = () => {
       closeOnboarding(false);
@@ -4586,8 +4586,8 @@ function showOnboardingStep(step, p, emp) {
       applyView();
     };
   } else if (step === 4) {
-    title.textContent = 'Lance ton premier espionnage';
-    sub.innerHTML = `Tu as une sonde ! Ouvre la galaxie, choisis une planète ennemie, et envoie une mission d'espionnage. Le rapport te dira ses ressources et défenses.`;
+    title.textContent = 'Lance ton premier raid';
+    sub.innerHTML = `Tu as une flotte ! Ouvre la galaxie, choisis une planète ennemie et envoie une <strong>attaque</strong>. Si tu gagnes, tu pilles ses ressources et le combat génère un champ de débris recyclable.`;
     goBtn.textContent = 'Ouvrir la galaxie →';
     obTour.primaryAction = () => {
       closeOnboarding(false);
@@ -4597,7 +4597,7 @@ function showOnboardingStep(step, p, emp) {
     };
   } else if (step === 5) {
     title.textContent = 'Lis tes rapports';
-    sub.innerHTML = `Tu as ton premier rapport ! L'onglet <strong>Rapports</strong> te montre l'intel obtenu. Si la cible est faible, tu peux lancer une attaque depuis le détail du rapport ou via la galaxie.`;
+    sub.innerHTML = `Ton rapport de bataille est arrivé. L'onglet <strong>Rapports</strong> archive tous tes combats et espionnages. Plus tard, quand tu auras la recherche <em>Espionnage Profond</em>, tu pourras envoyer des sondes avant chaque attaque pour évaluer les défenses adverses.`;
     goBtn.textContent = 'Voir mes rapports →';
     obTour.primaryAction = () => {
       // Étape finale : marque le guide comme terminé.
@@ -4656,19 +4656,25 @@ function maybeAdvanceOnboarding(p, emp) {
       return;
     }
   }
-  // Étape 4 : flotte_au_sol.sonde >= 1.
+  // Étape 4 : au moins une unité offensive au sol (chasseur ou +).
+  // La sonde requiert la recherche espionnage_profond — pas réaliste pour un débutant.
   if (stored === 3) {
-    const sondes = p.flotte_au_sol?.sonde || 0;
-    if (sondes >= 1) {
+    const fl = p.flotte_au_sol || {};
+    const offensiveUnits = (fl.chasseur_leger || 0) + (fl.chasseur_lourd || 0)
+      + (fl.croiseur || 0) + (fl.fregate || 0) + (fl.cuirasse || 0)
+      + (fl.destroyer || 0) + (fl.dreadnought || 0);
+    if (offensiveUnits >= 1) {
       showOnboardingStep(4, p, emp);
       return;
     }
   }
-  // Étape 5 : au moins un rapport intel.
+  // Étape 5 : au moins un rapport (bataille ou intel) où le joueur est impliqué.
   if (stored === 4) {
     const me = state.current;
     const intel = state.reports?.intelByPlayer?.[me] || [];
-    if (intel.length > 0) {
+    const battles = (state.reports?.battles || [])
+      .filter(b => b.attaquant === me || b.defenseur === me);
+    if (intel.length > 0 || battles.length > 0) {
       showOnboardingStep(5, p, emp);
       return;
     }

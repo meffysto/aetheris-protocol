@@ -595,6 +595,22 @@ h2.sect .rule {
   border: none;
 }
 .bcard .gl svg { width: 22px; height: 22px; }
+/* Codex sprites — bigger, rectangular, transparent. Le sprite EST l'illustration. */
+.bcard:has(.codex-img) { grid-template-columns: 64px 1fr auto; }
+.bcard .gl:has(.codex-img) {
+  width: 64px; height: 80px;
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 2px;
+}
+.bcard .gl .codex-img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+}
+.bcard.zero .gl:has(.codex-img) { opacity: 0.5; filter: grayscale(0.7); border-color: var(--ink-3); background: transparent; }
 .bcard .nm {
   font-family: var(--display); font-weight: 600; font-size: 15px;
   color: var(--bone-2); line-height: 1.1;
@@ -2081,6 +2097,49 @@ const icons = {
   default_d: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2L4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z"/></svg>`,
 };
 
+// Mapping nom FR (rules.yaml) → fichier PNG dans assets/codex/.
+// Les bâtiments depot, silo_missiles, terminal_marchand, centre_diplomatique
+// ne sont pas dans le sheet et restent en SVG fallback.
+const codexAssets = {
+  // bâtiments
+  mine_ferrum: 'building/building_ferrum_mine',
+  extracteur_lumen: 'building/building_lumen_extractor',
+  synthetiseur_plasmide: 'building/building_plasmide_synthesizer',
+  centrale_solaire: 'building/building_solar_plant',
+  reacteur_fusion: 'building/building_fusion_reactor',
+  usine_robotique: 'building/building_robotic_factory',
+  chantier_spatial: 'building/building_spaceyard',
+  laboratoire: 'building/building_laboratory',
+  // vaisseaux
+  sonde: 'ship/ship_probe',
+  chasseur_leger: 'ship/ship_light_fighter',
+  chasseur_lourd: 'ship/ship_heavy_fighter',
+  croiseur: 'ship/ship_cruiser',
+  fregate: 'ship/ship_frigate',
+  cuirasse: 'ship/ship_battlecruiser',
+  destroyer: 'ship/ship_destroyer',
+  dreadnought: 'ship/ship_dreadnought',
+  cargo_lourd: 'ship/ship_heavy_cargo',
+  recycleur: 'ship/ship_recycler',
+  vaisseau_colon: 'ship/ship_colony',
+  // défenses
+  lance_missiles: 'defense/defense_missile_launcher',
+  canon_laser_leger: 'defense/defense_light_laser',
+  canon_laser_lourd: 'defense/defense_heavy_laser',
+  canon_gauss: 'defense/defense_gauss_cannon',
+  canon_ionique: 'defense/defense_ion_cannon',
+  canon_plasma: 'defense/defense_plasma_cannon',
+  petit_bouclier_planetaire: 'defense/defense_small_planetary_shield',
+  grand_bouclier_planetaire: 'defense/defense_large_planetary_shield',
+};
+
+function codexImg(name, alt) {
+  const path = codexAssets[name];
+  if (!path) return null;
+  const safeName = String(name).replace(/[^a-z_]/gi, '');
+  return `<img class="codex-img" src="assets/codex/${path}.png" alt="${escapeHtml(alt || safeName)}" loading="lazy" onerror="this.parentElement.classList.add('codex-fallback');this.remove()">`;
+}
+
 const labels = {
   mine_ferrum: 'Mine de Ferrum',
   extracteur_lumen: 'Extracteur Lumen',
@@ -2813,7 +2872,7 @@ function renderBatGrid(p, max) {
   return `<div class="bgrid">${list.map(([k, lvl]) => {
     const q = queueMap[k];
     const pend = pendingMap[k];
-    const ico = icons[k] || icons.default_b;
+    const ico = codexImg(k, labels[k]) || icons[k] || icons.default_b;
     let footer = '';
     if (q) {
       const remain = Math.max(0, q.fin_utj || 0);
@@ -2979,7 +3038,7 @@ function renderUnitGrid(p, kind) {
   const ICOS = { ferrum: 'Fe', lumen: 'Lu', plasmide: 'Pl' };
   const defs = state.rules[kind] || {};
   const owned = (kind === 'vaisseaux' ? (p.flotte_au_sol || {}) : (p.defenses || {}));
-  const ico = kind === 'vaisseaux' ? icons.default_f : icons.default_d;
+  const fallbackIco = kind === 'vaisseaux' ? icons.default_f : icons.default_d;
   const subDefault = kind === 'vaisseaux' ? 'unité spatiale' : 'pièce défensive';
 
   const queueMap = {};
@@ -3060,6 +3119,7 @@ function renderUnitGrid(p, kind) {
     if (reqBad) footer = `<div class="req">requiert <b>${missing}</b></div>` + footer;
 
     const tip = unitTooltip(unite, def, have, kind);
+    const ico = codexImg(unite, labels[unite]) || fallbackIco;
     return `<div class="bcard ${have === 0 ? 'zero' : ''}" data-tip="${escapeHtml(tip)}">
       <div class="gl">${ico}</div>
       <div class="nm">${labels[unite] || unite}<small>${taglines[unite] || subDefault}</small></div>

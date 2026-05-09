@@ -15,6 +15,8 @@ const TAG_HEX = '61657468';
 
 const OP_TYPES_REV = { 0x01: 'join', 0x02: 'order', 0x03: 'sealed', 0x04: 'reveal' };
 
+const DEFAULT_CONCURRENCY = 12;
+
 // ─── Esplora API ─────────────────────────────────────────────────────────────
 
 const FETCH_OPTS = { cache: 'no-store' };
@@ -43,6 +45,32 @@ export async function fetchTipHeight(api) {
   const res = await fetch(`${api}/blocks/tip/height`, FETCH_OPTS);
   if (!res.ok) throw new Error(`fetchTipHeight: ${res.status}`);
   return parseInt(await res.text(), 10);
+}
+
+/**
+ * Récupère l'ensemble des transactions d'un bloc en pages de 25 (avec witnesses).
+ * Utilise `/block/:hash/txs[/:start_index]` — ~10x plus rapide que N×/tx/:txid.
+ *
+ * @param {string} blockHash
+ * @param {string} api
+ * @returns {Promise<Array>} txs Esplora complètes
+ */
+export async function fetchBlockTxsBatch(blockHash, api) {
+  const all = [];
+  // Première page : pas d'index. Pages suivantes : multiples de 25.
+  // On s'arrête quand une page renvoie < 25 tx (= dernière page).
+  let start = 0;
+  while (true) {
+    const url = start === 0
+      ? `${api}/block/${blockHash}/txs`
+      : `${api}/block/${blockHash}/txs/${start}`;
+    const page = await esploraGet(url);
+    if (!Array.isArray(page) || page.length === 0) break;
+    all.push(...page);
+    if (page.length < 25) break;
+    start += 25;
+  }
+  return all;
 }
 
 // ─── parsing de l'envelope ───────────────────────────────────────────────────
@@ -172,24 +200,26 @@ function extractEnvelope(bytes) {
 
 /**
  * Cherche des inscriptions Citadel dans toutes les TX d'un bloc.
+ *
+ * Implémentation : utilise `/block/:hash/txs` (pages de 25 tx avec witnesses)
+ * au lieu de N×`/tx/:txid` — divise le nombre de requêtes par ~25 par bloc.
+ *
  * @param {string} blockHash
  * @param {number} blockHeight
  * @param {string} api  URL base Esplora
  * @returns {AsyncGenerator<ParsedInscription>}
  */
 export async function* scanBlock(blockHash, blockHeight, api) {
-  const txids = await fetchBlockTxids(blockHash, api);
+  let txs;
+  try {
+    txs = await fetchBlockTxsBatch(blockHash, api);
+  } catch (e) {
+    console.warn(`scanBlock: échec batch ${blockHash}: ${e.message}`);
+    return;
+  }
 
-  for (const txid of txids) {
-    // Fetch la TX complète pour ses witnesses
-    let tx;
-    try {
-      tx = await fetchTx(txid, api);
-    } catch (e) {
-      console.warn(`scanBlock: skip ${txid}: ${e.message}`);
-      continue;
-    }
-
+  for (const tx of txs) {
+    const txid = tx.txid;
     // Cherche dans tous les inputs
     for (const vin of tx.vin ?? []) {
       const witness = vin.witness;
@@ -213,23 +243,82 @@ export async function* scanBlock(blockHash, blockHeight, api) {
 }
 
 /**
+ * Scanne en parallèle (window de `concurrency` blocs) puis collecte les résultats.
+ * Helper interne : scanne un bloc et retourne un tableau d'inscriptions.
+ */
+async function scanBlockArray(height, api) {
+  try {
+    const blockHash = await fetchBlockHash(height, api);
+    const out = [];
+    for await (const ins of scanBlock(blockHash, height, api)) out.push(ins);
+    return out;
+  } catch (e) {
+    console.warn(`scanRange: erreur bloc ${height}: ${e.message}`);
+    return [];
+  }
+}
+
+/**
  * Scanne une plage de blocs et retourne toutes les inscriptions Citadel.
+ *
+ * Comportement de yield :
+ *   - Avec `concurrency > 1` (défaut 12) : les blocs sont scannés en parallèle
+ *     avec une fenêtre glissante. L'ordre de yield ENTRE blocs n'est PAS garanti
+ *     (un bloc plus rapide peut sortir avant un bloc précédent). L'ordre INTRA
+ *     bloc reste l'ordre des tx du bloc. Le caller est responsable du tri si besoin
+ *     (cf. `boot-bitcoin.mjs` qui trie déjà par blockHeight).
+ *   - Avec `concurrency === 1` : comportement séquentiel pur (pour debug).
+ *
+ * Le callback `opts.onBlock(h)` est appelé au DÉMARRAGE du scan d'un bloc
+ * (pas à sa résolution) pour que la barre de progression reste lisible.
+ *
  * @param {number} fromBlock
  * @param {number} toBlock
- * @param {{ api: string, onBlock?: (h: number) => void }} opts
+ * @param {{ api?: string, onBlock?: (h: number) => void, concurrency?: number }} opts
  * @returns {AsyncGenerator<ParsedInscription>}
  */
 export async function* scanRange(fromBlock, toBlock, opts = {}) {
   const api = opts.api ?? 'https://mutinynet.com/api';
+  const concurrency = Math.max(1, opts.concurrency ?? DEFAULT_CONCURRENCY);
 
-  for (let height = fromBlock; height <= toBlock; height++) {
-    if (opts.onBlock) opts.onBlock(height);
-    try {
-      const blockHash = await fetchBlockHash(height, api);
-      yield* scanBlock(blockHash, height, api);
-    } catch (e) {
-      console.warn(`scanRange: erreur bloc ${height}: ${e.message}`);
+  // Mode séquentiel pur (debug / rétro-compat stricte).
+  if (concurrency === 1) {
+    for (let height = fromBlock; height <= toBlock; height++) {
+      if (opts.onBlock) opts.onBlock(height);
+      try {
+        const blockHash = await fetchBlockHash(height, api);
+        yield* scanBlock(blockHash, height, api);
+      } catch (e) {
+        console.warn(`scanRange: erreur bloc ${height}: ${e.message}`);
+      }
     }
+    return;
+  }
+
+  // Mode parallèle : window de `concurrency` blocs en vol simultanément.
+  // On utilise un Map<height, Promise<inscriptions[]>> et on yield dès qu'une
+  // promise résout (Promise.race sur les pending), peu importe l'ordre.
+  const pending = new Map();
+  let next = fromBlock;
+
+  const launch = (h) => {
+    if (opts.onBlock) opts.onBlock(h);
+    const p = scanBlockArray(h, api).then(arr => ({ h, arr }));
+    pending.set(h, p);
+  };
+
+  // Amorce la fenêtre.
+  while (next <= toBlock && pending.size < concurrency) {
+    launch(next++);
+  }
+
+  while (pending.size > 0) {
+    // Attend la première promise qui résout.
+    const { h, arr } = await Promise.race(pending.values());
+    pending.delete(h);
+    for (const ins of arr) yield ins;
+    // Lance le bloc suivant pour maintenir la fenêtre pleine.
+    if (next <= toBlock) launch(next++);
   }
 }
 
@@ -260,13 +349,15 @@ if (isMain) {
   const fromBlock = parseInt(args[0] ?? '0', 10);
   const toBlock = parseInt(args[1] ?? String(fromBlock), 10);
   const api = process.env.AETH_API ?? 'https://mutinynet.com/api';
+  const concurrency = parseInt(process.env.AETH_SCAN_CONCURRENCY ?? '12', 10);
 
-  console.log(`Scan blocs ${fromBlock}..${toBlock} sur ${api}`);
+  console.log(`Scan blocs ${fromBlock}..${toBlock} sur ${api} (K=${concurrency})`);
 
   (async () => {
     let count = 0;
     for await (const ins of scanRange(fromBlock, toBlock, {
       api,
+      concurrency,
       onBlock: h => process.stdout.write(`\rbloc ${h}...`),
     })) {
       process.stdout.write('\n');

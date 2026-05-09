@@ -898,6 +898,11 @@ h2.sect .rule {
   margin: 0 0 8px; font-family: var(--display); font-weight: 600; font-style: normal;
   font-size: 24px; color: var(--bone-2); letter-spacing: -0.01em;
 }
+.onboarding .ob-step-marker {
+  font-family: var(--display); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--brass-dim); margin: 0 0 10px;
+}
 .onboarding .ob-sub {
   margin: 0 0 20px; color: var(--bone-dim); font-size: 14px; line-height: 1.55;
 }
@@ -1624,7 +1629,7 @@ h2.sect .rule {
 <div id="boot-status" style="position:fixed;top:8px;right:8px;background:#1f3556;color:#f4ecdc;padding:6px 12px;border-radius:6px;font:500 12px/1.4 var(--mono);z-index:10000;max-width:340px;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);"></div>
 <div class="toast" id="toast"></div>
 
-<div class="ob-bg" id="obBg">
+<div class="ob-bg" id="obBgLegacy" hidden>
   <div class="ob-card" id="obCard">
     <button type="button" class="ob-skip" id="obSkip">passer</button>
     <div class="ob-step-num" id="obStepNum">étape 1 / 4</div>
@@ -1718,10 +1723,11 @@ h2.sect .rule {
 
 <div class="onboarding-bg" id="obBg">
   <div class="onboarding">
-    <h2>Bienvenue, <span id="ob-name">commandant</span>.</h2>
-    <p class="ob-sub">Tu contrôles <strong id="ob-planet">—</strong>. Citadel est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.</p>
+    <div class="ob-step-marker" id="obStepMarker">Étape 1/5</div>
+    <h2 id="obTourTitle">Bienvenue, <span id="ob-name">commandant</span>.</h2>
+    <p class="ob-sub" id="obTourSub">Tu contrôles <strong id="ob-planet">—</strong>. Citadel est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.</p>
 
-    <div class="ob-card">
+    <div class="ob-card" id="obStep1Stats">
       <div class="ob-stat">
         <span class="lab">Coordonnées</span>
         <span class="val" id="ob-coords">—</span>
@@ -1734,20 +1740,21 @@ h2.sect .rule {
       </div>
     </div>
 
-    <div class="ob-tick">
+    <div class="ob-tick" id="obStep1Tick">
       <span class="lab">Prochain tick dans</span>
       <span class="val" id="ob-countdown">—</span>
     </div>
 
-    <ol>
+    <ol id="obStep1List">
       <li>Ta <span class="gloss" title="Mine de Ferrum : produit du ferrum (mineralia) à chaque tick. Plus le niveau est élevé, plus la production augmente.">Mine de Ferrum</span> est ta première source de revenu — améliore-la</li>
       <li>L'ordre est signé localement (ta clé ne quitte jamais ton browser) et poussé en PR</li>
       <li>Le moteur l'auto-merge en ~20s, puis l'applique au tick suivant</li>
     </ol>
 
     <div class="ob-actions">
+      <button class="ob-skip" onclick="skipOnboardingTour()">Passer le guide</button>
       <button class="ob-skip" onclick="closeOnboarding(false)">Plus tard</button>
-      <button class="ob-go" id="obGoBtn" onclick="upgradeFirstMine()">Améliorer ma Mine maintenant →</button>
+      <button class="ob-go" id="obGoBtn" onclick="onboardingPrimaryAction()">Améliorer ma Mine maintenant →</button>
     </div>
   </div>
 </div>
@@ -2472,7 +2479,7 @@ function render() {
   document.getElementById('lastRefresh').textContent =
     new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  if (p) showOnboarding(p.nom);
+  if (p) maybeAdvanceOnboarding(p, emp);
 }
 
 function renderNavCounts(p, emp) {
@@ -4217,6 +4224,8 @@ document.getElementById('cfgClear').onclick = () => {
   clearBitcoinWallet();
   localStorage.removeItem('aetheris.player');
   localStorage.removeItem('aetheris.onboarding.done');
+  localStorage.removeItem('aetheris.onboarding.step');
+  localStorage.removeItem('aetheris.onboarding.tickRef');
   state.current = null;
   openSettings();
 };
@@ -4409,48 +4418,231 @@ document.getElementById('missionSubmit').onclick = () => {
   submitMission(payload);
 };
 
-/* ───────────────────────────── Onboarding ──────────────────────────────── */
-function showOnboarding(planetName) {
-  if (localStorage.getItem('aetheris.onboarding.done')) return;
-  if (!cfg.ready) return; // attend que la connexion + cle soient prets
+/* ───────────────────────────── Onboarding (tour 5 étapes) ───────────────── */
+// État persistant : 0 = pas commencé, 1..4 = étape N vue mais la suivante
+// pas encore atteinte, 5 = guide terminé. Le tour ne revient jamais une fois ≥5.
+const OB_STORAGE_KEY = 'aetheris.onboarding.step';
+const OB_TOTAL = 5;
+function obGetStep() {
+  const v = parseInt(localStorage.getItem(OB_STORAGE_KEY) || '0', 10);
+  return Number.isFinite(v) ? Math.max(0, Math.min(OB_TOTAL, v)) : 0;
+}
+function obSetStep(n) {
+  localStorage.setItem(OB_STORAGE_KEY, String(Math.max(0, Math.min(OB_TOTAL, n))));
+}
+// Tick de référence stocké au moment où l'étape 1 est déclenchée — utilisé
+// comme heuristique pour détecter "≥2 améliorations" plus tard (étape 3).
+const OB_TICK_REF_KEY = 'aetheris.onboarding.tickRef';
+
+// État runtime : étape actuellement à l'écran (1..5), 0 si fermé.
+const obTour = { current: 0, primaryAction: null };
+
+function showOnboardingStep(step, p, emp) {
+  if (!cfg.ready) return;
+  const modal = document.getElementById('obBg');
+  if (!modal) return;
+  obTour.current = step;
+  document.getElementById('obStepMarker').textContent = `Étape ${step}/${OB_TOTAL}`;
+
+  const stats = document.getElementById('obStep1Stats');
+  const tickBlock = document.getElementById('obStep1Tick');
+  const list = document.getElementById('obStep1List');
+  const title = document.getElementById('obTourTitle');
+  const sub = document.getElementById('obTourSub');
+  const goBtn = document.getElementById('obGoBtn');
+
+  // Par défaut, masque les blocs spécifiques à l'étape 1.
+  stats.style.display = 'none';
+  tickBlock.style.display = 'none';
+  list.style.display = 'none';
+
+  if (step === 1) {
+    const planetName = p?.nom || '—';
+    title.innerHTML = `Bienvenue, <span id="ob-name">${escapeHtml(state.current || 'commandant')}</span>.`;
+    sub.innerHTML = `Tu contrôles <strong id="ob-planet">${escapeHtml(planetName)}</strong>. Citadel est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.`;
+    stats.style.display = '';
+    tickBlock.style.display = '';
+    list.style.display = '';
+    document.getElementById('ob-coords').textContent = (p?.coordonnees || []).join(':') || '—';
+    document.getElementById('ob-classe').textContent = p?.type || '—';
+    const ch = p?.champs || {};
+    document.getElementById('ob-champs').textContent = `${(ch.total || 0) - (ch.utilises || 0)} / ${ch.total || 0}`;
+    const niv = p?.batiments?.mine_ferrum || 0;
+    goBtn.textContent = niv === 0
+      ? 'Construire ma Mine de Ferrum →'
+      : `Améliorer ma Mine (niv ${niv} → ${niv + 1}) →`;
+    obTour.primaryAction = async () => {
+      try {
+        const tref = (state.manifest?.tick) ?? 0;
+        localStorage.setItem(OB_TICK_REF_KEY, String(tref));
+      } catch {}
+      closeOnboarding(true);
+      await submitImprove('mine_ferrum');
+    };
+    refreshOnboardingTick();
+  } else if (step === 2) {
+    title.textContent = 'Découvre la galaxie';
+    sub.innerHTML = `Ton ordre est inscrit. En attendant le prochain bloc, explore la galaxie : clique sur une planète ennemie pour préparer une mission.`;
+    goBtn.textContent = 'Ouvrir la galaxie →';
+    obTour.primaryAction = () => {
+      closeOnboarding(false);
+      state.view = 'galaxie';
+      localStorage.setItem('aetheris.view', 'galaxie');
+      applyView();
+    };
+  } else if (step === 3) {
+    title.textContent = 'Construis ton premier vaisseau';
+    sub.innerHTML = `Avec un <strong>Chantier Spatial</strong> tu peux construire des vaisseaux. Commence par une <strong>Sonde</strong> — c'est l'éclaireur qui révèle les empires voisins.`;
+    goBtn.textContent = 'Aller à la Flotte →';
+    obTour.primaryAction = () => {
+      closeOnboarding(false);
+      state.view = 'flotte';
+      localStorage.setItem('aetheris.view', 'flotte');
+      applyView();
+    };
+  } else if (step === 4) {
+    title.textContent = 'Lance ton premier espionnage';
+    sub.innerHTML = `Tu as une sonde ! Ouvre la galaxie, choisis une planète ennemie, et envoie une mission d'espionnage. Le rapport te dira ses ressources et défenses.`;
+    goBtn.textContent = 'Ouvrir la galaxie →';
+    obTour.primaryAction = () => {
+      closeOnboarding(false);
+      state.view = 'galaxie';
+      localStorage.setItem('aetheris.view', 'galaxie');
+      applyView();
+    };
+  } else if (step === 5) {
+    title.textContent = 'Lis tes rapports';
+    sub.innerHTML = `Tu as ton premier rapport ! L'onglet <strong>Rapports</strong> te montre l'intel obtenu. Si la cible est faible, tu peux lancer une attaque depuis le détail du rapport ou via la galaxie.`;
+    goBtn.textContent = 'Voir mes rapports →';
+    obTour.primaryAction = () => {
+      // Étape finale : marque le guide comme terminé.
+      obSetStep(OB_TOTAL);
+      obTour.current = 0;
+      modal.classList.remove('on');
+      state.view = 'rapports';
+      localStorage.setItem('aetheris.view', 'rapports');
+      applyView();
+    };
+  }
+  modal.classList.add('on');
+}
+
+// Rétro-compat : ancien point d'entrée. La logique vit dans
+// maybeAdvanceOnboarding(p, emp).
+function showOnboarding(_planetName) {
   const emp = state.players[state.current];
   const p = emp?.planetes?.[0];
-  if (!p) return;
-  document.getElementById('ob-name').textContent = state.current || 'commandant';
-  document.getElementById('ob-planet').textContent = planetName;
-  document.getElementById('ob-coords').textContent = (p.coordonnees || []).join(':') || '—';
-  document.getElementById('ob-classe').textContent = p.type || '—';
-  const ch = p.champs || {};
-  document.getElementById('ob-champs').textContent = `${(ch.total || 0) - (ch.utilises || 0)} / ${ch.total || 0}`;
-  // bouton direct desactive si pas de regles chargees ou pas de Mine constructible
-  const goBtn = document.getElementById('obGoBtn');
-  const niv = p.batiments?.mine_ferrum || 0;
-  goBtn.textContent = niv === 0
-    ? 'Construire ma Mine de Ferrum →'
-    : `Améliorer ma Mine (niv ${niv} → ${niv + 1}) →`;
-  document.getElementById('obBg').classList.add('on');
-  refreshOnboardingTick();
+  maybeAdvanceOnboarding(p, emp);
 }
+
+// Détection de progression : appelée à chaque rerender. Si la condition de
+// l'étape suivante est remplie, ouvre le modal correspondant.
+function maybeAdvanceOnboarding(p, emp) {
+  if (!cfg.ready || !p || !emp) return;
+  const stored = obGetStep();
+  if (stored >= OB_TOTAL) return; // guide terminé
+  if (obTour.current > 0) return; // déjà ouvert
+
+  if (stored === 0) {
+    showOnboardingStep(1, p, emp);
+    return;
+  }
+  // Étape 2 : un ordre est en pending OU mine_ferrum >= 1.
+  if (stored === 1) {
+    const hasPending = state.pending && state.pending.size > 0;
+    const niv = (p.batiments?.mine_ferrum || 0);
+    if (hasPending || niv >= 1) {
+      showOnboardingStep(2, p, emp);
+      return;
+    }
+  }
+  // Étape 3 : chantier_spatial >= 1 OU heuristique ≥2 améliorations.
+  if (stored === 2) {
+    const cs = (p.batiments?.chantier_spatial || 0);
+    let advanced = cs >= 1;
+    if (!advanced) {
+      const tref = parseInt(localStorage.getItem(OB_TICK_REF_KEY) || '0', 10);
+      const tcur = (state.manifest?.tick) ?? 0;
+      const totalLvl = Object.values(p.batiments || {}).reduce((a, b) => a + (b || 0), 0);
+      if ((tcur - tref) >= 2 && totalLvl >= 2) advanced = true;
+    }
+    if (advanced) {
+      showOnboardingStep(3, p, emp);
+      return;
+    }
+  }
+  // Étape 4 : flotte_au_sol.sonde >= 1.
+  if (stored === 3) {
+    const sondes = p.flotte_au_sol?.sonde || 0;
+    if (sondes >= 1) {
+      showOnboardingStep(4, p, emp);
+      return;
+    }
+  }
+  // Étape 5 : au moins un rapport intel.
+  if (stored === 4) {
+    const me = state.current;
+    const intel = state.reports?.intelByPlayer?.[me] || [];
+    if (intel.length > 0) {
+      showOnboardingStep(5, p, emp);
+      return;
+    }
+  }
+}
+
 function refreshOnboardingTick() {
   const el = document.getElementById('ob-countdown');
-  if (!el || !document.getElementById('obBg').classList.contains('on')) return;
+  const modal = document.getElementById('obBg');
+  if (!el || !modal || !modal.classList.contains('on')) return;
+  if (obTour.current !== 1) return;
   const info = nextTickInfo();
   const m = Math.floor(info.secs / 60);
   const s = info.secs % 60;
   el.textContent = `${m}m ${String(s).padStart(2,'0')}s`;
 }
+
+// "Plus tard" : on enregistre l'étape courante comme vue ; le modal reviendra
+// quand la condition de l'étape suivante sera satisfaite.
 function closeOnboarding(goToBat) {
-  localStorage.setItem('aetheris.onboarding.done', '1');
-  document.getElementById('obBg').classList.remove('on');
+  if (obTour.current > 0) {
+    obSetStep(obTour.current);
+  }
+  obTour.current = 0;
+  const modal = document.getElementById('obBg');
+  if (modal) modal.classList.remove('on');
   if (goToBat) {
     state.view = 'batiments';
     localStorage.setItem('aetheris.view', 'batiments');
     applyView();
   }
 }
+
+// "Passer le guide" : termine définitivement le tour.
+function skipOnboardingTour() {
+  obSetStep(OB_TOTAL);
+  obTour.current = 0;
+  const modal = document.getElementById('obBg');
+  if (modal) modal.classList.remove('on');
+}
+
+// Action principale du modal — déléguée à l'étape courante.
+function onboardingPrimaryAction() {
+  if (typeof obTour.primaryAction === 'function') {
+    obTour.primaryAction();
+  }
+}
+
+// Escape ferme le modal (équivalent à "Plus tard").
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const modal = document.getElementById('obBg');
+  if (modal && modal.classList.contains('on') && obTour.current > 0) {
+    closeOnboarding(false);
+  }
+});
+
+// Alias rétro-compat conservé pour ne casser aucun appel inline existant.
 async function upgradeFirstMine() {
-  // Ferme le modal, bascule sur la vue Batiments pour que le joueur voie
-  // l'ordre apparaitre dans le rail droit, puis declenche l'amelioration.
   closeOnboarding(true);
   await submitImprove('mine_ferrum');
 }
@@ -4793,10 +4985,12 @@ const onboarding = {
   show() {
     this.step = 0;
     this.render();
-    document.getElementById('obBg').classList.add('on');
+    const el = document.getElementById('obBgLegacy');
+    if (el) { el.hidden = false; el.classList.add('on'); }
   },
   hide() {
-    document.getElementById('obBg').classList.remove('on');
+    const el = document.getElementById('obBgLegacy');
+    if (el) { el.classList.remove('on'); el.hidden = true; }
     this.markDone();
   },
   render() {
@@ -4819,7 +5013,7 @@ const onboarding = {
 };
 
 (function setupOnboarding() {
-  const bg = document.getElementById('obBg');
+  const bg = document.getElementById('obBgLegacy');
   if (!bg) return;
   document.getElementById('obNext').addEventListener('click', () => onboarding.next());
   document.getElementById('obPrev').addEventListener('click', () => onboarding.prev());
@@ -4833,12 +5027,8 @@ const onboarding = {
   });
 })();
 
-/* boot */
-load().then(() => {
-  if (!onboarding.isDone()) {
-    setTimeout(() => onboarding.show(), 800);
-  }
-});
+/* boot — le tour onboarding moderne (5 étapes) prend le relais via maybeAdvanceOnboarding(). */
+load();
 tickCountdown();
 
 // Si un wallet chiffré est stocké, demande le password au boot (1 fois)

@@ -1,777 +1,693 @@
 {
   "source": "assets/aetheris-codex/source/aetheris-codex-grid-4x12-raw.png",
-  "transparent_sheet": "assets/aetheris-codex/processed/grid-4x12/sheet-transparent.png",
-  "rows": 4,
-  "cols": 12,
-  "cell_size": [
-    147,
-    221
-  ],
   "assets": [
     {
       "name": "building_ferrum_mine",
-      "path": "assets/aetheris-codex/processed/grid-4x12/building/building_ferrum_mine.png",
-      "row": 1,
-      "col": 1,
-      "bbox": [
-        18,
-        22,
-        147,
-        221
+      "category": "building",
+      "path": "assets/aetheris-codex/processed/components-v5/building/building_ferrum_mine.png",
+      "source_box": [
+        19,
+        24,
+        226,
+        251
       ],
       "size": [
-        129,
-        199
+        207,
+        227
       ],
-      "opaque_pixels": 14043
+      "area": 21678
     },
     {
       "name": "building_lumen_extractor",
-      "path": "assets/aetheris-codex/processed/grid-4x12/building/building_lumen_extractor.png",
-      "row": 1,
-      "col": 2,
-      "bbox": [
-        0,
-        46,
-        147,
-        221
+      "category": "building",
+      "path": "assets/aetheris-codex/processed/components-v5/building/building_lumen_extractor.png",
+      "source_box": [
+        233,
+        21,
+        395,
+        251
       ],
       "size": [
-        147,
-        175
+        162,
+        230
       ],
-      "opaque_pixels": 12584
+      "area": 17540
     },
     {
       "name": "building_plasmide_synthesizer",
-      "path": "assets/aetheris-codex/processed/grid-4x12/building/building_plasmide_synthesizer.png",
-      "row": 1,
-      "col": 3,
-      "bbox": [
-        0,
-        20,
-        147,
-        221
+      "category": "building",
+      "path": "assets/aetheris-codex/processed/components-v5/building/building_plasmide_synthesizer.png",
+      "source_box": [
+        407,
+        26,
+        611,
+        254
       ],
       "size": [
-        147,
-        201
+        204,
+        228
       ],
-      "opaque_pixels": 14269
+      "area": 24607
     },
     {
       "name": "building_solar_plant",
-      "path": "assets/aetheris-codex/processed/grid-4x12/building/building_solar_plant.png",
-      "row": 1,
-      "col": 4,
-      "bbox": [
-        0,
-        26,
-        147,
-        221
+      "category": "building",
+      "path": "assets/aetheris-codex/processed/components-v5/building/building_solar_plant.png",
+      "source_box": [
+        608,
+        62,
+        792,
+        251
       ],
       "size": [
-        147,
-        195
+        184,
+        189
       ],
-      "opaque_pixels": 21003
+      "area": 15248
     },
     {
       "name": "building_fusion_reactor",
-      "path": "assets/aetheris-codex/processed/grid-4x12/building/building_fusion_reactor.png",
-      "row": 1,
-      "col": 5,
-      "bbox": [
-        0,
-        44,
-        147,
-        221
+      "category": "building",
+      "path": "assets/aetheris-codex/processed/components-v5/building/building_fusion_reactor.png",
+      "source_box": [
+        795,
+        96,
+        948,
+        245
       ],
       "size": [
-        147,
-        177
+        153,
+        149
       ],
-      "opaque_pixels": 12467
+      "area": 14717
     },
     {
       "name": "building_robotic_factory",
-      "path": "assets/aetheris-codex/processed/grid-4x12/building/building_robotic_factory.png",
-      "row": 1,
-      "col": 6,
-      "bbox": [
-        0,
-        45,
-        147,
-        221
+      "category": "building",
+      "path": "assets/aetheris-codex/processed/components-v5/building/building_robotic_factory.png",
+      "source_box": [
+        948,
+        51,
+        1113,
+        251
       ],
       "size": [
-        147,
-        176
+        165,
+        200
       ],
-      "opaque_pixels": 12203
+      "area": 16837
     },
     {
       "name": "building_spaceyard",
-      "path": "assets/aetheris-codex/processed/grid-4x12/building/building_spaceyard.png",
-      "row": 1,
-      "col": 7,
-      "bbox": [
-        0,
-        50,
-        147,
-        221
+      "category": "building",
+      "path": "assets/aetheris-codex/processed/components-v5/building/building_spaceyard.png",
+      "source_box": [
+        1125,
+        67,
+        1300,
+        238
       ],
       "size": [
-        147,
+        175,
         171
       ],
-      "opaque_pixels": 14146
+      "area": 11544
     },
     {
       "name": "building_laboratory",
-      "path": "assets/aetheris-codex/processed/grid-4x12/building/building_laboratory.png",
-      "row": 1,
-      "col": 8,
-      "bbox": [
-        0,
-        43,
-        147,
-        221
-      ],
-      "size": [
-        147,
-        178
-      ],
-      "opaque_pixels": 11600
-    },
-    {
-      "name": "empty_r1_c9",
-      "path": "assets/aetheris-codex/processed/grid-4x12/empty/empty_r1_c9.png",
-      "row": 1,
-      "col": 9,
-      "bbox": [
-        0,
-        47,
-        147,
-        221
-      ],
-      "size": [
-        147,
-        174
-      ],
-      "opaque_pixels": 9621
-    },
-    {
-      "name": "empty_r1_c10",
-      "path": "assets/aetheris-codex/processed/grid-4x12/empty/empty_r1_c10.png",
-      "row": 1,
-      "col": 10,
-      "bbox": [
-        0,
+      "category": "building",
+      "path": "assets/aetheris-codex/processed/components-v5/building/building_laboratory.png",
+      "source_box": [
+        1306,
         44,
-        146,
-        221
+        1458,
+        251
       ],
       "size": [
-        146,
-        177
+        152,
+        207
       ],
-      "opaque_pixels": 16172
+      "area": 17223
     },
     {
       "name": "ship_probe",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_probe.png",
-      "row": 2,
-      "col": 1,
-      "bbox": [
-        21,
-        0,
-        147,
-        221
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_probe.png",
+      "source_box": [
+        22,
+        272,
+        141,
+        439
       ],
       "size": [
-        126,
-        221
+        119,
+        167
       ],
-      "opaque_pixels": 4915
+      "area": 2892
     },
     {
       "name": "ship_light_fighter",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_light_fighter.png",
-      "row": 2,
-      "col": 2,
-      "bbox": [
-        0,
-        0,
-        147,
-        211
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_light_fighter.png",
+      "source_box": [
+        149,
+        313,
+        278,
+        429
       ],
       "size": [
-        147,
-        211
+        129,
+        116
       ],
-      "opaque_pixels": 6087
+      "area": 4904
     },
     {
       "name": "ship_heavy_fighter",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_heavy_fighter.png",
-      "row": 2,
-      "col": 3,
-      "bbox": [
-        0,
-        0,
-        147,
-        217
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_heavy_fighter.png",
+      "source_box": [
+        281,
+        312,
+        414,
+        437
       ],
       "size": [
-        147,
-        217
+        133,
+        125
       ],
-      "opaque_pixels": 8661
+      "area": 7192
     },
     {
       "name": "ship_cruiser",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_cruiser.png",
-      "row": 2,
-      "col": 4,
-      "bbox": [
-        0,
-        0,
-        147,
-        218
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_cruiser.png",
+      "source_box": [
+        409,
+        303,
+        566,
+        438
       ],
       "size": [
-        147,
-        218
+        157,
+        135
       ],
-      "opaque_pixels": 9568
+      "area": 7552
     },
     {
       "name": "ship_frigate",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_frigate.png",
-      "row": 2,
-      "col": 5,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_frigate.png",
+      "source_box": [
+        552,
+        304,
+        703,
+        439
       ],
       "size": [
-        147,
-        221
+        151,
+        135
       ],
-      "opaque_pixels": 8483
+      "area": 6782
     },
     {
       "name": "ship_battlecruiser",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_battlecruiser.png",
-      "row": 2,
-      "col": 6,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_battlecruiser.png",
+      "source_box": [
+        688,
+        304,
+        835,
+        446
       ],
       "size": [
         147,
-        221
+        142
       ],
-      "opaque_pixels": 9376
+      "area": 7539
     },
     {
       "name": "ship_destroyer",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_destroyer.png",
-      "row": 2,
-      "col": 7,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_destroyer.png",
+      "source_box": [
+        822,
+        304,
+        972,
+        443
       ],
       "size": [
-        147,
-        221
+        150,
+        139
       ],
-      "opaque_pixels": 11882
+      "area": 8190
     },
     {
       "name": "ship_dreadnought",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_dreadnought.png",
-      "row": 2,
-      "col": 8,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_dreadnought.png",
+      "source_box": [
+        962,
+        294,
+        1142,
+        460
       ],
       "size": [
-        147,
-        221
+        180,
+        166
       ],
-      "opaque_pixels": 11732
+      "area": 13795
     },
     {
       "name": "ship_heavy_cargo",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_heavy_cargo.png",
-      "row": 2,
-      "col": 9,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
-      ],
-      "size": [
-        147,
-        221
-      ],
-      "opaque_pixels": 10682
-    },
-    {
-      "name": "ship_recycler",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_recycler.png",
-      "row": 2,
-      "col": 10,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
-      ],
-      "size": [
-        147,
-        221
-      ],
-      "opaque_pixels": 11271
-    },
-    {
-      "name": "ship_colony",
-      "path": "assets/aetheris-codex/processed/grid-4x12/ship/ship_colony.png",
-      "row": 2,
-      "col": 11,
-      "bbox": [
-        0,
-        85,
-        86,
-        221
-      ],
-      "size": [
-        86,
-        136
-      ],
-      "opaque_pixels": 6375
-    },
-    {
-      "name": "defense_missile_launcher",
-      "path": "assets/aetheris-codex/processed/grid-4x12/defense/defense_missile_launcher.png",
-      "row": 3,
-      "col": 1,
-      "bbox": [
-        31,
-        0,
-        147,
-        208
-      ],
-      "size": [
-        116,
-        208
-      ],
-      "opaque_pixels": 9245
-    },
-    {
-      "name": "defense_light_laser",
-      "path": "assets/aetheris-codex/processed/grid-4x12/defense/defense_light_laser.png",
-      "row": 3,
-      "col": 2,
-      "bbox": [
-        7,
-        0,
-        147,
-        211
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_heavy_cargo.png",
+      "source_box": [
+        1142,
+        303,
+        1282,
+        447
       ],
       "size": [
         140,
-        211
+        144
       ],
-      "opaque_pixels": 9354
+      "area": 9483
     },
     {
-      "name": "defense_heavy_laser",
-      "path": "assets/aetheris-codex/processed/grid-4x12/defense/defense_heavy_laser.png",
-      "row": 3,
-      "col": 3,
-      "bbox": [
-        0,
-        0,
-        147,
-        208
+      "name": "ship_recycler",
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_recycler.png",
+      "source_box": [
+        1268,
+        305,
+        1419,
+        448
       ],
       "size": [
-        147,
-        208
+        151,
+        143
       ],
-      "opaque_pixels": 9484
+      "area": 8821
     },
     {
-      "name": "defense_gauss_cannon",
-      "path": "assets/aetheris-codex/processed/grid-4x12/defense/defense_gauss_cannon.png",
-      "row": 3,
-      "col": 4,
-      "bbox": [
-        0,
-        0,
-        147,
-        208
+      "name": "ship_colony",
+      "category": "ship",
+      "path": "assets/aetheris-codex/processed/components-v5/ship/ship_colony.png",
+      "source_box": [
+        1419,
+        307,
+        1555,
+        443
       ],
       "size": [
-        147,
-        208
+        136,
+        136
       ],
-      "opaque_pixels": 9094
+      "area": 8986
     },
     {
-      "name": "defense_ion_cannon",
-      "path": "assets/aetheris-codex/processed/grid-4x12/defense/defense_ion_cannon.png",
-      "row": 3,
-      "col": 5,
-      "bbox": [
-        0,
-        0,
-        147,
-        208
-      ],
-      "size": [
-        147,
-        208
-      ],
-      "opaque_pixels": 8591
-    },
-    {
-      "name": "defense_plasma_cannon",
-      "path": "assets/aetheris-codex/processed/grid-4x12/defense/defense_plasma_cannon.png",
-      "row": 3,
-      "col": 6,
-      "bbox": [
-        0,
-        0,
-        147,
-        208
-      ],
-      "size": [
-        147,
-        208
-      ],
-      "opaque_pixels": 9019
-    },
-    {
-      "name": "defense_small_planetary_shield",
-      "path": "assets/aetheris-codex/processed/grid-4x12/defense/defense_small_planetary_shield.png",
-      "row": 3,
-      "col": 7,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
-      ],
-      "size": [
-        147,
-        221
-      ],
-      "opaque_pixels": 9423
-    },
-    {
-      "name": "defense_large_planetary_shield",
-      "path": "assets/aetheris-codex/processed/grid-4x12/defense/defense_large_planetary_shield.png",
-      "row": 3,
-      "col": 8,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
-      ],
-      "size": [
-        147,
-        221
-      ],
-      "opaque_pixels": 11331
-    },
-    {
-      "name": "icon_ferrum_cube",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_ferrum_cube.png",
-      "row": 3,
-      "col": 9,
-      "bbox": [
-        0,
-        0,
-        147,
-        221
-      ],
-      "size": [
-        147,
-        221
-      ],
-      "opaque_pixels": 14021
-    },
-    {
-      "name": "icon_lumen_crystal",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_lumen_crystal.png",
-      "row": 3,
-      "col": 10,
-      "bbox": [
-        0,
-        0,
-        147,
-        208
-      ],
-      "size": [
-        147,
-        208
-      ],
-      "opaque_pixels": 14152
-    },
-    {
-      "name": "icon_plasmide_droplet",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_plasmide_droplet.png",
-      "row": 3,
-      "col": 11,
-      "bbox": [
-        0,
-        0,
-        147,
-        208
-      ],
-      "size": [
-        147,
-        208
-      ],
-      "opaque_pixels": 14077
-    },
-    {
-      "name": "icon_energy_bolt",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_energy_bolt.png",
-      "row": 3,
-      "col": 12,
-      "bbox": [
-        0,
-        69,
-        133,
-        211
-      ],
-      "size": [
-        133,
-        142
-      ],
-      "opaque_pixels": 11291
-    },
-    {
-      "name": "icon_score_laurel",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_score_laurel.png",
-      "row": 4,
-      "col": 1,
-      "bbox": [
-        26,
-        25,
-        147,
-        173
+      "name": "defense_missile_launcher",
+      "category": "defense",
+      "path": "assets/aetheris-codex/processed/components-v5/defense/defense_missile_launcher.png",
+      "source_box": [
+        32,
+        477,
+        153,
+        628
       ],
       "size": [
         121,
-        148
+        151
       ],
-      "opaque_pixels": 11982
+      "area": 8307
+    },
+    {
+      "name": "defense_light_laser",
+      "category": "defense",
+      "path": "assets/aetheris-codex/processed/components-v5/defense/defense_light_laser.png",
+      "source_box": [
+        181,
+        493,
+        309,
+        629
+      ],
+      "size": [
+        128,
+        136
+      ],
+      "area": 8449
+    },
+    {
+      "name": "defense_heavy_laser",
+      "category": "defense",
+      "path": "assets/aetheris-codex/processed/components-v5/defense/defense_heavy_laser.png",
+      "source_box": [
+        339,
+        489,
+        468,
+        629
+      ],
+      "size": [
+        129,
+        140
+      ],
+      "area": 9271
+    },
+    {
+      "name": "defense_gauss_cannon",
+      "category": "defense",
+      "path": "assets/aetheris-codex/processed/components-v5/defense/defense_gauss_cannon.png",
+      "source_box": [
+        490,
+        495,
+        619,
+        630
+      ],
+      "size": [
+        129,
+        135
+      ],
+      "area": 8311
+    },
+    {
+      "name": "defense_ion_cannon",
+      "category": "defense",
+      "path": "assets/aetheris-codex/processed/components-v5/defense/defense_ion_cannon.png",
+      "source_box": [
+        649,
+        498,
+        770,
+        630
+      ],
+      "size": [
+        121,
+        132
+      ],
+      "area": 8304
+    },
+    {
+      "name": "defense_plasma_cannon",
+      "category": "defense",
+      "path": "assets/aetheris-codex/processed/components-v5/defense/defense_plasma_cannon.png",
+      "source_box": [
+        796,
+        501,
+        920,
+        630
+      ],
+      "size": [
+        124,
+        129
+      ],
+      "area": 8031
+    },
+    {
+      "name": "defense_small_planetary_shield",
+      "category": "defense",
+      "path": "assets/aetheris-codex/processed/components-v5/defense/defense_small_planetary_shield.png",
+      "source_box": [
+        939,
+        517,
+        1074,
+        631
+      ],
+      "size": [
+        135,
+        114
+      ],
+      "area": 7372
+    },
+    {
+      "name": "defense_large_planetary_shield",
+      "category": "defense",
+      "path": "assets/aetheris-codex/processed/components-v5/defense/defense_large_planetary_shield.png",
+      "source_box": [
+        1090,
+        481,
+        1275,
+        642
+      ],
+      "size": [
+        185,
+        161
+      ],
+      "area": 15081
+    },
+    {
+      "name": "icon_ferrum_cube",
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_ferrum_cube.png",
+      "source_box": [
+        1283,
+        512,
+        1397,
+        632
+      ],
+      "size": [
+        114,
+        120
+      ],
+      "area": 10141
+    },
+    {
+      "name": "icon_lumen_crystal",
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_lumen_crystal.png",
+      "source_box": [
+        1401,
+        512,
+        1515,
+        632
+      ],
+      "size": [
+        114,
+        120
+      ],
+      "area": 10151
+    },
+    {
+      "name": "icon_plasmide_droplet",
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_plasmide_droplet.png",
+      "source_box": [
+        1520,
+        512,
+        1634,
+        632
+      ],
+      "size": [
+        114,
+        120
+      ],
+      "area": 10142
+    },
+    {
+      "name": "icon_energy_bolt",
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_energy_bolt.png",
+      "source_box": [
+        1637,
+        512,
+        1749,
+        633
+      ],
+      "size": [
+        112,
+        121
+      ],
+      "area": 9944
+    },
+    {
+      "name": "icon_score_laurel",
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_score_laurel.png",
+      "source_box": [
+        26,
+        688,
+        146,
+        817
+      ],
+      "size": [
+        120,
+        129
+      ],
+      "area": 11502
     },
     {
       "name": "icon_fleet_wedge",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_fleet_wedge.png",
-      "row": 4,
-      "col": 2,
-      "bbox": [
-        5,
-        25,
-        147,
-        173
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_fleet_wedge.png",
+      "source_box": [
+        152,
+        689,
+        274,
+        817
       ],
       "size": [
-        142,
-        148
+        122,
+        128
       ],
-      "opaque_pixels": 12974
+      "area": 11715
     },
     {
       "name": "icon_shield",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_shield.png",
-      "row": 4,
-      "col": 3,
-      "bbox": [
-        0,
-        25,
-        147,
-        173
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_shield.png",
+      "source_box": [
+        279,
+        688,
+        400,
+        817
       ],
       "size": [
-        147,
-        148
+        121,
+        129
       ],
-      "opaque_pixels": 14492
+      "area": 11625
     },
     {
       "name": "icon_eye",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_eye.png",
-      "row": 4,
-      "col": 4,
-      "bbox": [
-        0,
-        25,
-        147,
-        173
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_eye.png",
+      "source_box": [
+        405,
+        688,
+        526,
+        817
       ],
       "size": [
-        147,
-        148
+        121,
+        129
       ],
-      "opaque_pixels": 14630
+      "area": 11623
     },
     {
       "name": "icon_scroll",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_scroll.png",
-      "row": 4,
-      "col": 5,
-      "bbox": [
-        0,
-        25,
-        147,
-        176
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_scroll.png",
+      "source_box": [
+        531,
+        688,
+        652,
+        817
       ],
       "size": [
-        147,
-        151
+        121,
+        129
       ],
-      "opaque_pixels": 14778
+      "area": 11616
     },
     {
       "name": "icon_gear",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_gear.png",
-      "row": 4,
-      "col": 6,
-      "bbox": [
-        0,
-        25,
-        147,
-        173
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_gear.png",
+      "source_box": [
+        656,
+        688,
+        779,
+        817
       ],
       "size": [
-        147,
-        148
+        123,
+        129
       ],
-      "opaque_pixels": 14198
+      "area": 11736
     },
     {
       "name": "icon_alert",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_alert.png",
-      "row": 4,
-      "col": 7,
-      "bbox": [
-        0,
-        25,
-        147,
-        176
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_alert.png",
+      "source_box": [
+        787,
+        688,
+        907,
+        817
       ],
       "size": [
-        147,
-        151
+        120,
+        129
       ],
-      "opaque_pixels": 14140
+      "area": 11532
     },
     {
       "name": "icon_message",
-      "path": "assets/aetheris-codex/processed/grid-4x12/icon/icon_message.png",
-      "row": 4,
-      "col": 8,
-      "bbox": [
-        32,
-        0,
-        147,
-        199
+      "category": "icon",
+      "path": "assets/aetheris-codex/processed/components-v5/icon/icon_message.png",
+      "source_box": [
+        909,
+        688,
+        1030,
+        817
       ],
       "size": [
-        115,
-        199
+        121,
+        129
       ],
-      "opaque_pixels": 9484
+      "area": 11634
     },
     {
       "name": "vfx_block_confirmation_pulse",
-      "path": "assets/aetheris-codex/processed/grid-4x12/vfx/vfx_block_confirmation_pulse.png",
-      "row": 4,
-      "col": 9,
-      "bbox": [
-        0,
-        0,
-        147,
-        204
+      "category": "vfx",
+      "path": "assets/aetheris-codex/processed/components-v5/vfx/vfx_block_confirmation_pulse.png",
+      "source_box": [
+        1073,
+        681,
+        1222,
+        845
       ],
       "size": [
-        147,
-        204
+        149,
+        164
       ],
-      "opaque_pixels": 8453
+      "area": 5864
     },
     {
       "name": "vfx_mining_beam",
-      "path": "assets/aetheris-codex/processed/grid-4x12/vfx/vfx_mining_beam.png",
-      "row": 4,
-      "col": 10,
-      "bbox": [
-        0,
-        0,
-        147,
-        200
+      "category": "vfx",
+      "path": "assets/aetheris-codex/processed/components-v5/vfx/vfx_mining_beam.png",
+      "source_box": [
+        1262,
+        675,
+        1398,
+        843
       ],
       "size": [
-        147,
-        200
+        136,
+        168
       ],
-      "opaque_pixels": 11697
+      "area": 10168
     },
     {
       "name": "vfx_shield_shimmer",
-      "path": "assets/aetheris-codex/processed/grid-4x12/vfx/vfx_shield_shimmer.png",
-      "row": 4,
-      "col": 11,
-      "bbox": [
-        0,
-        10,
-        147,
-        200
+      "category": "vfx",
+      "path": "assets/aetheris-codex/processed/components-v5/vfx/vfx_shield_shimmer.png",
+      "source_box": [
+        1426,
+        682,
+        1578,
+        840
       ],
       "size": [
-        147,
-        190
+        152,
+        158
       ],
-      "opaque_pixels": 12928
+      "area": 7720
     },
     {
       "name": "vfx_transaction_trail",
-      "path": "assets/aetheris-codex/processed/grid-4x12/vfx/vfx_transaction_trail.png",
-      "row": 4,
-      "col": 12,
-      "bbox": [
-        0,
-        25,
-        116,
-        200
+      "category": "vfx",
+      "path": "assets/aetheris-codex/processed/components-v5/vfx/vfx_transaction_trail.png",
+      "source_box": [
+        1600,
+        713,
+        1717,
+        827
       ],
       "size": [
-        116,
-        175
+        117,
+        114
       ],
-      "opaque_pixels": 6118
+      "area": 2473
     }
   ]
 }

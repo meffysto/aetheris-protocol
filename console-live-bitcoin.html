@@ -1707,7 +1707,7 @@ h2.sect .rule {
 <div class="modal-bg" id="missionBg">
   <div class="modal mission-modal">
     <h2>Préparer une mission</h2>
-    <p class="lead">Sélectionne le type, la planète d'origine, et la composition de la flotte. L'ordre sera signé puis poussé sur GitHub.</p>
+    <p class="lead">Sélectionne le type, la planète d'origine, et la composition de la flotte. L'ordre sera signé puis inscrit sur Mutinynet.</p>
 
     <div class="target" id="missionTarget">—</div>
 
@@ -1745,7 +1745,7 @@ h2.sect .rule {
   <div class="onboarding">
     <div class="ob-step-marker" id="obStepMarker">Étape 1/5</div>
     <h2 id="obTourTitle">Bienvenue, <span id="ob-name">commandant</span>.</h2>
-    <p class="ob-sub" id="obTourSub">Tu contrôles <strong id="ob-planet">—</strong>. Citadel est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.</p>
+    <p class="ob-sub" id="obTourSub">Tu contrôles <strong id="ob-planet">—</strong>. Citadel est un MMO 4X qui vit dans la blockchain Bitcoin : chaque ordre est une inscription Taproot signée par ta clé, appliquée par le moteur à chaque <span class="gloss" title="Un tick = un bloc Mutinynet (signet Bitcoin). Cible ≈ 30s. Tous les ordres confirmés au bloc N sont appliqués au bloc N+1.">tick</span>.</p>
 
     <div class="ob-card" id="obStep1Stats">
       <div class="ob-stat">
@@ -1767,8 +1767,8 @@ h2.sect .rule {
 
     <ol id="obStep1List">
       <li>Ta <span class="gloss" title="Mine de Ferrum : produit du ferrum (mineralia) à chaque tick. Plus le niveau est élevé, plus la production augmente.">Mine de Ferrum</span> est ta première source de revenu — améliore-la</li>
-      <li>L'ordre est signé localement (ta clé ne quitte jamais ton browser) et poussé en PR</li>
-      <li>Le moteur l'auto-merge en ~20s, puis l'applique au tick suivant</li>
+      <li>L'ordre est signé localement (ta clé Taproot ne quitte jamais ton browser) et inscrit sur Mutinynet</li>
+      <li>1-2 blocs de confirmation, puis le moteur l'applique au tick suivant</li>
     </ol>
 
     <div class="ob-actions">
@@ -4544,7 +4544,7 @@ function showOnboardingStep(step, p, emp) {
   if (step === 1) {
     const planetName = p?.nom || '—';
     title.innerHTML = `Bienvenue, <span id="ob-name">${escapeHtml(state.current || 'commandant')}</span>.`;
-    sub.innerHTML = `Tu contrôles <strong id="ob-planet">${escapeHtml(planetName)}</strong>. Citadel est un MMO 4X qui vit dans un dépôt git : chaque ordre est signé avec ta clé et appliqué par le moteur à chaque <span class="gloss" title="Pas de simulation. Le moteur avance toutes les 15 minutes (UTC) et applique tous les ordres signés en attente.">tick</span>.`;
+    sub.innerHTML = `Tu contrôles <strong id="ob-planet">${escapeHtml(planetName)}</strong>. Citadel est un MMO 4X qui vit dans la blockchain Bitcoin : chaque ordre est une inscription Taproot signée par ta clé, appliquée par le moteur à chaque <span class="gloss" title="Un tick = un bloc Mutinynet (signet Bitcoin). Cible ≈ 30s. Tous les ordres confirmés au bloc N sont appliqués au bloc N+1.">tick</span>.`;
     stats.style.display = '';
     tickBlock.style.display = '';
     list.style.display = '';

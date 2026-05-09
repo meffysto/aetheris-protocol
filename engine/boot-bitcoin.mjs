@@ -212,9 +212,28 @@ export async function bootBitcoin({
 
   log(`✓ Boot terminé — tick ${manifest.tick}, ${Object.keys(empires).length} empire(s)`);
 
+  // ─── Roster Nostr : pubkeys Schnorr (32B hex x-only) des joueurs ────────
+  // Utilisé par la messagerie NIP-17 pour whitelister les expéditeurs.
+  // C'est exactement la même clé qui signe les inscriptions Bitcoin
+  // (identites[name].cle_publique = "schnorr:<hex>"), donc l'identité du
+  // jeu et l'identité de la messagerie sont une seule et même clé.
+  const roster = new Set();
+  for (const id of Object.values(identites)) {
+    const pk = id?.cle_publique;
+    if (typeof pk === 'string' && pk.startsWith('schnorr:')) {
+      roster.add(pk.slice('schnorr:'.length));
+    }
+  }
+  // Hook browser : expose globalement pour la console / la messagerie.
+  if (typeof globalThis.window !== 'undefined') {
+    globalThis.window.aetheris = globalThis.window.aetheris || {};
+    globalThis.window.aetheris.roster = roster;
+  }
+
   return {
     manifest, rules, galaxie, empires, identites,
     tickCourant, blocGenesis, blocsParTick, tip,
     joins, ordersByTick,
+    roster,
   };
 }

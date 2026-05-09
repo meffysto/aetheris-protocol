@@ -147,6 +147,15 @@ export async function bootBitcoin({
   log(`▸ Replay des ${tickCourant} tick(s)…`);
   let processedJoinIdx = 0;
 
+  // Accumulateurs de rapports — l'engine les produit à chaque tick mais ils
+  // étaient jetés. On les garde pour les surfacer dans l'UI (onglet Rapports).
+  // intelByPlayer[name] = [{ tick, filename, content }]   (espionnages reçus/émis par 'name')
+  // alertsByPlayer[name] = [{ tick, filename, content }]  (alertes : on a été espionné)
+  // battles = [{ tick, filename, content, attaquant, defenseur, lieu, issue }]
+  const intelByPlayer = {};
+  const alertsByPlayer = {};
+  const battles = [];
+
   for (let T = 1; T <= tickCourant; T++) {
     onProgress({ phase: 'replay', current: T, total: tickCourant });
 
@@ -208,6 +217,34 @@ export async function bootBitcoin({
     });
     manifest = result.newManifest;
     empires = result.newEmpires;
+
+    // Collecte des rapports produits par ce tick
+    const tickReports = result.reports || {};
+    for (const r of (tickReports.intel || [])) {
+      const player = r.player || _playerFromIntelFilename(r.filename);
+      if (!player) continue;
+      (intelByPlayer[player] ||= []).push({ tick: T, filename: r.filename, content: r.content });
+    }
+    for (const r of (tickReports.alerts || [])) {
+      const player = r.player || _playerFromIntelFilename(r.filename);
+      if (!player) continue;
+      (alertsByPlayer[player] ||= []).push({ tick: T, filename: r.filename, content: r.content });
+    }
+    for (const r of (tickReports.battles || [])) {
+      battles.push({ tick: T, filename: r.filename, content: r.content });
+    }
+    // Évènements de bataille servent à indexer les rapports par participant
+    for (const ev of (result.events || [])) {
+      if (ev.type === 'bataille') {
+        const last = battles[battles.length - 1];
+        if (last && last.tick === T && !last.attaquant) {
+          last.attaquant = ev.attaquant;
+          last.defenseur = ev.defenseur;
+          last.lieu = ev.lieu;
+          last.issue = ev.issue;
+        }
+      }
+    }
   }
 
   log(`✓ Boot terminé — tick ${manifest.tick}, ${Object.keys(empires).length} empire(s)`);
@@ -235,5 +272,12 @@ export async function bootBitcoin({
     tickCourant, blocGenesis, blocsParTick, tip,
     joins, ordersByTick,
     roster,
+    reports: { intelByPlayer, alertsByPlayer, battles },
   };
+}
+
+// joueurs/<name>/intel/tick-NNNN-...md → <name>
+function _playerFromIntelFilename(fn) {
+  const m = /^joueurs\/([^\/]+)\//.exec(fn || '');
+  return m ? m[1] : null;
 }

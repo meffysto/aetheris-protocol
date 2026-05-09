@@ -1230,6 +1230,67 @@ h2.sect .rule {
 .toast.err .title { color: var(--phosphor); }
 @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* incoming hostile fleet flag on galaxy positions */
+.pos.incoming { outline: 1px solid var(--rust); animation: pulse-incoming 1.6s ease-in-out infinite; }
+.pos .incoming-flag {
+  position: absolute; top: 2px; right: 4px;
+  font-size: 10px; color: var(--rust); font-family: var(--mono);
+  pointer-events: none; line-height: 1;
+}
+@keyframes pulse-incoming {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(208, 70, 72, 0); }
+  50%      { box-shadow: 0 0 0 2px rgba(208, 70, 72, 0.25); }
+}
+
+/* rapports view */
+.rap-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.rap-item {
+  border: 1px solid var(--hairline);
+  background: rgba(255,255,255,0.015);
+  padding: 10px 14px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  display: grid;
+  grid-template-columns: 60px 80px 1fr auto;
+  gap: 14px;
+  align-items: baseline;
+}
+.rap-item:hover { background: rgba(255,255,255,0.04); border-color: var(--bone-dim); }
+.rap-item.alert { border-left: 2px solid var(--phosphor); }
+.rap-item.battle { border-left: 2px solid var(--rust); }
+.rap-item.intel { border-left: 2px solid var(--brass); }
+.rap-item .rap-tick { color: var(--brass-dim); font-family: var(--display); }
+.rap-item .rap-kind { color: var(--bone-dim); text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; }
+.rap-item .rap-title { color: var(--bone); }
+.rap-item .rap-issue { color: var(--rust); font-size: 10px; text-transform: uppercase; }
+.rap-detail {
+  margin-top: 12px;
+  border: 1px solid var(--hairline);
+  padding: 16px 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  background: rgba(0,0,0,0.15);
+  line-height: 1.6;
+}
+.rap-detail h1, .rap-detail h2 { font-family: var(--display); color: var(--brass); margin: 12px 0 6px; font-size: 14px; letter-spacing: 0.04em; }
+.rap-detail h1 { font-size: 16px; color: var(--phosphor); }
+.rap-detail strong { color: var(--bone-2); }
+.rap-detail blockquote { border-left: 2px solid var(--phosphor); padding-left: 10px; margin: 8px 0; color: var(--phosphor); }
+.rap-back { display: inline-block; margin-bottom: 10px; color: var(--brass); cursor: pointer; font-family: var(--mono); font-size: 11px; }
+.rap-back:hover { color: var(--bone-2); }
+
+/* classement view */
+.hs-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-family: var(--mono); font-size: 12px; }
+.hs-table th, .hs-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--hairline); }
+.hs-table th { font-family: var(--display); color: var(--brass-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: normal; }
+.hs-table tr.me { background: rgba(210, 170, 60, 0.06); }
+.hs-table tr.me td { color: var(--phosphor); }
+.hs-table .rank { color: var(--brass); font-family: var(--display); width: 40px; }
+.hs-table .score { text-align: right; color: var(--bone-2); }
+.hs-table .num-c { text-align: right; color: var(--bone-dim); }
+
 /* notifications panel */
 .notif-panel {
   position: fixed; top: 62px; right: 22px;
@@ -1750,6 +1811,14 @@ h2.sect .rule {
       <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v11H7l-3 3z"/></svg></span>
       Messagerie <span class="ct" id="ctMsg">—</span>
     </button>
+    <button data-view="rapports">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+      Rapports <span class="ct" id="ctRap">—</span>
+    </button>
+    <button data-view="classement">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 21V10M12 21V4M19 21v-7"/></svg></span>
+      Classement
+    </button>
   </nav>
 
   <!-- MAIN -->
@@ -1764,6 +1833,8 @@ h2.sect .rule {
     <div class="view" data-v="galaxie" id="vGal"></div>
     <div class="view" data-v="journal" id="vJou"></div>
     <div class="view" data-v="messagerie" id="vMsg"></div>
+    <div class="view" data-v="rapports" id="vRap"></div>
+    <div class="view" data-v="classement" id="vCls"></div>
   </main>
 
   <!-- RIGHT RAIL -->
@@ -1961,6 +2032,7 @@ const state = {
   })(),
   walletPassword: null,               // password en mémoire (volatile, ré-demandé chaque session)
   identites: {},
+  reports: { intelByPlayer: {}, alertsByPlayer: {}, battles: [] },
 };
 // Sync URL-derived player to localStorage pour les refresh suivants.
 if (state.current) localStorage.setItem('aetheris.player', state.current);
@@ -2195,6 +2267,7 @@ async function load() {
     state.galaxie = result.galaxie;
     state.players = result.empires;
     state.identites = result.identites;
+    state.reports = result.reports || { intelByPlayer: {}, alertsByPlayer: {}, battles: [] };
     const previousTip = state.bitcoin?.tip;
     state.bitcoin = {
       tip: result.tip,
@@ -2331,6 +2404,8 @@ function render() {
   renderDefense(p);
   renderGalaxie();
   renderJournal(p, emp);
+  renderRapports();
+  renderClassement();
   renderRail(p, emp);
   renderNavCounts(p, emp);
   applyView();
@@ -2347,6 +2422,12 @@ function renderNavCounts(p, emp) {
   document.getElementById('ctRec').textContent = emp ? numActive(emp.recherche) : '—';
   document.getElementById('ctFlt').textContent = p ? numActive(p.flotte_au_sol) : '—';
   document.getElementById('ctDef').textContent = p ? numActive(p.defenses) : '—';
+  const ctRap = document.getElementById('ctRap');
+  if (ctRap) {
+    const me = state.current;
+    const n = me ? collectRapports(me).length : 0;
+    ctRap.textContent = n || '—';
+  }
 }
 
 function renderResourceStrip(p) {
@@ -2996,6 +3077,24 @@ function renderGalaxie() {
   const myPlanet = state.players[state.current]?.planetes?.[0];
   const myCoord = myPlanet?.coordonnees ? myPlanet.coordonnees.join(':') : null;
 
+  // Index des flottes hostiles incoming, par nom de planète cible.
+  // Une flotte est "hostile sur moi" si vers.joueur === current et type ≠ retour.
+  const me = state.current;
+  const hostileTypes = new Set(['attaque', 'siege', 'pillage', 'bombardement', 'espionnage']);
+  const incomingByPlanet = new Map();
+  for (const [pname, e] of Object.entries(state.players || {})) {
+    if (pname === me) continue;
+    for (const f of (e.flottes_en_vol || [])) {
+      if (f.vers?.joueur !== me) continue;
+      const dest = f.vers?.planete;
+      if (!dest) continue;
+      const t = (f.type_mission || '').toLowerCase();
+      if (!hostileTypes.has(t)) continue;
+      if (!incomingByPlanet.has(dest)) incomingByPlanet.set(dest, []);
+      incomingByPlanet.get(dest).push({ from: pname, type: t, arr: f.tick_arrivee, comp: f.composition });
+    }
+  }
+
   let html = `<h2 class="sect">Cartographie galactique <span class="num">§ G</span> <span class="rule"></span></h2><div class="galaxy">`;
   for (const [coord, sys] of Object.entries(g.systemes)) {
     const star = sys.etoile || {};
@@ -3020,19 +3119,29 @@ function renderGalaxie() {
       // Une planète à moi (pas la courante) = cible valide pour transport interne.
       const isAllyOwn = t === 'planete' && owner === state.current && !isMine;
       const isMissionTarget = isEnemy || isAllyOwn;
+      const incoming = (t === 'planete' && pos.nom) ? incomingByPlanet.get(pos.nom) : null;
+      const hasIncoming = incoming && incoming.length > 0;
       let tip = '';
       if (t === 'planete') {
         tip = `${pos.nom || 'planète'} · ${cls || '?'}${owner ? ' · ' + owner : ' · libre'}`;
         if (isEnemy) tip += ' · clic → mission';
         else if (isAllyOwn) tip += ' · clic → transport';
+        if (hasIncoming) {
+          const cur = state.manifest?.tick ?? 0;
+          for (const inc of incoming) {
+            const left = inc.arr ? Math.max(0, inc.arr - cur) : null;
+            tip += ` · ⚠ ${inc.type} ← ${inc.from}${left != null ? ` (T-${left})` : ''}`;
+          }
+        }
       } else if (t === 'asteroide') {
         tip = `astéroïde`;
       } else { tip = `vide`; }
       const dataAttrs = isMissionTarget
         ? ` data-mission-target="${owner}|${pos.nom || ''}"`
         : '';
-      html += `<div class="pos ${kind} ${isMine?'mine':''} ${isEnemy?'enemy':''} ${isAllyOwn?'allyown':''}" data-c="${cls||''}"${dataAttrs}>
+      html += `<div class="pos ${kind} ${isMine?'mine':''} ${isEnemy?'enemy':''} ${isAllyOwn?'allyown':''} ${hasIncoming?'incoming':''}" data-c="${cls||''}"${dataAttrs}>
         <span class="num">${i}</span>${dot}
+        ${hasIncoming ? `<span class="incoming-flag" title="${incoming.length} flotte(s) hostile(s)">⚠</span>` : ''}
         ${owner ? `<span class="own">${owner.slice(0,5)}</span>` : ''}
         <span class="tip">${tip}</span>
       </div>`;
@@ -3065,6 +3174,158 @@ function renderJournal(p, emp) {
       <span style="color:${l.tone==='phos'?'var(--phosphor)':l.tone==='rust'?'var(--rust)':'var(--bone)'}">${l.txt}</span>
     </div>`).join('')}
     </div>`;
+}
+
+// État local du panneau rapports : index du rapport ouvert (-1 = liste).
+const rapState = { openIdx: -1, openKey: null };
+
+function collectRapports(me) {
+  const r = state.reports || {};
+  const out = [];
+  for (const it of (r.intelByPlayer?.[me] || [])) {
+    out.push({ kind: 'intel', tick: it.tick, filename: it.filename, content: it.content });
+  }
+  for (const it of (r.alertsByPlayer?.[me] || [])) {
+    out.push({ kind: 'alert', tick: it.tick, filename: it.filename, content: it.content });
+  }
+  for (const b of (r.battles || [])) {
+    if (b.attaquant === me || b.defenseur === me) {
+      out.push({ kind: 'battle', tick: b.tick, filename: b.filename, content: b.content,
+                 attaquant: b.attaquant, defenseur: b.defenseur, lieu: b.lieu, issue: b.issue });
+    }
+  }
+  // tri descendant par tick (récents en haut)
+  out.sort((a, b) => b.tick - a.tick);
+  return out;
+}
+
+// Rendu markdown minimal — suffisant pour les rapports générés par tick-core.
+function renderMd(md) {
+  let s = String(md || '');
+  // strip frontmatter YAML (--- ... ---)
+  s = s.replace(/^---\n[\s\S]*?\n---\n?/, '');
+  // escape HTML
+  s = s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  // headers
+  s = s.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  // bold
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // blockquotes
+  s = s.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  // bullets — laisse en texte préformaté (white-space: pre-wrap fera le reste)
+  return s;
+}
+
+function rapportTitle(r) {
+  if (r.kind === 'intel') {
+    const m = /Rapport d'espionnage — ([^\n]+)/.exec(r.content);
+    return m ? `espionnage · ${m[1]}` : 'rapport d\'espionnage';
+  }
+  if (r.kind === 'alert') return `alerte · espionnage intercepté`;
+  if (r.kind === 'battle') {
+    const me = state.current;
+    const adv = r.attaquant === me ? r.defenseur : r.attaquant;
+    const role = r.attaquant === me ? 'attaque' : 'défense';
+    return `${role} · ${adv || '?'}/${r.lieu || '?'}`;
+  }
+  return 'rapport';
+}
+
+function rapportIssueLabel(r) {
+  if (r.kind !== 'battle' || !r.issue) return '';
+  const map = {
+    'victoire-attaquant': 'victoire att.',
+    'victoire-defenseur': 'victoire déf.',
+    'match-nul': 'nul',
+  };
+  return map[r.issue] || r.issue;
+}
+
+function renderRapports() {
+  const v = document.getElementById('vRap');
+  if (!v) return;
+  const me = state.current;
+  if (!me) { v.innerHTML = `<h2 class="sect">Rapports</h2><div class="empty-stamp">aucun commandant sélectionné</div>`; return; }
+
+  const items = collectRapports(me);
+
+  if (rapState.openIdx >= 0 && rapState.openKey) {
+    const r = items.find(x => `${x.kind}|${x.filename}` === rapState.openKey);
+    if (r) {
+      v.innerHTML = `<h2 class="sect">Rapports <span class="num">§ R</span> <span class="rule"></span></h2>
+        <a class="rap-back" id="rapBack">← retour à la liste</a>
+        <div class="rap-detail">${renderMd(r.content)}</div>`;
+      const back = document.getElementById('rapBack');
+      if (back) back.onclick = () => { rapState.openIdx = -1; rapState.openKey = null; renderRapports(); };
+      return;
+    }
+    // clé périmée
+    rapState.openIdx = -1; rapState.openKey = null;
+  }
+
+  if (!items.length) {
+    v.innerHTML = `<h2 class="sect">Rapports <span class="num">§ R</span> <span class="rule"></span></h2>
+      <div class="empty-stamp">aucun rapport — espionne ou attaque pour en générer</div>`;
+    return;
+  }
+
+  let html = `<h2 class="sect">Rapports <span class="num">§ R</span> <span class="rule"></span></h2><div class="rap-list">`;
+  for (const r of items) {
+    const key = `${r.kind}|${r.filename}`;
+    html += `<div class="rap-item ${r.kind}" data-rap-key="${escapeHtml(key)}">
+      <span class="rap-tick">T${String(r.tick).padStart(3,'0')}</span>
+      <span class="rap-kind">${r.kind === 'intel' ? 'Intel' : r.kind === 'alert' ? 'Alerte' : 'Bataille'}</span>
+      <span class="rap-title">${escapeHtml(rapportTitle(r))}</span>
+      <span class="rap-issue">${rapportIssueLabel(r)}</span>
+    </div>`;
+  }
+  html += `</div>`;
+  v.innerHTML = html;
+  v.querySelectorAll('[data-rap-key]').forEach(el => {
+    el.addEventListener('click', () => {
+      rapState.openKey = el.dataset.rapKey;
+      rapState.openIdx = 0;
+      renderRapports();
+    });
+  });
+}
+
+function renderClassement() {
+  const v = document.getElementById('vCls');
+  if (!v) return;
+  const me = state.current;
+  const rows = Object.entries(state.players || {})
+    .map(([name, emp]) => ({
+      name,
+      score: emp?.score ?? 0,
+      planetes: (emp?.planetes || []).length,
+      flotte: Object.values((emp?.planetes || [])[0]?.flotte_au_sol || {}).reduce((a, b) => a + (b || 0), 0)
+              + ((emp?.flottes_en_vol) || []).reduce((a, f) => a + Object.values(f.composition || {}).reduce((x, y) => x + (y || 0), 0), 0),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  if (!rows.length) {
+    v.innerHTML = `<h2 class="sect">Classement</h2><div class="empty-stamp">aucun empire</div>`;
+    return;
+  }
+
+  let html = `<h2 class="sect">Classement galactique <span class="num">§ C</span> <span class="rule"></span></h2>
+    <table class="hs-table">
+      <thead><tr><th class="rank">#</th><th>Empire</th><th class="num-c">Planètes</th><th class="num-c">Flotte</th><th class="score">Score</th></tr></thead>
+      <tbody>`;
+  rows.forEach((r, i) => {
+    const isMe = r.name === me ? ' class="me"' : '';
+    html += `<tr${isMe}>
+      <td class="rank">${i + 1}</td>
+      <td>${escapeHtml(r.name)}</td>
+      <td class="num-c">${r.planetes}</td>
+      <td class="num-c">${fmtCompact(r.flotte)}</td>
+      <td class="score">${fmt(r.score)}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  v.innerHTML = html;
 }
 
 function renderRail(p, emp) {
@@ -4320,9 +4581,46 @@ function detectNotifs() {
           body: `<b>${m.res}</b> sur <b>${m.p.nom}</b> à ${pct}% (${fmt(m.r.stock)}/${fmt(m.r.capacite)}).` });
       }
     }
+    // Rapports nouveaux : intel/alert/battle pour le joueur courant
+    for (const r of (state.reports?.intelByPlayer?.[me] || [])) {
+      const key = `intel|${r.filename}`;
+      if (!prev.reports.has(key)) {
+        notif.add({ type: 'rapport-intel', severity: 'med', key,
+          title: 'Nouveau rapport d\'espionnage',
+          body: `Tick ${r.tick} · ${escapeHtml(rapportTitle({kind:'intel', content:r.content}))}` });
+      }
+    }
+    for (const r of (state.reports?.alertsByPlayer?.[me] || [])) {
+      const key = `alert|${r.filename}`;
+      if (!prev.reports.has(key)) {
+        notif.add({ type: 'rapport-alert', severity: 'high', key,
+          title: '⚠ Tu as été espionné',
+          body: `Tick ${r.tick} · contre-espionnage activé` });
+      }
+    }
+    for (const b of (state.reports?.battles || [])) {
+      if (b.attaquant !== me && b.defenseur !== me) continue;
+      const key = `battle|${b.filename}`;
+      if (!prev.reports.has(key)) {
+        const isAtt = b.attaquant === me;
+        const adv = isAtt ? b.defenseur : b.attaquant;
+        const sev = (!isAtt && b.issue === 'victoire-attaquant') ? 'high' : 'med';
+        notif.add({ type: 'rapport-battle', severity: sev, key,
+          title: isAtt ? 'Rapport de bataille' : '⚔ Attaque sur ton empire',
+          body: `Tick ${b.tick} · ${isAtt ? 'contre' : 'par'} <b>${adv}</b> sur <b>${b.lieu || '?'}</b> · ${b.issue || ''}` });
+      }
+    }
   }
 
-  notifSnap[me] = { tick, chantiers, research, incoming, stockFull };
+  // Index des rapports déjà notifiés (sous forme Set de clés)
+  const reportKeys = new Set();
+  for (const r of (state.reports?.intelByPlayer?.[me] || [])) reportKeys.add(`intel|${r.filename}`);
+  for (const r of (state.reports?.alertsByPlayer?.[me] || [])) reportKeys.add(`alert|${r.filename}`);
+  for (const b of (state.reports?.battles || [])) {
+    if (b.attaquant === me || b.defenseur === me) reportKeys.add(`battle|${b.filename}`);
+  }
+
+  notifSnap[me] = { tick, chantiers, research, incoming, stockFull, reports: reportKeys };
   refreshNotifUI();
 }
 

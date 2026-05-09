@@ -1301,6 +1301,26 @@ h2.sect .rule {
 .rap-detail blockquote { border-left: 2px solid var(--phosphor); padding-left: 10px; margin: 8px 0; color: var(--phosphor); }
 .rap-back { display: inline-block; margin-bottom: 10px; color: var(--brass); cursor: pointer; font-family: var(--mono); font-size: 11px; }
 .rap-back:hover { color: var(--bone-2); }
+.rap-actions {
+  margin-top: 14px; display: flex; flex-direction: column; gap: 8px;
+  align-items: flex-start;
+}
+.rap-actions .rap-warn {
+  font-family: var(--mono); font-size: 11px; color: var(--brass-dim);
+  font-style: italic;
+}
+.rap-attack-btn {
+  appearance: none; cursor: pointer;
+  font-family: var(--display); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--bone-2);
+  background: var(--brass);
+  border: 1px solid var(--brass-2);
+  padding: 10px 16px; border-radius: 4px;
+  transition: background .12s, transform .12s;
+}
+.rap-attack-btn:hover { background: var(--brass-2); transform: translateY(-1px); }
+.rap-attack-btn:active { transform: translateY(0); }
 
 /* classement view */
 .hs-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-family: var(--mono); font-size: 12px; }
@@ -3309,6 +3329,50 @@ function rapportIssueLabel(r) {
   return map[r.issue] || r.issue;
 }
 
+// Extrait la cible d'un rapport d'espionnage depuis le frontmatter YAML.
+// Format produit par engine/tick-core.mjs (renderIntelReport) :
+//   ---
+//   type: rapport-espionnage
+//   tick: 42
+//   cible: { joueur: NomJoueur, planete: NomPlanete }
+//   niveau_intel: 3
+//   ---
+// Fallback : split sur le titre "Rapport d'espionnage — Joueur/Planete".
+function parseIntelTarget(r) {
+  if (!r || r.kind !== 'intel') return null;
+  const c = String(r.content || '');
+  const mCible = /cible\s*:\s*\{\s*joueur\s*:\s*([^,}]+?)\s*,\s*planete\s*:\s*([^,}]+?)\s*\}/i.exec(c);
+  if (mCible) {
+    const joueur = mCible[1].replace(/^['"]|['"]$/g, '').trim();
+    const planete = mCible[2].replace(/^['"]|['"]$/g, '').trim();
+    let niveau = null;
+    const mN = /niveau_intel\s*:\s*(\d+)/i.exec(c);
+    if (mN) niveau = parseInt(mN[1], 10);
+    if (joueur && planete) return { joueur, planete, niveau };
+  }
+  const mT = /Rapport d'espionnage — ([^\/\n]+)\/([^\n]+)/.exec(c);
+  if (mT) return { joueur: mT[1].trim(), planete: mT[2].trim(), niveau: null };
+  return null;
+}
+
+// Bascule sur la galaxie, ouvre le compositeur de mission pré-réglé en attaque.
+function launchAttackFromReport(joueurCible, planeteCible) {
+  if (!joueurCible || !planeteCible) return;
+  state.view = 'galaxie';
+  localStorage.setItem('aetheris.view', 'galaxie');
+  applyView();
+  // openMission gère le pré-set des champs ; on force ensuite le type "attaque"
+  // si le bouton n'est pas désactivé (ex. cible alliée).
+  openMission(joueurCible, planeteCible);
+  const atkBtn = document.querySelector('#missionType button[data-mt="attaque"]');
+  if (atkBtn && !atkBtn.disabled) {
+    mission.type = 'attaque';
+    document.querySelectorAll('#missionType button').forEach(x =>
+      x.classList.toggle('on', x.dataset.mt === 'attaque'));
+    if (typeof renderMissionFleet === 'function') renderMissionFleet();
+  }
+}
+
 function renderRapports() {
   const v = document.getElementById('vRap');
   if (!v) return;
@@ -3320,11 +3384,32 @@ function renderRapports() {
   if (rapState.openIdx >= 0 && rapState.openKey) {
     const r = items.find(x => `${x.kind}|${x.filename}` === rapState.openKey);
     if (r) {
+      let actionsHtml = '';
+      if (r.kind === 'intel') {
+        const tgt = parseIntelTarget(r);
+        if (tgt) {
+          // Niveau d'intel < 2 = pas de visibilité sur les défenses adverses.
+          const lowIntel = tgt.niveau != null && tgt.niveau < 2;
+          actionsHtml = `<div class="rap-actions">
+            ${lowIntel ? `<div class="rap-warn">Niveau d'intel insuffisant pour évaluer les défenses</div>` : ''}
+            <button type="button" class="rap-attack-btn" id="rapAttackBtn"
+              data-target-joueur="${escapeHtml(tgt.joueur)}"
+              data-target-planete="${escapeHtml(tgt.planete)}">⚔ Lancer une attaque sur cette planète</button>
+          </div>`;
+        }
+      }
       v.innerHTML = `<h2 class="sect">Rapports <span class="num">§ R</span> <span class="rule"></span></h2>
         <a class="rap-back" id="rapBack">← retour à la liste</a>
-        <div class="rap-detail">${renderMd(r.content)}</div>`;
+        <div class="rap-detail">${renderMd(r.content)}</div>
+        ${actionsHtml}`;
       const back = document.getElementById('rapBack');
       if (back) back.onclick = () => { rapState.openIdx = -1; rapState.openKey = null; renderRapports(); };
+      const atk = document.getElementById('rapAttackBtn');
+      if (atk) atk.onclick = () => {
+        const j = atk.dataset.targetJoueur;
+        const pl = atk.dataset.targetPlanete;
+        launchAttackFromReport(j, pl);
+      };
       return;
     }
     // clé périmée

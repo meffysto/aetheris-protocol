@@ -3202,6 +3202,9 @@ function applyView() {
   const emp = state.players[state.current];
   const p = emp && (emp.planetes || [])[0];
   if (emp) renderPlanetHead(p, emp);
+  if (state.view === 'messagerie') {
+    try { renderMsgView(); refreshMsgCount(); } catch {}
+  }
 }
 document.getElementById('nav').addEventListener('click', e => {
   const btn = e.target.closest('button[data-view]'); if (!btn) return;

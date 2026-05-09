@@ -272,3 +272,147 @@ function constTimeEq(a, b) {
   for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
   return d === 0;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Nostr events — id, signature, helpers (NIP-01)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Sérialisation canonique NIP-01 pour calculer l'id :
+ * sha256(JSON.stringify([0, pubkey, created_at, kind, tags, content]))
+ */
+export function serializeEvent(evt) {
+  return JSON.stringify([0, evt.pubkey, evt.created_at, evt.kind, evt.tags, evt.content]);
+}
+
+export function eventId(evt) {
+  return bytesToHex(sha256(utf8.encode(serializeEvent(evt))));
+}
+
+/** Signe un event partiel (pubkey, created_at, kind, tags, content) → event complet. */
+export function signEvent(partial, privkey) {
+  const priv = typeof privkey === 'string' ? hexToBytes(privkey) : privkey;
+  const pubkey = bytesToHex(schnorr.getPublicKey(priv));
+  const evt = {
+    pubkey,
+    created_at: partial.created_at ?? Math.floor(Date.now() / 1000),
+    kind: partial.kind,
+    tags: partial.tags ?? [],
+    content: partial.content ?? '',
+  };
+  const id = eventId(evt);
+  const sig = bytesToHex(schnorr.sign(hexToBytes(id), priv));
+  return { id, ...evt, sig };
+}
+
+export function verifyEvent(evt) {
+  try {
+    const id = eventId(evt);
+    if (id !== evt.id) return false;
+    return schnorr.verify(hexToBytes(evt.sig), hexToBytes(id), hexToBytes(evt.pubkey));
+  } catch { return false; }
+}
+
+export function randomEphemeralKey() {
+  return schnorr.utils.randomSecretKey();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NIP-17 gift-wrap
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Pipeline d'envoi (Alice → Bob) :
+//   1. rumor   = event kind 14 NON SIGNÉ (juste id + pubkey émetteur)
+//   2. seal    = event kind 13 signé par Alice, content = NIP-44(rumor JSON, Alice→Bob)
+//   3. wrap    = event kind 1059 signé par clé éphémère, content = NIP-44(seal JSON, eph→Bob),
+//                tags=[["p", Bob]], created_at randomisé (±2j passé).
+//
+// Pipeline de réception : déchiffre wrap avec sa privkey + pubkey du wrap → seal.
+// Vérifie seal.sig, déchiffre seal avec sa privkey + seal.pubkey → rumor.
+// Le `from` autoritaire est seal.pubkey (PAS wrap.pubkey).
+
+export const KIND_DM_RUMOR = 14;
+export const KIND_DM_SEAL = 13;
+export const KIND_DM_WRAP = 1059;
+
+const TWO_DAYS = 2 * 24 * 3600;
+
+function jitterPast(nowSec = Math.floor(Date.now() / 1000)) {
+  // ±2 jours de jitter dans le passé (recommandation NIP-17 anti-corrélation).
+  const jitter = Math.floor(Math.random() * TWO_DAYS * 2) - TWO_DAYS;
+  return nowSec - Math.max(0, jitter); // toujours dans le passé
+}
+
+/**
+ * Construit un gift-wrap NIP-17 prêt à publier.
+ * `senderPriv` (32B), `recipientPub` (32B x-only hex ou bytes).
+ * Retourne l'event signé (kind 1059).
+ */
+export function wrapDM(plaintext, senderPriv, recipientPub, opts = {}) {
+  const senderPrivBytes = typeof senderPriv === 'string' ? hexToBytes(senderPriv) : senderPriv;
+  const recipientPubBytes = typeof recipientPub === 'string' ? hexToBytes(recipientPub) : recipientPub;
+  const recipientPubHex = typeof recipientPub === 'string' ? recipientPub : bytesToHex(recipientPub);
+  const senderPubHex = bytesToHex(schnorr.getPublicKey(senderPrivBytes));
+  const nowSec = opts.now ?? Math.floor(Date.now() / 1000);
+
+  // 1) rumor (NON signé — pas de sig).
+  const rumorPartial = {
+    pubkey: senderPubHex,
+    created_at: nowSec,
+    kind: KIND_DM_RUMOR,
+    tags: [['p', recipientPubHex], ...(opts.extraTags ?? [])],
+    content: plaintext,
+  };
+  const rumor = { id: eventId(rumorPartial), ...rumorPartial };
+
+  // 2) seal — signé par sender, content = NIP-44(rumor JSON, sender→recipient).
+  const sealContent = encryptNip44(JSON.stringify(rumor), senderPrivBytes, recipientPubBytes);
+  const seal = signEvent({
+    kind: KIND_DM_SEAL,
+    created_at: jitterPast(nowSec),
+    tags: [],
+    content: sealContent,
+  }, senderPrivBytes);
+
+  // 3) wrap — clé éphémère, content = NIP-44(seal JSON, eph→recipient).
+  const ephPriv = randomEphemeralKey();
+  const wrapContent = encryptNip44(JSON.stringify(seal), ephPriv, recipientPubBytes);
+  const wrap = signEvent({
+    kind: KIND_DM_WRAP,
+    created_at: jitterPast(nowSec),
+    tags: [['p', recipientPubHex]],
+    content: wrapContent,
+  }, ephPriv);
+
+  return wrap;
+}
+
+/**
+ * Déchiffre un gift-wrap NIP-17 avec la privkey du destinataire.
+ * Retourne {from, content, createdAt, rumor, seal} ou null si invalide.
+ */
+export function unwrapDM(giftEvent, recipientPriv) {
+  try {
+    if (!giftEvent || giftEvent.kind !== KIND_DM_WRAP) return null;
+    const recipientPrivBytes = typeof recipientPriv === 'string' ? hexToBytes(recipientPriv) : recipientPriv;
+    // Déchiffre wrap avec privkey destinataire + pubkey ÉMETTEUR du wrap (la clé éphémère).
+    const sealJSON = decryptNip44(giftEvent.content, recipientPrivBytes, hexToBytes(giftEvent.pubkey));
+    const seal = JSON.parse(sealJSON);
+    if (!seal || seal.kind !== KIND_DM_SEAL) return null;
+    if (!verifyEvent(seal)) return null;
+    // Déchiffre seal avec privkey destinataire + seal.pubkey (vraie identité émetteur).
+    const rumorJSON = decryptNip44(seal.content, recipientPrivBytes, hexToBytes(seal.pubkey));
+    const rumor = JSON.parse(rumorJSON);
+    if (!rumor || rumor.kind !== KIND_DM_RUMOR) return null;
+    if (rumor.pubkey !== seal.pubkey) return null; // anti-impersonation
+    return {
+      from: seal.pubkey,
+      content: rumor.content,
+      createdAt: rumor.created_at,
+      rumor,
+      seal,
+    };
+  } catch {
+    return null;
+  }
+}

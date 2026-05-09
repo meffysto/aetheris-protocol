@@ -4716,7 +4716,12 @@ function renderMsgView() {
               ${newThreadOptions}
             </select>
           </div>
-        ` : ''}
+        ` : `
+          <div class="empty" style="padding:14px;line-height:1.5">
+            Aucun autre joueur dans le roster.<br>
+            Invite quelqu'un à rejoindre via <code>join-bitcoin.html</code> — il apparaîtra ici dès que sa TX <code>join</code> sera confirmée et scannée.
+          </div>
+        `}
         ${threadsHtml}
       </div>
       <div class="msg-pane">${paneHtml}</div>

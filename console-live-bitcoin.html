@@ -656,6 +656,43 @@ h2.sect .rule {
   50% { box-shadow: 0 0 0 7px rgba(168,58,37,0); }
 }
 
+/* ─── decoder view ────────────────────────────────────────── */
+.dec-shell { max-width: 640px; display: flex; flex-direction: column; gap: 22px; padding: 4px 0 40px; }
+.dec-eyebrow { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--bone-dim); font-family: var(--mono); }
+.dec-title { font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--bone-2); line-height: 1.2; margin: 4px 0 0; }
+.dec-lead { font-size: 12px; color: var(--bone-dim); line-height: 1.6; margin: 0; }
+.dec-lead code { font-family: var(--mono); font-size: 11px; background: var(--ink-4); border-radius: 4px; padding: 1px 5px; }
+.dec-controls { display: flex; flex-direction: column; gap: 10px; }
+.dec-row { display: flex; gap: 10px; align-items: stretch; }
+.dec-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.dec-lbl { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bone-dim); font-family: var(--mono); }
+.dec-input { background: var(--ink-2); border: 1px solid var(--hairline); border-radius: 8px; color: var(--brass); font-family: var(--mono); font-size: 12px; padding: 9px 12px; outline: none; width: 100%; transition: border-color .15s; }
+.dec-input:focus { border-color: var(--brass-dim); }
+.dec-input::placeholder { color: var(--bone-dim); }
+.dec-btn { background: var(--brass); border: none; border-radius: 8px; color: var(--ink); font-family: var(--mono); font-size: 12px; font-weight: 500; padding: 9px 22px; cursor: pointer; white-space: nowrap; transition: background .15s; align-self: flex-end; }
+.dec-btn:hover { background: var(--brass-2); }
+.dec-btn:disabled { opacity: 0.4; cursor: default; }
+.dec-card { background: var(--ink-2); border: 1px solid var(--hairline); border-radius: var(--r-card); padding: 20px 24px; display: none; flex-direction: column; gap: 14px; box-shadow: var(--shadow-card); }
+.dec-card.on { display: flex; }
+.dec-meta { display: grid; grid-template-columns: auto 1fr; gap: 3px 16px; font-size: 11px; font-family: var(--mono); }
+.dec-mk { color: var(--bone-dim); }
+.dec-mv { color: var(--bone); }
+.dec-mv.tag { color: var(--brass); font-weight: 600; }
+.dec-hr { border: none; border-top: 1px solid var(--hairline); }
+.dec-out { font-size: 12px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; overflow: auto; max-height: 440px; margin: 0; font-family: var(--mono); }
+.dec-out .y-comment { color: var(--bone-dim); }
+.dec-out .y-key { color: #3a7a9c; }
+.dec-out .y-val { color: var(--green); }
+.dec-out .y-num { color: var(--phosphor); }
+.dec-out .y-bool { color: var(--rust); }
+.dec-err { color: var(--rust); font-size: 12px; font-family: var(--mono); display: none; }
+.dec-err.on { display: block; }
+.dec-footer { font-size: 11px; color: var(--bone-dim); }
+.dec-footer a { color: var(--brass-dim); text-decoration: none; font-family: var(--mono); }
+.dec-footer a:hover { color: var(--brass); }
+@keyframes dec-spin { to { transform: rotate(360deg); } }
+.dec-spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--bone-dim); border-top-color: var(--brass); border-radius: 50%; animation: dec-spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+
 /* simple table for fleet/research/defense */
 .tbl {
   width: 100%; border-collapse: collapse;
@@ -1953,6 +1990,11 @@ body.tick-pulsed::after {
       <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="2"/><path d="M3 12c5-9 13-9 18 0M21 12c-5 9-13 9-18 0"/></svg></span>
       Galaxie
     </button>
+    <div class="heading" style="margin-top:18px">outils</div>
+    <button data-view="decoder">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5l4 4"/><path d="M8 11h6M11 8v6"/></svg></span>
+      Décoder TX
+    </button>
     <div class="heading" style="margin-top:18px">flux</div>
     <button data-view="journal">
       <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 4h11l3 3v13H5z"/><path d="M9 9h7M9 13h7M9 17h4"/></svg></span>
@@ -1991,6 +2033,46 @@ body.tick-pulsed::after {
     <div class="view" data-v="rapports" id="vRap"></div>
     <div class="view" data-v="marche" id="vMkt"></div>
     <div class="view" data-v="classement" id="vCls"></div>
+    <div class="view" data-v="decoder" id="vDecoder">
+      <div class="dec-shell">
+        <header class="dec-header">
+          <div class="dec-eyebrow">Outils · On-chain</div>
+          <h2 class="dec-title">Décodeur d'inscription Tapscript</h2>
+          <p class="dec-lead">Extrait le payload <code>OP_0 OP_IF … OP_ENDIF</code> du witness, détecte et décompresse le gzip, affiche le contenu brut.</p>
+        </header>
+        <div class="dec-controls">
+          <div class="dec-row">
+            <div class="dec-field" style="flex:3">
+              <label class="dec-lbl" for="decTxid">TXID</label>
+              <input id="decTxid" type="text" spellcheck="false" class="dec-input"
+                     placeholder="b6a5e25b…"
+                     value="b6a5e25bb67ca9aaefabdb9ef692928d9d4053dfc145f5034271859e3ccd8430"/>
+            </div>
+            <div class="dec-field" style="flex:1">
+              <label class="dec-lbl" for="decNet">Réseau</label>
+              <select id="decNet" class="dec-input">
+                <option value="mutinynet" selected>Mutinynet</option>
+                <option value="signet">Signet</option>
+                <option value="testnet">Testnet</option>
+                <option value="mainnet">Mainnet</option>
+              </select>
+            </div>
+          </div>
+          <div class="dec-row" style="justify-content:flex-end">
+            <button id="decBtn" class="dec-btn">Décoder</button>
+          </div>
+        </div>
+        <p class="dec-err" id="decErr"></p>
+        <div class="dec-card" id="decCard">
+          <div class="dec-meta" id="decMeta"></div>
+          <hr class="dec-hr"/>
+          <pre id="decOut" class="dec-out"></pre>
+        </div>
+        <div class="dec-footer">
+          <a id="decLink" href="#" target="_blank" rel="noopener">Voir sur l'explorer →</a>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- RIGHT RAIL -->
@@ -6178,6 +6260,119 @@ async function pollNewBlocks() {
   }
 }
 setInterval(pollNewBlocks, 15000);
+
+/* ─── Decode inscription ─────────────────────────────────── */
+{
+  const DEC_APIS = {
+    mutinynet: 'https://mutinynet.com/api',
+    signet:    'https://mempool.space/signet/api',
+    testnet:   'https://mempool.space/testnet/api',
+    mainnet:   'https://mempool.space/api',
+  };
+  const DEC_EXPLORERS = {
+    mutinynet: 'https://mutinynet.com/tx/',
+    signet:    'https://mempool.space/signet/tx/',
+    testnet:   'https://mempool.space/testnet/tx/',
+    mainnet:   'https://mempool.space/tx/',
+  };
+
+  async function decGunzip(bytes) {
+    const ds = new DecompressionStream('gzip');
+    const w = ds.writable.getWriter(); w.write(bytes); w.close();
+    const chunks = []; const r = ds.readable.getReader();
+    for (;;) { const { done, value } = await r.read(); if (done) break; chunks.push(value); }
+    const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+    let off = 0; for (const c of chunks) { out.set(c, off); off += c.length; }
+    return new TextDecoder().decode(out);
+  }
+
+  function decHex(hex) {
+    const b = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    return b;
+  }
+
+  function decExtract(asm) {
+    const m = asm.match(/OP_0 OP_IF\s+([\s\S]+?)\s+OP_ENDIF/);
+    if (!m) return null;
+    const body = m[1];
+    const tagM = body.match(/^OP_PUSHBYTES_4 ([0-9a-f]{8})/);
+    const tag  = tagM ? new TextDecoder().decode(decHex(tagM[1])) : null;
+    const datM = body.match(/OP_PUSHDATA\d+ ([0-9a-f]+)$/) ?? body.match(/OP_PUSHBYTES_\d+ ([0-9a-f]+)$/);
+    if (!datM) return null;
+    return { tag, hex: datM[1] };
+  }
+
+  function decEsc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function decColorYaml(text) {
+    return text.split('\n').map(line => {
+      if (line.trimStart().startsWith('#')) return `<span class="y-comment">${decEsc(line)}</span>`;
+      const kv = line.match(/^(\s*)([\w_.-]+)(\s*:\s*)(.*)$/);
+      if (!kv) return decEsc(line);
+      const [, indent, key, sep, val] = kv;
+      let vHtml;
+      if (val === '') vHtml = '';
+      else if (/^-?\d[\d.]*$/.test(val)) vHtml = `<span class="y-num">${decEsc(val)}</span>`;
+      else if (val === 'true' || val === 'false') vHtml = `<span class="y-bool">${decEsc(val)}</span>`;
+      else vHtml = `<span class="y-val">${decEsc(val)}</span>`;
+      return `${decEsc(indent)}<span class="y-key">${decEsc(key)}</span>${decEsc(sep)}${vHtml}`;
+    }).join('\n');
+  }
+
+  const decBtn  = document.getElementById('decBtn');
+  const decCard = document.getElementById('decCard');
+  const decErr  = document.getElementById('decErr');
+  const decMeta = document.getElementById('decMeta');
+  const decOut  = document.getElementById('decOut');
+  const decLink = document.getElementById('decLink');
+
+  if (decBtn) {
+    decBtn.addEventListener('click', async () => {
+      const txid = document.getElementById('decTxid').value.trim();
+      const net  = document.getElementById('decNet').value;
+      if (!txid) { decErr.textContent = 'Entre un TXID.'; decErr.classList.add('on'); return; }
+      decErr.classList.remove('on');
+      decCard.classList.remove('on');
+      decBtn.disabled = true;
+      decBtn.innerHTML = '<span class="dec-spinner"></span>Récupération…';
+      try {
+        const res = await fetch(`${DEC_APIS[net]}/tx/${txid}`);
+        if (!res.ok) throw new Error(`API ${res.status} — transaction introuvable sur ${net}`);
+        const tx = await res.json();
+        let found = null;
+        for (const inp of tx.vin) {
+          if (!inp.inner_witnessscript_asm) continue;
+          found = decExtract(inp.inner_witnessscript_asm);
+          if (found) break;
+        }
+        if (!found) throw new Error('Aucune inscription Tapscript (OP_0 OP_IF envelope) dans cette transaction.');
+        const { tag, hex } = found;
+        const bytes  = decHex(hex);
+        const isGzip = bytes[0] === 0x1f && bytes[1] === 0x8b;
+        const content = isGzip ? await decGunzip(bytes) : new TextDecoder().decode(bytes);
+        decMeta.innerHTML = [
+          ['tag',     tag ?? '(inconnu)', 'tag'],
+          ['format',  isGzip ? 'gzip → UTF-8' : 'raw', ''],
+          ['bytes',   bytes.length + ' octets', ''],
+          ['bloc',    tx.status?.block_height ?? 'non confirmé', ''],
+        ].map(([k, v, cls]) =>
+          `<span class="dec-mk">${decEsc(k)}</span><span class="dec-mv${cls ? ' '+cls : ''}">${decEsc(String(v))}</span>`
+        ).join('');
+        decOut.innerHTML = decColorYaml(content);
+        decLink.href = DEC_EXPLORERS[net] + txid;
+        decLink.textContent = `Voir sur l'explorer (${net}) →`;
+        decCard.classList.add('on');
+      } catch (e) {
+        decErr.textContent = e.message;
+        decErr.classList.add('on');
+      } finally {
+        decBtn.disabled = false;
+        decBtn.textContent = 'Décoder';
+      }
+    });
+  }
+}
 </script>
 </body>
 </html>

@@ -380,12 +380,12 @@ footer a:hover { color: var(--phosphor); }
       <div class="val dim" id="status-block">—</div>
     </div>
     <div class="item">
-      <div class="lbl">Cycle = 1 bloc</div>
-      <div class="val dim">≈ 30 s</div>
+      <div class="lbl">Tick = 30 blocs</div>
+      <div class="val dim">≈ 15 min</div>
     </div>
     <div class="item">
       <div class="lbl">Genesis</div>
-      <div class="val dim">3 084 991</div>
+      <div class="val dim">3 085 121</div>
     </div>
   </div>
 
@@ -437,8 +437,8 @@ footer a:hover { color: var(--phosphor); }
 </main>
 
 <script>
-const BLOC_GENESIS = 3084991;
-const BLOCS_PAR_TICK = 1;
+const BLOC_GENESIS = 3085121;
+const BLOCS_PAR_TICK = 30;
 
 async function loadStatus() {
   try {

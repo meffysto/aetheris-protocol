@@ -54,6 +54,12 @@ export async function bootBitcoin({
   }
   if (!api) throw new Error('bootBitcoin: api Esplora requis');
 
+  // Mutinynet vise 30s/bloc ; mainnet 10min/bloc. Pour l'instant on assume
+  // Mutinynet (le seul réseau supporté par boot-bitcoin), donc 1 tick =
+  // blocsParTick × 30s. duree_tick_min sert au countdown UI et aux ETA.
+  const SEC_PAR_BLOC = 30;
+  const dureeTickMin = (blocsParTick * SEC_PAR_BLOC) / 60;
+
   // ─── État initial : manifest dérivé de genesis, empires vides ───────────
   let manifest = {
     version: 1,
@@ -62,7 +68,7 @@ export async function bootBitcoin({
     tick: 0,
     seed: genesis.seed,
     demarrage_iso: genesis.demarrage_iso,
-    duree_tick_min: 15,
+    duree_tick_min: dureeTickMin,
     parametres: { ...genesis.parametres },
     hash_etat: 'sha256:' + '0'.repeat(32),
   };

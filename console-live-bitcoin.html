@@ -2511,22 +2511,32 @@ function chantierETA(remainUtj) {
   return { tickArrivee, mins };
 }
 
-// Mode Bitcoin : un tick = un bloc Mutinynet (≈30s cible). Le compte à rebours
-// estime le temps avant le prochain bloc en se basant sur la dernière fois où
-// on a vu le tip changer (state.bitcoin.lastBlockSeenAt).
+// Mode Bitcoin : un tick = blocs_par_tick blocs Mutinynet (≈30s cible/bloc).
+// Le compte à rebours estime le temps avant la prochaine FRONTIÈRE de tick
+// (pas le prochain bloc), basé sur la position du tip dans le cycle courant.
 const BLOCK_INTERVAL_SEC = 30;
 function nextTickInfo() {
   const m = state.manifest;
-  const seenAt = state.bitcoin?.lastBlockSeenAt || Date.now();
+  const b = state.bitcoin;
+  const N = b?.blocsParTick || 1;
+  const seenAt = b?.lastBlockSeenAt || Date.now();
   const elapsed = (Date.now() - seenAt) / 1000;
-  const secs = Math.max(0, Math.round(BLOCK_INTERVAL_SEC - elapsed));
-  const pct = Math.min(100, Math.max(0, (elapsed / BLOCK_INTERVAL_SEC) * 100));
+  // Blocs restants avant le prochain tick (1..N).
+  let blocsRestants = N;
+  if (b && Number.isFinite(b.tip) && Number.isFinite(b.blocGenesis)) {
+    const dansLeCycle = ((b.tip - b.blocGenesis) % N + N) % N;
+    blocsRestants = N - dansLeCycle;  // ∈ [1, N]
+  }
+  const totalSec = blocsRestants * BLOCK_INTERVAL_SEC;
+  const secs = Math.max(0, Math.round(totalSec - elapsed));
+  const pct = Math.min(100, Math.max(0, (1 - secs / totalSec) * 100));
   return {
     tick: m?.tick ?? 0,
     secs,
     pct,
-    mins: BLOCK_INTERVAL_SEC / 60,                  // ≈ 0.5 min / tick (Mutinynet)
-    overdue: elapsed > BLOCK_INTERVAL_SEC,
+    mins: totalSec / 60,                     // durée nominale du tick courant
+    overdue: elapsed > totalSec,
+    blocsRestants,
   };
 }
 

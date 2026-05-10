@@ -15,7 +15,11 @@ reseau: mutinynet
 
 parametres:
   tick_source: bitcoin
-  blocs_par_tick: 1
+  # Mutinynet cible 30s/bloc → 6 blocs = ~3 min/tick. La balance rules.yaml
+  # est calibrée pour ~2.5 min/UTJ (donc ~15 min/tick = 6 UTJ × 2.5 min) ;
+  # à 3 min/tick le jeu est ~5× plus rapide qu'à l'intent originel — c'est
+  # un compromis "Bitcoin live" jouable en session. Voir rules.yaml ligne 6.
+  blocs_par_tick: 6
   galaxies: 9
   systemes_par_galaxie: 499
   positions_par_systeme: 15

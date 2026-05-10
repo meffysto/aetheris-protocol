@@ -5,7 +5,7 @@ serveur: aetheris-1
 tick: 101
 seed: 0xf057ddd71510a983
 demarrage_iso: "2026-05-06T21:18:33.928Z"
-duree_tick_min: 3
+duree_tick_min: 15
 parametres:
   galaxies: 1
   systemes_par_galaxie: 3

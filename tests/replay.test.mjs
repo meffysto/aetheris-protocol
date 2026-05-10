@@ -158,6 +158,107 @@ test('runTick : tick avance de exactement 1', async () => {
   }
 });
 
+test('runTick : marché — deux ordres opposés se matchent au prix du plus ancien', async () => {
+  const alice = emptyEmpire('alice', [planet('p-a', [0, 0, 0])]);
+  const bob = emptyEmpire('bob', [planet('p-b', [0, 0, 1])]);
+  alice.planetes[0].ressources.ferrum.stock = 10000;
+  alice.planetes[0].ressources.lumen.stock = 0;
+  alice.planetes[0].ressources.ferrum.production_par_utj = 0;
+  alice.planetes[0].ressources.lumen.production_par_utj = 0;
+  bob.planetes[0].ressources.ferrum.stock = 0;
+  bob.planetes[0].ressources.lumen.stock = 10000;
+  bob.planetes[0].ressources.ferrum.production_par_utj = 0;
+  bob.planetes[0].ressources.lumen.production_par_utj = 0;
+
+  const orders = {
+    alice: { joueur: 'alice', tick_cible: 1, nonce: 'a', ordres: [
+      { type: 'marche-poser', depuis: 'p-a', vend: { ferrum: 5000 }, demande: { lumen: 2000 } },
+    ]},
+    bob: { joueur: 'bob', tick_cible: 1, nonce: 'b', ordres: [
+      { type: 'marche-poser', depuis: 'p-b', vend: { lumen: 3000 }, demande: { ferrum: 6000 } },
+    ]},
+  };
+
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires: { alice, bob }, orders, identites: {}, combat,
+  });
+
+  // Alice : −5000 Fe (posté), reçoit 2000 × (1−0.05) = 1900 Lu
+  assert.equal(result.newEmpires.alice.planetes[0].ressources.ferrum.stock, 5000);
+  assert.equal(result.newEmpires.alice.planetes[0].ressources.lumen.stock, 1900);
+  // Bob : −3000 Lu (posté), reçoit 5000 × 0.95 = 4750 Fe + refund 500 Lu
+  assert.equal(result.newEmpires.bob.planetes[0].ressources.ferrum.stock, 4750);
+  assert.equal(result.newEmpires.bob.planetes[0].ressources.lumen.stock, 7500);
+  // Book : ordre Bob partiellement rempli (1000 Lu / 1000 Fe restants)
+  const book = result.newManifest.marche.books['ferrum-lumen'];
+  assert.equal(book.length, 1);
+  assert.equal(book[0].joueur, 'bob');
+  assert.equal(book[0].qty_vend_restant, 1000);
+});
+
+test('runTick : marché — ordre expire et rembourse la planète d\'origine', async () => {
+  const alice = emptyEmpire('alice', [planet('p-a')]);
+  alice.planetes[0].ressources.ferrum.stock = 10000;
+  alice.planetes[0].ressources.ferrum.production_par_utj = 0;
+
+  const orders = {
+    alice: { joueur: 'alice', tick_cible: 1, nonce: 'a', ordres: [
+      { type: 'marche-poser', depuis: 'p-a', vend: { ferrum: 5000 }, demande: { lumen: 9999 }, expire_dans_ticks: 1 },
+    ]},
+  };
+
+  // Tick 1 : pose, réserve 5000 Fe.
+  const r1 = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires: { alice }, orders, identites: {}, combat,
+  });
+  assert.equal(r1.newEmpires.alice.planetes[0].ressources.ferrum.stock, 5000);
+  assert.equal(r1.newManifest.marche.books['ferrum-lumen'].length, 1);
+
+  // Tick 2 : ordre expire (expire_tick = tick_pose + 1 = 2 → ≤ tickSuivant 2).
+  const r2 = await runTick({
+    manifest: r1.newManifest, rules, galaxie,
+    empires: r1.newEmpires, orders: {}, identites: {}, combat,
+  });
+  assert.equal(r2.newEmpires.alice.planetes[0].ressources.ferrum.stock, 10000, 'Fe remboursé après expiration');
+  assert.equal(r2.newManifest.marche.books['ferrum-lumen'].length, 0);
+});
+
+test('runTick : marché — fee réduite par terminal_marchand', async () => {
+  const alice = emptyEmpire('alice', [planet('p-a', [0, 0, 0])]);
+  const bob = emptyEmpire('bob', [planet('p-b', [0, 0, 1])]);
+  alice.planetes[0].ressources.ferrum.stock = 10000;
+  alice.planetes[0].ressources.lumen.stock = 0;
+  alice.planetes[0].ressources.ferrum.production_par_utj = 0;
+  alice.planetes[0].ressources.lumen.production_par_utj = 0;
+  bob.planetes[0].ressources.ferrum.stock = 0;
+  bob.planetes[0].ressources.lumen.stock = 10000;
+  bob.planetes[0].ressources.ferrum.production_par_utj = 0;
+  bob.planetes[0].ressources.lumen.production_par_utj = 0;
+  // Bob a un terminal niv 5 → fee Alice (qui paie pour recevoir Lu) réduite ×(1−0.05×5) = ×0.75
+  bob.planetes[0].batiments.terminal_marchand = 5;
+
+  const orders = {
+    alice: { joueur: 'alice', tick_cible: 1, nonce: 'a', ordres: [
+      { type: 'marche-poser', depuis: 'p-a', vend: { ferrum: 5000 }, demande: { lumen: 2000 } },
+    ]},
+    bob: { joueur: 'bob', tick_cible: 1, nonce: 'b', ordres: [
+      { type: 'marche-poser', depuis: 'p-b', vend: { lumen: 2000 }, demande: { ferrum: 5000 } },
+    ]},
+  };
+
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires: { alice, bob }, orders, identites: {}, combat,
+  });
+  // Le terminal de Bob réduit la fee sur le Fe que Bob reçoit (pas sur le Lu d'Alice).
+  // Alice (terminal 0) : feeB = 0.05 → reçoit 2000 × 0.95 = 1900 Lu.
+  // Bob (terminal 5)   : feeA = 0.05 × (1 − 0.05 × 5) = 0.0375 → reçoit 5000 × 0.9625 = 4812 Fe.
+  assert.equal(result.newEmpires.alice.planetes[0].ressources.lumen.stock, 1900);
+  assert.equal(result.newEmpires.bob.planetes[0].ressources.ferrum.stock, 4812);
+});
+
 test('runTick : pas de stock négatif après prod', async () => {
   const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
   empires.meff.planetes[0].ressources.ferrum.stock = 0;

@@ -354,8 +354,11 @@ combat:
 # ───────────────────────── MARCHÉ ─────────────────────────
 
 marche:
-  ratio_base: { ferrum: 3.0, lumen: 2.0, plasmide: 1.0 }
-  ecart_max: 0.20
+  ratio_base: { ferrum: 3.0, lumen: 2.0, plasmide: 1.0 }   # référence informationnelle
+  fee_base: 0.05                                           # 5% prélevés à chaque match
+  fee_reduction_par_terminal: 0.05                         # réduit à 0% à terminal niv 20
+  expire_ticks_default: 12                                 # ordres non remplis annulés après 12 ticks (~3h)
+  expire_ticks_max: 48
 
 # ───────────────────────── ESPIONNAGE ─────────────────────────
 # diff = nombre_sondes - tech_espionnage_defenseur × 4

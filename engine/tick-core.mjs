@@ -255,9 +255,10 @@ export async function runTick({
   const events = [];
   const reports = { intel: [], alerts: [], battles: [] };
 
-  // ─── Phase 0 — Expiration des effets temporels (relations, moral) ──────
+  // ─── Phase 0 — Expiration des effets temporels (relations, moral, marché)
   // Avant la production, on nettoie : trêves échues passent à 'neutre',
-  // malus moraux passés sont oubliés. Cela garantit que le tick courant
+  // malus moraux passés sont oubliés, ordres marché expirés sont
+  // remboursés à la planète d'origine. Cela garantit que le tick courant
   // applique des effets cohérents.
   for (const emp of Object.values(empires)) {
     emp.relations = emp.relations || {};
@@ -266,6 +267,34 @@ export async function runTick({
         emp.relations[autre] = { status: 'neutre', expire_tick: null };
       }
     }
+  }
+
+  // Order book galactique : structure persistante sur le manifest.
+  // Clés normalisées en ordre alphabétique, e.g. 'ferrum-lumen'.
+  manifest.marche = manifest.marche || { books: {} };
+  const PAIRES_MARCHE = ['ferrum-lumen', 'ferrum-plasmide', 'lumen-plasmide'];
+  for (const k of PAIRES_MARCHE) {
+    manifest.marche.books[k] = manifest.marche.books[k] || [];
+  }
+  // Expirer + rembourser
+  for (const k of PAIRES_MARCHE) {
+    const restants = [];
+    for (const ord of manifest.marche.books[k]) {
+      if ((ord.expire_tick || 0) <= tickSuivant) {
+        const emp = empires[ord.joueur];
+        const planete = emp ? (emp.planetes || []).find(p => p.nom === ord.planete) : null;
+        if (planete && planete.ressources?.[ord.vend]) {
+          planete.ressources[ord.vend].stock = Math.min(
+            (planete.ressources[ord.vend].stock || 0) + ord.qty_vend_restant,
+            planete.ressources[ord.vend].capacite || Infinity,
+          );
+        }
+        events.push({ type: 'marche-expire', joueur: ord.joueur, paire: k, qty_remboursee: ord.qty_vend_restant, ressource: ord.vend });
+      } else {
+        restants.push(ord);
+      }
+    }
+    manifest.marche.books[k] = restants;
   }
 
   // ─── Phase 1 — Production ──────────────────────────────────────────────
@@ -430,6 +459,7 @@ export async function runTick({
       case 'espionnage':   return queueEspionnage(emp, action, playerName);
       case 'recyclage':    return queueRecyclage(emp, action, playerName);
       case 'diplomatie':   return queueDiplomatie(emp, action, playerName);
+      case 'marche-poser': return queueMarchePoser(emp, action, playerName);
       default:
         log(`  · ${playerName}: type d'ordre non implémenté: ${action.type}`);
     }
@@ -537,6 +567,63 @@ export async function runTick({
     }
 
     log(`  · ${playerName}: action diplomatie inconnue: ${action.action}`);
+  }
+
+  // Ordre `marche-poser {depuis: 'planete', vend: {ferrum: 5000}, demande: {lumen: 2500}, expire_dans_ticks?: 12}`.
+  // Réserve immédiatement la quantité vendue sur la planète d'origine ;
+  // l'ordre rejoint le book de sa paire (clé alphabétique). Les matchs
+  // ont lieu en Phase 3.5 (tous les ordres du tick sont posés avant).
+  function queueMarchePoser(emp, action, playerName) {
+    const RESS_VALIDES = new Set(['ferrum', 'lumen', 'plasmide']);
+    const planete = (emp.planetes || []).find(p => p.nom === action.depuis);
+    if (!planete) { log(`  · ${playerName}: marché — planète inconnue ${action.depuis}`); return; }
+    const vendEntries = Object.entries(action.vend || {});
+    const demEntries = Object.entries(action.demande || {});
+    if (vendEntries.length !== 1 || demEntries.length !== 1) {
+      log(`  · ${playerName}: marché — vend/demande doivent contenir exactement une ressource`);
+      return;
+    }
+    const [vendRes, vendQtyRaw] = vendEntries[0];
+    const [demRes, demQtyRaw] = demEntries[0];
+    const vendQty = parseInt(vendQtyRaw, 10);
+    const demQty = parseInt(demQtyRaw, 10);
+    if (!RESS_VALIDES.has(vendRes) || !RESS_VALIDES.has(demRes) || vendRes === demRes) {
+      log(`  · ${playerName}: marché — paire de ressources invalide (${vendRes}→${demRes})`);
+      return;
+    }
+    if (!vendQty || vendQty <= 0 || !demQty || demQty <= 0) {
+      log(`  · ${playerName}: marché — quantités invalides`);
+      return;
+    }
+    if ((planete.ressources?.[vendRes]?.stock || 0) < vendQty) {
+      log(`  · ${playerName}: marché — stock insuffisant (${vendRes} ${vendQty} requis)`);
+      return;
+    }
+    const expireMax = rules.marche?.expire_ticks_max || 48;
+    const expireDef = rules.marche?.expire_ticks_default || 12;
+    const expDans = Math.min(expireMax, Math.max(1, parseInt(action.expire_dans_ticks, 10) || expireDef));
+    // Réservation : on retire de la planète, on remettra au match ou à
+    // l'expiration.
+    planete.ressources[vendRes].stock -= vendQty;
+
+    const paire = [vendRes, demRes].sort().join('-');
+    manifest.marche = manifest.marche || { books: {} };
+    manifest.marche.books[paire] = manifest.marche.books[paire] || [];
+    const ordreId = `mkt-${tickSuivant}-${rng().toString(36).slice(2, 8)}`;
+    manifest.marche.books[paire].push({
+      id: ordreId,
+      joueur: playerName,
+      planete: action.depuis,
+      vend: vendRes,
+      qty_vend: vendQty,            // initial
+      qty_vend_restant: vendQty,    // décrémenté par match
+      demande: demRes,
+      qty_demande: demQty,          // initial
+      qty_demande_restant: demQty,
+      tick_pose: tickSuivant,
+      expire_tick: tickSuivant + expDans,
+    });
+    log(`  💱 ${playerName}: marché ${vendQty} ${vendRes} → ${demQty} ${demRes} (paire ${paire}, expire t+${expDans})`);
   }
 
   function queueEspionnage(emp, action, playerName) {
@@ -763,6 +850,111 @@ export async function runTick({
     if (g1 !== g2) return 20000 + Math.abs(g1 - g2) * 5000;
     if (s1 !== s2) return 2700 + Math.abs(s1 - s2) * 95;
     return 1000 + Math.abs(p1 - p2) * 5;
+  }
+
+  // ─── Phase 3.5 — Matching marché galactique ────────────────────────────
+  // Pour chaque paire, on apparie les ordres compatibles : un ordre A→B
+  // (vend A, demande B) match un ordre B→A (vend B, demande A) si le ratio
+  // proposé par le vendeur est plus avantageux ou égal à celui de
+  // l'acheteur. FIFO : tri par tick_pose ASC à prix égal, prix exécuté =
+  // ratio de l'ordre le plus ancien (le "taker" prend le prix posté).
+  log(`▸ Phase 3.5/6 — Matching marché galactique`);
+  const feeBase = rules.marche?.fee_base || 0.05;
+  const feeReduc = rules.marche?.fee_reduction_par_terminal || 0.05;
+  const empTerminalLevel = (joueur) => {
+    const e = empires[joueur];
+    if (!e) return 0;
+    let max = 0;
+    for (const p of e.planetes || []) max = Math.max(max, p.batiments?.terminal_marchand || 0);
+    return max;
+  };
+  const livrer = (joueur, planeteNom, ressource, qty) => {
+    const e = empires[joueur];
+    if (!e) return;
+    const p = (e.planetes || []).find(pl => pl.nom === planeteNom)
+           || (e.planetes || [])[0]; // fallback : première planète si la planète d'origine n'existe plus
+    if (!p?.ressources?.[ressource]) return;
+    p.ressources[ressource].stock = Math.min(
+      (p.ressources[ressource].stock || 0) + qty,
+      p.ressources[ressource].capacite || Infinity,
+    );
+  };
+  for (const paire of PAIRES_MARCHE) {
+    const [resA, resB] = paire.split('-');
+    const book = manifest.marche.books[paire] || [];
+    // Pour cette paire, on définit "ordres-A" = ordres qui vendent A (et
+    // demandent B), ordres-B = ordres qui vendent B (et demandent A).
+    // Prix unitaire en B par A pour un ordre-A : qty_demande_B / qty_vend_A.
+    // Prix unitaire en B par A pour un ordre-B (côté payer A) :
+    //   qty_vend_B / qty_demande_A (combien de B le buyer paie par A reçu).
+    // Match si bestSell.prix ≤ bestBuy.prix.
+    const sellsA = book.filter(o => o.vend === resA && o.qty_vend_restant > 0);
+    const sellsB = book.filter(o => o.vend === resB && o.qty_vend_restant > 0);
+    sellsA.sort((x, y) =>
+      (x.qty_demande / x.qty_vend) - (y.qty_demande / y.qty_vend) ||
+      (x.tick_pose - y.tick_pose) ||
+      (x.id < y.id ? -1 : 1)
+    );
+    sellsB.sort((x, y) =>
+      (y.qty_vend / y.qty_demande) - (x.qty_vend / x.qty_demande) ||
+      (x.tick_pose - y.tick_pose) ||
+      (x.id < y.id ? -1 : 1)
+    );
+
+    let i = 0, j = 0;
+    while (i < sellsA.length && j < sellsB.length) {
+      const sa = sellsA[i], sb = sellsB[j];
+      const prixA_demande = sa.qty_demande / sa.qty_vend;       // B per A demandé par le vendeur de A
+      const prixA_offert = sb.qty_vend / sb.qty_demande;        // B per A offert par l'acheteur de A
+      if (prixA_demande > prixA_offert + 1e-9) break; // best sell > best buy → plus aucun match possible
+
+      // Prix exécuté = ordre le plus ancien (taker prend le prix maker).
+      const prixExec = (sa.tick_pose <= sb.tick_pose) ? prixA_demande : prixA_offert;
+
+      // Quantité matchée en A : min(stock A restant côté vendeur, demande A
+      // restante côté acheteur).
+      const qtyA = Math.min(sa.qty_vend_restant, sb.qty_demande_restant);
+      if (qtyA <= 0) { if (sa.qty_vend_restant <= 0) i++; if (sb.qty_demande_restant <= 0) j++; continue; }
+      const qtyB = Math.floor(qtyA * prixExec);
+      if (qtyB <= 0) { i++; continue; }
+      // L'acheteur de A avait réservé qty_vend_B = qty_demande_B selon son
+      // propre prix. Il consomme qtyB de sa réserve. S'il avait posté un
+      // prix supérieur (plus généreux), le delta lui est remboursé.
+      const qtyB_reserve_consommee = Math.min(sb.qty_vend_restant, qtyB);
+      const sb_prix_pose = sb.qty_vend / sb.qty_demande;
+      const sb_devait_payer_a_son_prix = Math.floor(qtyA * sb_prix_pose);
+      const refundB = Math.max(0, sb_devait_payer_a_son_prix - qtyB_reserve_consommee);
+
+      // Fees : prélevées sur la quantité reçue par chaque partie. Réduites
+      // par le terminal_marchand max de chaque empire.
+      const feeA = Math.max(0, feeBase * (1 - feeReduc * empTerminalLevel(sb.joueur))); // l'acheteur de A paie sa fee
+      const feeB = Math.max(0, feeBase * (1 - feeReduc * empTerminalLevel(sa.joueur))); // le vendeur de A paie sa fee
+      const livresA = Math.floor(qtyA * (1 - feeA));
+      const livresB = Math.floor(qtyB_reserve_consommee * (1 - feeB));
+
+      // Livraison : A va à l'acheteur (sb.joueur, sb.planete), B va au
+      // vendeur (sa.joueur, sa.planete). Refund B retour à l'acheteur.
+      livrer(sb.joueur, sb.planete, resA, livresA);
+      livrer(sa.joueur, sa.planete, resB, livresB);
+      if (refundB > 0) livrer(sb.joueur, sb.planete, resB, refundB);
+
+      sa.qty_vend_restant -= qtyA;
+      sa.qty_demande_restant = Math.max(0, sa.qty_demande_restant - qtyB_reserve_consommee);
+      sb.qty_vend_restant = Math.max(0, sb.qty_vend_restant - qtyB_reserve_consommee);
+      sb.qty_demande_restant -= qtyA;
+
+      events.push({
+        type: 'marche-match', paire,
+        vendeur: sa.joueur, acheteur: sb.joueur,
+        qty_a: qtyA, ressource_a: resA, qty_b: qtyB_reserve_consommee, ressource_b: resB,
+        prix_exec: prixExec, fees: { a: feeA, b: feeB },
+      });
+
+      if (sa.qty_vend_restant <= 0) i++;
+      if (sb.qty_vend_restant <= 0 || sb.qty_demande_restant <= 0) j++;
+    }
+    // Compacter le book : retirer les ordres totalement remplis.
+    manifest.marche.books[paire] = book.filter(o => o.qty_vend_restant > 0 && o.qty_demande_restant > 0);
   }
 
   // ─── Phase 4 — Mouvements de flotte ─────────────────────────────────────

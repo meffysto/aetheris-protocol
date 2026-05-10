@@ -1857,6 +1857,10 @@ h2.sect .rule {
       <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
       Rapports <span class="ct" id="ctRap">—</span>
     </button>
+    <button data-view="marche">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M7 4l-2 3 2 3M17 14l2 3-2 3"/></svg></span>
+      Marché <span class="ct" id="ctMkt">—</span>
+    </button>
     <button data-view="classement">
       <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 21V10M12 21V4M19 21v-7"/></svg></span>
       Classement
@@ -1876,6 +1880,7 @@ h2.sect .rule {
     <div class="view" data-v="journal" id="vJou"></div>
     <div class="view" data-v="messagerie" id="vMsg"></div>
     <div class="view" data-v="rapports" id="vRap"></div>
+    <div class="view" data-v="marche" id="vMkt"></div>
     <div class="view" data-v="classement" id="vCls"></div>
   </main>
 
@@ -2495,6 +2500,7 @@ function render() {
   renderGalaxie();
   renderJournal(p, emp);
   renderRapports();
+  renderMarche(p, emp);
   renderClassement();
   renderRail(p, emp);
   renderNavCounts(p, emp);
@@ -3452,6 +3458,163 @@ function renderRapports() {
       renderRapports();
     });
   });
+}
+
+function renderMarche(myPlanete, emp) {
+  const v = document.getElementById('vMkt');
+  if (!v) return;
+  const RES = { ferrum: 'Fe', lumen: 'Lu', plasmide: 'Pl' };
+  const PAIRES = ['ferrum-lumen', 'ferrum-plasmide', 'lumen-plasmide'];
+  const books = state.manifest?.marche?.books || {};
+  const me = state.current;
+  const tickCur = state.manifest?.tick ?? 0;
+
+  // Compteur top-bar : ordres ouverts à mon nom.
+  let mineCount = 0;
+  for (const k of PAIRES) {
+    for (const o of (books[k] || [])) if (o.joueur === me) mineCount++;
+  }
+  const navCt = document.getElementById('ctMkt');
+  if (navCt) navCt.textContent = mineCount || '—';
+
+  // Mes ordres ouverts.
+  const mineRows = [];
+  for (const k of PAIRES) {
+    for (const o of (books[k] || [])) {
+      if (o.joueur === me) mineRows.push({ ...o, paire: k });
+    }
+  }
+  mineRows.sort((a, b) => a.expire_tick - b.expire_tick);
+
+  const fmtRatio = (n) => {
+    if (!Number.isFinite(n)) return '—';
+    return n >= 100 ? n.toFixed(0) : n >= 10 ? n.toFixed(1) : n.toFixed(2);
+  };
+  const renderBookSide = (orders, side) => {
+    if (!orders.length) return `<tr><td colspan="4" class="empty-rail">aucun ordre</td></tr>`;
+    return orders.slice(0, 8).map(o => {
+      const prixB_per_A = o.qty_demande_restant / o.qty_vend_restant;
+      const isMe = o.joueur === me ? ' style="color:var(--brass);font-weight:600"' : '';
+      return `<tr${isMe}>
+        <td>${escapeHtml(o.joueur)}</td>
+        <td class="num-c">${fmt(o.qty_vend_restant)} ${RES[o.vend]}</td>
+        <td class="num-c">${fmt(o.qty_demande_restant)} ${RES[o.demande]}</td>
+        <td class="num-c">${fmtRatio(prixB_per_A)}</td>
+      </tr>`;
+    }).join('');
+  };
+
+  const ratiosBase = state.rules?.marche?.ratio_base || {};
+  const refRatio = (a, b) => (ratiosBase[b] && ratiosBase[a]) ? (ratiosBase[a] / ratiosBase[b]).toFixed(2) : '—';
+
+  let html = `<h2 class="sect">Marché galactique <span class="num">§ M</span> <span class="rule"></span></h2>
+    <div style="font-size:11px;color:var(--bone-dim);margin-bottom:14px;letter-spacing:0.02em;line-height:1.5">
+      Pose un ordre limite ; il sera apparié au prochain tick avec un ordre opposé compatible. Les ordres non remplis expirent après 12 ticks (~3h) et te sont remboursés. Fee de 5% prélevée à chaque match (réduite par <em>terminal_marchand</em>).
+    </div>`;
+
+  // Mes ordres
+  html += `<h3 class="sect" style="margin-top:8px">Mes ordres ouverts</h3>`;
+  if (!mineRows.length) {
+    html += `<div class="empty-stamp" style="margin-bottom:14px">aucun ordre en attente</div>`;
+  } else {
+    html += `<table class="hs-table" style="margin-bottom:18px"><thead><tr><th>Paire</th><th>Origine</th><th class="num-c">Vend (restant)</th><th class="num-c">Demande (restant)</th><th class="num-c">Expire (tick)</th></tr></thead><tbody>`;
+    for (const o of mineRows) {
+      html += `<tr>
+        <td>${o.paire.split('-').map(r => RES[r]).join('↔')}</td>
+        <td>${escapeHtml(o.planete)}</td>
+        <td class="num-c">${fmt(o.qty_vend_restant)} ${RES[o.vend]}</td>
+        <td class="num-c">${fmt(o.qty_demande_restant)} ${RES[o.demande]}</td>
+        <td class="num-c">${o.expire_tick} <small style="color:var(--bone-dim)">(t+${o.expire_tick - tickCur})</small></td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+
+  // Books par paire
+  for (const k of PAIRES) {
+    const [a, b] = k.split('-');
+    const book = books[k] || [];
+    const sellsA = book.filter(o => o.vend === a).sort((x, y) => (x.qty_demande_restant / x.qty_vend_restant) - (y.qty_demande_restant / y.qty_vend_restant));
+    const sellsB = book.filter(o => o.vend === b).sort((x, y) => (x.qty_demande_restant / x.qty_vend_restant) - (y.qty_demande_restant / y.qty_vend_restant));
+    html += `<h3 class="sect" style="margin-top:18px">${RES[a]} ↔ ${RES[b]} <span style="color:var(--bone-dim);font-weight:400;font-size:11px;margin-left:8px">référence ${refRatio(a, b)} ${RES[b]}/${RES[a]}</span></h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:8px">
+        <div>
+          <div style="font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--bone-dim);margin-bottom:4px">Vend ${RES[a]} → demande ${RES[b]}</div>
+          <table class="hs-table"><thead><tr><th>Joueur</th><th class="num-c">Vend</th><th class="num-c">Demande</th><th class="num-c">${RES[b]}/${RES[a]}</th></tr></thead><tbody>${renderBookSide(sellsA, 'a')}</tbody></table>
+        </div>
+        <div>
+          <div style="font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--bone-dim);margin-bottom:4px">Vend ${RES[b]} → demande ${RES[a]}</div>
+          <table class="hs-table"><thead><tr><th>Joueur</th><th class="num-c">Vend</th><th class="num-c">Demande</th><th class="num-c">${RES[a]}/${RES[b]}</th></tr></thead><tbody>${renderBookSide(sellsB, 'b')}</tbody></table>
+        </div>
+      </div>`;
+  }
+
+  // Formulaire de pose
+  const planetes = (emp?.planetes || []).map(p => ({ nom: p.nom, ressources: p.ressources }));
+  const defaultPlanete = myPlanete?.nom || planetes[0]?.nom || '';
+  html += `<h3 class="sect" style="margin-top:22px">Poser un ordre</h3>
+    <div class="form-card" style="background:rgba(196,180,138,0.06);border:1px solid var(--hairline);border-radius:6px;padding:16px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;font-size:12px">
+      <label>Planète d'origine
+        <select id="mktPlanete" style="width:100%;margin-top:4px;font-family:var(--mono);padding:6px">
+          ${planetes.map(p => `<option value="${escapeHtml(p.nom)}" ${p.nom === defaultPlanete ? 'selected' : ''}>${escapeHtml(p.nom)} (Fe ${fmtCompact(p.ressources?.ferrum?.stock || 0)} · Lu ${fmtCompact(p.ressources?.lumen?.stock || 0)} · Pl ${fmtCompact(p.ressources?.plasmide?.stock || 0)})</option>`).join('')}
+        </select>
+      </label>
+      <label>Expire dans (ticks)
+        <input id="mktExpire" type="number" min="1" max="48" value="12" style="width:100%;margin-top:4px;font-family:var(--mono);padding:6px"/>
+      </label>
+      <label>Je vends
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <select id="mktVendRes" style="flex:0 0 80px;font-family:var(--mono);padding:6px">
+            <option value="ferrum">Fe</option><option value="lumen">Lu</option><option value="plasmide">Pl</option>
+          </select>
+          <input id="mktVendQty" type="number" min="1" placeholder="quantité" style="flex:1;font-family:var(--mono);padding:6px"/>
+        </div>
+      </label>
+      <label>Je demande
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <select id="mktDemRes" style="flex:0 0 80px;font-family:var(--mono);padding:6px">
+            <option value="lumen">Lu</option><option value="ferrum">Fe</option><option value="plasmide">Pl</option>
+          </select>
+          <input id="mktDemQty" type="number" min="1" placeholder="quantité" style="flex:1;font-family:var(--mono);padding:6px"/>
+        </div>
+      </label>
+      <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+        <button id="mktSubmit" class="btn-primary" ${state.pending.has('mkt:pose') ? 'disabled' : ''}>${state.pending.has('mkt:pose') ? '…' : 'Poser l\\'ordre'}</button>
+      </div>
+    </div>`;
+
+  v.innerHTML = html;
+
+  const btn = document.getElementById('mktSubmit');
+  if (btn) btn.onclick = () => {
+    const depuis = document.getElementById('mktPlanete').value;
+    const vendRes = document.getElementById('mktVendRes').value;
+    const demRes = document.getElementById('mktDemRes').value;
+    const vendQty = parseInt(document.getElementById('mktVendQty').value, 10);
+    const demQty = parseInt(document.getElementById('mktDemQty').value, 10);
+    const expire = parseInt(document.getElementById('mktExpire').value, 10) || 12;
+    if (vendRes === demRes) { toast('Paire invalide', 'Vend et demande doivent porter sur deux ressources distinctes.', true); return; }
+    if (!vendQty || !demQty || vendQty <= 0 || demQty <= 0) { toast('Quantités invalides', 'Renseigne des quantités positives.', true); return; }
+    submitMarchePoser({ depuis, vend: { [vendRes]: vendQty }, demande: { [demRes]: demQty }, expire_dans_ticks: expire });
+  };
+}
+
+async function submitMarchePoser({ depuis, vend, demande, expire_dans_ticks }) {
+  const pendingKey = 'mkt:pose';
+  if (state.pending.has(pendingKey)) return;
+  if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin dans les paramètres pour inscrire des ordres.', true); return; }
+  state.pending.add(pendingKey); render();
+  try {
+    const [vendRes, vendQty] = Object.entries(vend)[0];
+    const [demRes, demQty] = Object.entries(demande)[0];
+    const message = `${state.current}: marché ${vendQty} ${vendRes} → ${demQty} ${demRes} (depuis ${depuis})`;
+    await appendOrderAndPush({ type: 'marche-poser', depuis, vend, demande, expire_dans_ticks }, message);
+    toast('Ordre scellé', `Marché ${vendQty} ${vendRes} → ${demQty} ${demRes} posé.`);
+  } catch (e) {
+    toast('Échec', e.message || String(e), true);
+  } finally {
+    state.pending.delete(pendingKey); render();
+  }
 }
 
 function renderClassement() {

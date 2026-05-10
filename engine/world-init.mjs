@@ -116,7 +116,7 @@ serveur: ${SERVEUR}
 tick: 0
 seed: ${seed}
 demarrage_iso: ${new Date().toISOString()}
-duree_tick_min: 15
+duree_tick_min: 3   # Mutinynet 30s × 6 blocs/tick — cohérent avec genesis.yaml
 parametres:
   galaxies: 1
   systemes_par_galaxie: ${NB_SYSTEMES}

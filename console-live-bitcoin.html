@@ -1818,7 +1818,7 @@ body.tick-pulsed::after {
   <div class="onboarding">
     <div class="ob-step-marker" id="obStepMarker">Étape 1/5</div>
     <h2 id="obTourTitle">Bienvenue, <span id="ob-name">commandant</span>.</h2>
-    <p class="ob-sub" id="obTourSub">Tu contrôles <strong id="ob-planet">—</strong>. Citadel est un MMO 4X qui vit dans la blockchain Bitcoin : chaque ordre est une inscription Taproot signée par ta clé, appliquée par le moteur à chaque <span class="gloss" title="Un tick = un bloc Mutinynet (signet Bitcoin). Cible ≈ 30s. Tous les ordres confirmés au bloc N sont appliqués au bloc N+1.">tick</span>.</p>
+    <p class="ob-sub" id="obTourSub">Tu contrôles <strong id="ob-planet">—</strong>. Citadel est un MMO 4X qui vit dans la blockchain Bitcoin : chaque ordre est une inscription Taproot signée par ta clé, appliquée par le moteur à chaque <span class="gloss" title="Un tick = 6 blocs Mutinynet (signet Bitcoin). Cible ≈ 3 min. Tous les ordres confirmés dans le cycle de 6 blocs sont appliqués au tick suivant.">tick</span>.</p>
 
     <div class="ob-card" id="obStep1Stats">
       <div class="ob-stat">
@@ -2495,7 +2495,7 @@ const fmtCompact = n => {
 };
 
 // 1 UTJ ≈ duree_tick_min / 6 (6 UTJ par tick par convention engine)
-function utjMin() { return ((state.manifest?.duree_tick_min) || 15) / 6; }
+function utjMin() { return ((state.manifest?.duree_tick_min) || 3) / 6; }
 
 // Le moteur progresse par ticks (6 UTJ par tick). Une duree affichee en UTJ
 // se traduit en N ticks = ceil(UTJ / 6). Toujours +1 tick de queue.
@@ -3295,7 +3295,7 @@ function renderUnitGrid(p, kind) {
 
     footer += `<div class="upg qrow">
       <div class="cost">${costHtml}</div>
-      <span class="dur">${dur} <span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Coût en UTJ par unite ; multiplie par la quantite construite.">UTJ</span>/u</span>
+      <span class="dur">${dur} <span class="utj-help" title="1 tick = 6 UTJ ≈ 3 min (cadence Mutinynet × 6 blocs). Coût en UTJ par unite ; multiplie par la quantite construite.">UTJ</span>/u</span>
       <div class="qbtns">${isPending ? '<button disabled>…</button>' : buttons}</div>
     </div>`;
     if (reqBad) footer = `<div class="req">requiert <b>${missing}</b></div>` + footer;
@@ -3844,7 +3844,7 @@ function renderRail(p, emp) {
     const remain = Math.max(0, c.fin_utj || 0);
     const itemTicks = Math.max(1, Math.ceil(remain / 6));
     cumTicksBat += itemTicks;
-    const cumMins = Math.round(cumTicksBat * (state.manifest?.duree_tick_min || 15));
+    const cumMins = Math.round(cumTicksBat * (state.manifest?.duree_tick_min || 3));
     const isHead = i === 0;
     const klass = isHead ? '' : ' queued';
     const pos = isHead
@@ -3854,7 +3854,7 @@ function renderRail(p, emp) {
     html += `<div class="qitem${klass}">
       <div class="top">
         <div class="nm">${labels[c.batiment] || c.batiment}<small>niveau ${c.niveau_cible}${pos}</small></div>
-        <div class="tgt">${remain}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
+        <div class="tgt">${remain}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase"><span class="utj-help" title="1 tick = 6 UTJ ≈ 3 min (cadence Mutinynet × 6 blocs). Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
       </div>
       <div class="tmeta"><span>≈ <b>${cumMins}</b> min</span><span>${eta}</span></div>
     </div>`;
@@ -3885,7 +3885,7 @@ function renderRail(p, emp) {
     const remain = Math.max(0, c.fin_utj || 0);
     const itemTicks = Math.max(1, Math.ceil(remain / 6));
     cumTicksAtl += itemTicks;
-    const cumMins = Math.round(cumTicksAtl * (state.manifest?.duree_tick_min || 15));
+    const cumMins = Math.round(cumTicksAtl * (state.manifest?.duree_tick_min || 3));
     const isHead = i === 0;
     const klass = isHead ? '' : ' queued';
     const pos = isHead
@@ -3895,7 +3895,7 @@ function renderRail(p, emp) {
     atlHtml += `<div class="qitem${klass}">
       <div class="top">
         <div class="nm">${labels[c.unite] || c.unite}<small>${c.quantite || 1} unité${(c.quantite || 1) > 1 ? 's' : ''} · ${c.planete || ''}${pos}</small></div>
-        <div class="tgt">${remain}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min.">UTJ</span></small></div>
+        <div class="tgt">${remain}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase"><span class="utj-help" title="1 tick = 6 UTJ ≈ 3 min (cadence Mutinynet × 6 blocs).">UTJ</span></small></div>
       </div>
       <div class="tmeta"><span>≈ <b>${cumMins}</b> min</span><span>${eta}</span></div>
     </div>`;
@@ -3915,7 +3915,7 @@ function renderRail(p, emp) {
         return `<div class="qitem">
           <div class="top">
             <div class="nm">${nm}<small>niv ${r.niveau_cible || '?'}</small></div>
-            <div class="tgt">${remain}<small style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:var(--bone-dim);display:block;margin-top:2px;text-align:right"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
+            <div class="tgt">${remain}<small style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:var(--bone-dim);display:block;margin-top:2px;text-align:right"><span class="utj-help" title="1 tick = 6 UTJ ≈ 3 min (cadence Mutinynet × 6 blocs). Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
           </div>
         </div>`;
       }).join('');
@@ -3930,7 +3930,7 @@ function renderRail(p, emp) {
         return `<div class="qitem">
           <div class="top">
             <div class="nm">${x.type_mission || 'mission'}<small>${(x.depuis?.planete||'?')} → ${(x.vers?.planete||x.vers||'?')}</small></div>
-            <div class="tgt">${remain}<small style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:var(--bone-dim);display:block;margin-top:2px;text-align:right"><span class="utj-help" title="1 tick = 6 UTJ ≈ 15 min. Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
+            <div class="tgt">${remain}<small style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;color:var(--bone-dim);display:block;margin-top:2px;text-align:right"><span class="utj-help" title="1 tick = 6 UTJ ≈ 3 min (cadence Mutinynet × 6 blocs). Le moteur progresse par ticks ; UTJ est l'unite interne de duree.">UTJ</span></small></div>
           </div>
         </div>`;
       }).join('');
@@ -5031,7 +5031,7 @@ function showOnboardingStep(step, p, emp) {
   if (step === 1) {
     const planetName = p?.nom || '—';
     title.innerHTML = `Bienvenue, <span id="ob-name">${escapeHtml(state.current || 'commandant')}</span>.`;
-    sub.innerHTML = `Tu contrôles <strong id="ob-planet">${escapeHtml(planetName)}</strong>. Citadel est un MMO 4X qui vit dans la blockchain Bitcoin : chaque ordre est une inscription Taproot signée par ta clé, appliquée par le moteur à chaque <span class="gloss" title="Un tick = un bloc Mutinynet (signet Bitcoin). Cible ≈ 30s. Tous les ordres confirmés au bloc N sont appliqués au bloc N+1.">tick</span>.`;
+    sub.innerHTML = `Tu contrôles <strong id="ob-planet">${escapeHtml(planetName)}</strong>. Citadel est un MMO 4X qui vit dans la blockchain Bitcoin : chaque ordre est une inscription Taproot signée par ta clé, appliquée par le moteur à chaque <span class="gloss" title="Un tick = 6 blocs Mutinynet (signet Bitcoin). Cible ≈ 3 min. Tous les ordres confirmés dans le cycle de 6 blocs sont appliqués au tick suivant.">tick</span>.`;
     stats.style.display = '';
     tickBlock.style.display = '';
     list.style.display = '';
@@ -5560,9 +5560,9 @@ const OB_STEPS = [
 <p>Aucun serveur ne détient la vérité — ton navigateur scanne la blockchain et reconstruit l'état localement. Personne ne peut tricher sans qu'on le voie.</p>`,
   },
   {
-    title: 'Chaque bloc Bitcoin = un tour',
-    body: `<p>Mutinynet produit un nouveau bloc toutes les <b>~30 secondes à 2 minutes</b>. À chaque bloc, le moteur applique les ordres confirmés et fait avancer le jeu.</p>
-<p>Les ordres que tu inscris au bloc <code>N</code> sont visibles dans l'état au bloc <code>N+1</code>. La console se rafraîchit automatiquement à chaque nouveau bloc.</p>`,
+    title: 'Un cycle de 6 blocs Bitcoin = un tick',
+    body: `<p>Mutinynet produit un nouveau bloc toutes les <b>~30 secondes</b>. Le moteur regroupe <b>6 blocs en un tick</b> (≈ 3 minutes) pour laisser le temps de réfléchir et de signer des ordres.</p>
+<p>Les ordres que tu inscris pendant le tick <code>T</code> sont appliqués au tick <code>T+1</code>. La console se rafraîchit automatiquement à chaque nouveau bloc.</p>`,
   },
   {
     title: 'Lire ta map',

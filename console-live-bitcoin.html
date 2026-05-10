@@ -1654,6 +1654,13 @@ body.tick-pulsed::after {
   background: rgba(14,29,51,0.06);
   outline: 1px solid var(--brass);
 }
+.pos.planete.free { cursor: pointer; }
+.pos.planete.free:hover {
+  background: rgba(111,230,225,0.08);
+  outline: 1px solid var(--phosphor);
+  box-shadow: 0 0 0 2px rgba(111,230,225,0.15);
+}
+.pos.planete.free:hover .dot { box-shadow: 0 0 0 2px var(--phosphor), 0 0 8px var(--phosphor) !important; }
 .pos.planete.enemy:hover { border-color: var(--phosphor); background: rgba(168,58,37,0.08); box-shadow: 0 0 0 2px rgba(168,58,37,0.18); }
 .pos.planete.enemy:hover .dot { box-shadow: 0 0 0 2px var(--phosphor), 0 0 8px var(--phosphor) !important; }
 
@@ -1776,10 +1783,17 @@ body.tick-pulsed::after {
       <button data-mt="attaque">Attaque</button>
       <button data-mt="transport">Transport</button>
       <button data-mt="recyclage">Recyclage</button>
+      <button data-mt="colonisation">Coloniser</button>
     </div>
 
     <label>Depuis</label>
     <select id="missionFrom"></select>
+
+    <div id="missionNomBlock" style="display:none">
+      <label>Nom de la colonie <span style="opacity:0.55;font-weight:400;text-transform:none;letter-spacing:0">(optionnel)</span></label>
+      <input type="text" id="missionNomColonie" placeholder="auto · sinon : a-z 0-9 -" maxlength="40"
+        style="width:100%;background:var(--cardridge);border:1px solid var(--hairline);color:var(--bone);padding:9px 12px;font-family:var(--mono);font-size:13px;border-radius:2px"/>
+    </div>
 
     <label id="missionFleetLabel">Flotte</label>
     <div id="missionFleet"></div>
@@ -3336,6 +3350,8 @@ function renderGalaxie() {
       const isEnemy = t === 'planete' && owner && owner !== state.current && !isMine;
       // Une planète à moi (pas la courante) = cible valide pour transport interne.
       const isAllyOwn = t === 'planete' && owner === state.current && !isMine;
+      // Planète libre = cible valide pour colonisation.
+      const isFree = t === 'planete' && (!owner || owner === '~' || owner === 'null');
       const isMissionTarget = isEnemy || isAllyOwn;
       const incoming = (t === 'planete' && pos.nom) ? incomingByPlanet.get(pos.nom) : null;
       const hasIncoming = incoming && incoming.length > 0;
@@ -3344,6 +3360,7 @@ function renderGalaxie() {
         tip = `${pos.nom || 'planète'} · ${cls || '?'}${owner ? ' · ' + owner : ' · libre'}`;
         if (isEnemy) tip += ' · clic → mission';
         else if (isAllyOwn) tip += ' · clic → transport';
+        else if (isFree) tip += ' · clic → coloniser';
         if (hasIncoming) {
           const cur = state.manifest?.tick ?? 0;
           for (const inc of incoming) {
@@ -3354,10 +3371,10 @@ function renderGalaxie() {
       } else if (t === 'asteroide') {
         tip = `astéroïde`;
       } else { tip = `vide`; }
-      const dataAttrs = isMissionTarget
-        ? ` data-mission-target="${owner}|${pos.nom || ''}"`
-        : '';
-      html += `<div class="pos ${kind} ${isMine?'mine':''} ${isEnemy?'enemy':''} ${isAllyOwn?'allyown':''} ${hasIncoming?'incoming':''}" data-c="${cls||''}"${dataAttrs}>
+      let dataAttrs = '';
+      if (isMissionTarget) dataAttrs = ` data-mission-target="${owner}|${pos.nom || ''}"`;
+      else if (isFree) dataAttrs = ` data-coloniser-target="${coord}|${i}|${cls || ''}"`;
+      html += `<div class="pos ${kind} ${isMine?'mine':''} ${isEnemy?'enemy':''} ${isAllyOwn?'allyown':''} ${isFree?'free':''} ${hasIncoming?'incoming':''}" data-c="${cls||''}"${dataAttrs}>
         <span class="num">${i}</span>${dot}
         ${hasIncoming ? `<span class="incoming-flag" title="${incoming.length} flotte(s) hostile(s)">⚠</span>` : ''}
         ${owner ? `<span class="own">${owner.slice(0,5)}</span>` : ''}
@@ -3382,7 +3399,13 @@ function renderJournal(p, emp) {
   }
   if (emp?.flottes_en_vol?.length) {
     for (const f of emp.flottes_en_vol) {
-      lines.push({ tick: m.tick, txt: `${f.type_mission} · ${f.depuis?.planete} → ${f.vers?.planete || f.vers}`, tone: 'rust' });
+      let dest;
+      if (f.type_mission === 'colonisation') {
+        dest = `${f.vers?.systeme}:${f.vers?.position}${f.nom_colonie ? ' (' + f.nom_colonie + ')' : ''}`;
+      } else {
+        dest = f.vers?.planete || (typeof f.vers === 'string' ? f.vers : '?');
+      }
+      lines.push({ tick: m.tick, txt: `${f.type_mission} · ${f.depuis?.planete} → ${dest}`, tone: 'rust' });
     }
   }
   v.innerHTML = `<h2 class="sect">Journal de bord <span class="num">§ J</span> <span class="rule"></span></h2>
@@ -3955,6 +3978,13 @@ document.getElementById('main').addEventListener('click', e => {
     openMission(joueur, planete);
     return;
   }
+
+  const colTgt = e.target.closest('[data-coloniser-target]');
+  if (colTgt) {
+    const [systeme, position, classe] = colTgt.dataset.coloniserTarget.split('|');
+    openColonisation(systeme, parseInt(position, 10), classe);
+    return;
+  }
 });
 
 /* ───────────────────────────── Tick countdown ───────────────────────────── */
@@ -4067,6 +4097,15 @@ function serializeOrder(o) {
     cible: { joueur: ${o.cible.joueur}, planete: ${o.cible.planete} }
     flotte: ${inlineMap(o.flotte)}
     cargaison: ${inlineMap(o.cargaison || {})}`;
+  if (o.type === 'colonisation') {
+    let s = `  - type: colonisation
+    depuis: ${o.depuis}
+    cible: { systeme: "${o.cible.systeme}", position: ${o.cible.position} }
+    flotte: ${inlineMap(o.flotte)}
+    cargaison: ${inlineMap(o.cargaison || {})}`;
+    if (o.nom_colonie) s += `\n    nom_colonie: ${o.nom_colonie}`;
+    return s;
+  }
   throw new Error(`serializeOrder: type inconnu "${o.type}"`);
 }
 
@@ -4410,37 +4449,61 @@ async function submitRecherche(technologie, niveauCible) {
   }
 }
 
-async function submitMission({ type, depuis, cibleJoueur, ciblePlanete, flotte, cargaison, nombreSondes }) {
-  const pendingKey = `mission:${type}:${depuis}:${cibleJoueur}:${ciblePlanete}`;
+async function submitMission({ type, depuis, cibleJoueur, ciblePlanete, cibleSysteme, ciblePosition, flotte, cargaison, nombreSondes, nomColonie }) {
+  const cibleKey = type === 'colonisation'
+    ? `${cibleSysteme}:${ciblePosition}`
+    : `${cibleJoueur}:${ciblePlanete}`;
+  const pendingKey = `mission:${type}:${depuis}:${cibleKey}`;
   if (state.pending.has(pendingKey)) return;
   if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin dans les paramètres pour inscrire des ordres.', true); return; }
 
   const tickCible = (state.manifest?.tick ?? 0) + 1;
 
   // Validation et construction de l'ordre objet selon le type.
-  const cibleObj = { joueur: cibleJoueur, planete: ciblePlanete };
   let orderObj;
   if (type === 'espionnage') {
     if (!nombreSondes || nombreSondes <= 0) { toast('Sondes requises', 'Au moins 1 sonde nécessaire.', true); return; }
-    orderObj = { type, depuis, cible: cibleObj, nombre_sondes: nombreSondes };
+    orderObj = { type, depuis, cible: { joueur: cibleJoueur, planete: ciblePlanete }, nombre_sondes: nombreSondes };
   } else if (type === 'attaque') {
     if (inlineMap(flotte) === '{}') { toast('Flotte vide', 'Inclus au moins 1 vaisseau dans la composition.', true); return; }
-    orderObj = { type, depuis, cible: cibleObj, flotte: { ...flotte } };
+    orderObj = { type, depuis, cible: { joueur: cibleJoueur, planete: ciblePlanete }, flotte: { ...flotte } };
   } else if (type === 'transport') {
     if (inlineMap(flotte) === '{}') { toast('Flotte vide', 'Au moins 1 vaisseau de transport est requis.', true); return; }
-    orderObj = { type, depuis, cible: cibleObj, flotte: { ...flotte }, cargaison: { ...(cargaison || {}) } };
+    orderObj = { type, depuis, cible: { joueur: cibleJoueur, planete: ciblePlanete }, flotte: { ...flotte }, cargaison: { ...(cargaison || {}) } };
   } else if (type === 'recyclage') {
     if (!flotte || (flotte.recycleur || 0) <= 0) { toast('Recycleurs requis', 'Au moins 1 recycleur nécessaire.', true); return; }
-    orderObj = { type, depuis, cible: cibleObj, flotte: { recycleur: flotte.recycleur } };
+    orderObj = { type, depuis, cible: { joueur: cibleJoueur, planete: ciblePlanete }, flotte: { recycleur: flotte.recycleur } };
+  } else if (type === 'colonisation') {
+    if (!flotte || (flotte.vaisseau_colon || 0) < 1) { toast('Colon requis', 'Au moins 1 vaisseau_colon nécessaire.', true); return; }
+    if (!cibleSysteme || cibleSysteme.split(':').length !== 2) { toast('Cible invalide', `Système attendu "g:s", reçu "${cibleSysteme}".`, true); return; }
+    if (!Number.isFinite(ciblePosition) || ciblePosition < 1) { toast('Cible invalide', 'Position invalide.', true); return; }
+    if (nomColonie && !/^[a-z][a-z0-9\-]{2,39}$/.test(nomColonie)) {
+      toast('Nom invalide', 'Nom de colonie : minuscules a-z, chiffres et tirets, 3 à 40 caractères, doit commencer par une lettre.', true);
+      return;
+    }
+    if (nomColonie && /^.+-c\d+$/.test(nomColonie)) {
+      toast('Nom réservé', 'Le format <joueur>-c<n> est réservé au nommage automatique.', true);
+      return;
+    }
+    orderObj = {
+      type, depuis,
+      cible: { systeme: cibleSysteme, position: ciblePosition },
+      flotte: { ...flotte },
+      cargaison: { ...(cargaison || {}) },
+    };
+    if (nomColonie) orderObj.nom_colonie = nomColonie;
   } else {
     toast('Type inconnu', type, true); return;
   }
 
   state.pending.add(pendingKey); render();
   try {
-    const message = `${state.current}: ${type} ${depuis} → ${cibleJoueur}/${ciblePlanete} (tick ${tickCible})`;
+    const dst = type === 'colonisation'
+      ? `${cibleSysteme}:${ciblePosition}${nomColonie ? ' (' + nomColonie + ')' : ''}`
+      : `${cibleJoueur}/${ciblePlanete}`;
+    const message = `${state.current}: ${type} ${depuis} → ${dst} (tick ${tickCible})`;
     await appendOrderAndPush(orderObj, message);
-    toast('Mission scellée', `${type} · ${depuis} → ${cibleJoueur}/${ciblePlanete}.`);
+    toast('Mission scellée', `${type} · ${depuis} → ${dst}.`);
     closeMission();
   } catch (e) {
     toast('Échec', e.message || String(e), true);
@@ -4630,7 +4693,74 @@ document.getElementById('cfgResetCache').onclick = async () => {
 };
 
 /* ───────────────────────────── Mission modal ────────────────────────────── */
-const mission = { type: 'espionnage', cibleJoueur: null, ciblePlanete: null, depuis: null };
+const mission = {
+  type: 'espionnage',
+  cibleJoueur: null, ciblePlanete: null,
+  // Mode colonisation : cible adressée par { systeme, position, classe }.
+  cibleSysteme: null, ciblePosition: null, cibleClasse: null,
+  depuis: null,
+};
+
+function openColonisation(systeme, position, classe) {
+  const emp = state.players[state.current];
+  if (!emp || !(emp.planetes || []).length) {
+    toast('Pas de planète', 'Tu n\'as aucune planète d\'origine pour lancer une mission.', true);
+    return;
+  }
+  const cap = state.manifest?.parametres?.planetes_max_par_joueur ?? 9;
+  const colsEnVol = (emp.flottes_en_vol || []).filter(f => f.type_mission === 'colonisation').length;
+  if ((emp.planetes?.length || 0) + colsEnVol >= cap) {
+    toast('Quota atteint', `Cap ${cap} planètes (possédées + colons en vol). Annule une colonisation en cours pour en lancer une autre.`, true);
+    return;
+  }
+  mission.cibleJoueur = null;
+  mission.ciblePlanete = null;
+  mission.cibleSysteme = systeme;
+  mission.ciblePosition = position;
+  mission.cibleClasse = classe || null;
+  mission.depuis = emp.planetes[0].nom;
+  mission.type = 'colonisation';
+
+  document.getElementById('missionTarget').innerHTML =
+    `colonisation · case libre <b>${systeme}:${position}</b>${classe ? ` · ${classe}` : ''}`;
+
+  // En mode colonisation, seul le bouton "Coloniser" est actif.
+  document.querySelectorAll('#missionType button').forEach(b => {
+    const mt = b.dataset.mt;
+    b.disabled = mt !== 'colonisation';
+    b.title = mt !== 'colonisation' ? 'Cible inhabitée : seule la colonisation est possible' : '';
+    if (mt === 'recyclage') b.textContent = 'Recyclage';
+  });
+  document.querySelectorAll('#missionType button').forEach(b =>
+    b.classList.toggle('on', b.dataset.mt === 'colonisation')
+  );
+
+  // dropdown source
+  const fromSel = document.getElementById('missionFrom');
+  fromSel.innerHTML = emp.planetes.map(p =>
+    `<option value="${p.nom}">${p.nom} · ${(p.coordonnees||[]).join(':')}</option>`
+  ).join('');
+  fromSel.value = mission.depuis;
+  fromSel.onchange = () => { mission.depuis = fromSel.value; renderMissionFleet(); };
+
+  // Hook bouton "Coloniser" (au cas où l'utilisateur reclique dessus).
+  document.querySelectorAll('#missionType button').forEach(b => {
+    b.onclick = () => {
+      if (b.disabled) return;
+      mission.type = b.dataset.mt;
+      document.querySelectorAll('#missionType button').forEach(x =>
+        x.classList.toggle('on', x.dataset.mt === mission.type)
+      );
+      renderMissionFleet();
+    };
+  });
+
+  // Pré-remplir le champ nom_colonie vide.
+  document.getElementById('missionNomColonie').value = '';
+
+  renderMissionFleet();
+  document.getElementById('missionBg').classList.add('on');
+}
 
 function openMission(joueurCible, planeteCible) {
   const emp = state.players[state.current];
@@ -4640,6 +4770,9 @@ function openMission(joueurCible, planeteCible) {
   }
   mission.cibleJoueur = joueurCible;
   mission.ciblePlanete = planeteCible;
+  mission.cibleSysteme = null;
+  mission.ciblePosition = null;
+  mission.cibleClasse = null;
   // Si la cible est une de mes propres planètes, on ne sélectionne pas
   // celle-ci comme source par défaut (transport sur soi-même = no-op).
   const isOwnTarget = joueurCible === state.current;
@@ -4673,6 +4806,10 @@ function openMission(joueurCible, planeteCible) {
       why = !isOwnTarget
         ? 'Recyclage v1 limité à tes propres planètes'
         : 'Aucun débris à recycler ici';
+    }
+    if (mt === 'colonisation') {
+      dis = true;
+      why = 'La colonisation cible une case libre (clique sur une planète sans propriétaire).';
     }
     b.disabled = dis;
     b.title = why;
@@ -4714,6 +4851,9 @@ function renderMissionFleet() {
   const lblEl = document.getElementById('missionFleetLabel');
   const wrap = document.getElementById('missionFleet');
   const cargoBlock = document.getElementById('missionCargoBlock');
+  const nomBlock = document.getElementById('missionNomBlock');
+  // Le bloc "nom de la colonie" n'est visible qu'en mode colonisation.
+  if (nomBlock) nomBlock.style.display = mission.type === 'colonisation' ? '' : 'none';
 
   if (mission.type === 'espionnage') {
     lblEl.textContent = 'Sondes';
@@ -4771,6 +4911,31 @@ function renderMissionFleet() {
     if (have === 0) {
       wrap.innerHTML += `<div class="empty-fleet">Aucun recycleur sur ${mission.depuis}. Construis-en un (chantier spatial).</div>`;
     }
+  } else if (mission.type === 'colonisation') {
+    lblEl.textContent = 'Flotte de colonisation';
+    cargoBlock.style.display = '';
+    const haveColon = owned.vaisseau_colon || 0;
+    // On expose vaisseau_colon (obligatoire ≥1) + tout autre vaisseau présent en escorte.
+    const others = Object.entries(owned).filter(([k, n]) => n > 0 && k !== 'vaisseau_colon' && state.rules?.vaisseaux?.[k]);
+    let html = `<div class="fleetgrid">
+      <span class="nm">Vaisseau colon <span style="opacity:0.55">(consommé)</span></span>
+      <span class="av">${fmt(haveColon)} dispo</span>
+      <input type="number" min="1" max="${Math.max(1, haveColon)}" value="${haveColon > 0 ? 1 : 1}" data-ship="vaisseau_colon"/>`;
+    for (const [k, n] of others) {
+      html += `
+      <span class="nm">${labels[k] || k} <span style="opacity:0.55">(escorte)</span></span>
+      <span class="av">${fmt(n)} dispo · cargo ${state.rules.vaisseaux[k]?.cargo || 0}</span>
+      <input type="number" min="0" max="${n}" value="0" data-ship="${k}"/>`;
+    }
+    html += `</div>`;
+    wrap.innerHTML = html;
+    if (haveColon === 0) {
+      wrap.innerHTML += `<div class="empty-fleet">Aucun vaisseau_colon sur ${mission.depuis}. Construis-en au chantier spatial avant de lancer une colonisation.</div>`;
+    }
+    // pré-remplir cargaison à 0
+    document.getElementById('cargoFerrum').value = 0;
+    document.getElementById('cargoLumen').value = 0;
+    document.getElementById('cargoPlasmide').value = 0;
   }
 }
 
@@ -4801,6 +4966,16 @@ document.getElementById('missionSubmit').onclick = () => {
     };
   } else if (mission.type === 'recyclage') {
     payload.flotte = flotte;
+  } else if (mission.type === 'colonisation') {
+    payload.cibleSysteme = mission.cibleSysteme;
+    payload.ciblePosition = mission.ciblePosition;
+    payload.flotte = flotte;
+    payload.cargaison = {
+      ferrum: parseInt(document.getElementById('cargoFerrum').value, 10) || 0,
+      lumen: parseInt(document.getElementById('cargoLumen').value, 10) || 0,
+      plasmide: parseInt(document.getElementById('cargoPlasmide').value, 10) || 0,
+    };
+    payload.nomColonie = (document.getElementById('missionNomColonie').value || '').trim();
   }
   submitMission(payload);
 };

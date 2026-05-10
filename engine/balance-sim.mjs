@@ -172,20 +172,27 @@ function militaryRush(emp, manifest, rules, tick) {
   const p = emp.planetes[0];
   const orders = [];
 
-  // Préreqs : usine_robotique 2 puis chantier_spatial 1+.
+  // Préreqs : mines/extracteurs/plasmide (usine demande 200 plasmide),
+  // usine_robotique 2, puis chantier_spatial.
   if (isQueueFree(p)) {
     const ur = p.batiments.usine_robotique || 0;
     const cs = p.batiments.chantier_spatial || 0;
     const mf = p.batiments.mine_ferrum || 0;
     const el = p.batiments.extracteur_lumen || 0;
-    let pick = null;
-    if (mf < 3) pick = 'mine_ferrum';
-    else if (el < 3) pick = 'extracteur_lumen';
-    else if (ur < 2) pick = 'usine_robotique';
-    else if (cs < 4) pick = 'chantier_spatial';
-    else if (mf < cs + 3) pick = 'mine_ferrum';
-    else if (el < cs + 3) pick = 'extracteur_lumen';
-    if (pick && canAffordChantier(p, rules, pick)) orders.push(buildOrder(p, pick));
+    const sp = p.batiments.synthetiseur_plasmide || 0;
+    // Ordre de priorité avec fallbacks (le premier affordable l'emporte).
+    const candidates = [];
+    if (mf < 3) candidates.push('mine_ferrum');
+    if (el < 3) candidates.push('extracteur_lumen');
+    if (sp < 1) candidates.push('synthetiseur_plasmide');  // débloquer plasmide
+    if (ur < 2) candidates.push('usine_robotique');
+    if (cs < 4) candidates.push('chantier_spatial');
+    if (mf < cs + 3) candidates.push('mine_ferrum');
+    if (el < cs + 3) candidates.push('extracteur_lumen');
+    candidates.push('mine_ferrum', 'extracteur_lumen', 'synthetiseur_plasmide');  // fallback
+    for (const b of candidates) {
+      if (canAffordChantier(p, rules, b)) { orders.push(buildOrder(p, b)); break; }
+    }
   }
 
   // Construction continue dès que chantier_spatial ≥ 1.
@@ -210,17 +217,27 @@ function techRush(emp, manifest, rules, tick) {
   const p = emp.planetes[0];
   const orders = [];
 
+  // Laboratoire requiert 200 plasmide — il faut un synthétiseur d'abord.
+  // Recherches consomment plus de lumen que de ferrum → équilibrer mines/extracteurs.
   if (isQueueFree(p)) {
     const lab = p.batiments.laboratoire || 0;
     const mf = p.batiments.mine_ferrum || 0;
     const el = p.batiments.extracteur_lumen || 0;
-    let pick = null;
-    if (mf < 2) pick = 'mine_ferrum';
-    else if (el < 2) pick = 'extracteur_lumen';
-    else if (lab < 8) pick = 'laboratoire';
-    else if (mf < lab) pick = 'mine_ferrum';
-    else if (el < lab) pick = 'extracteur_lumen';
-    if (pick && canAffordChantier(p, rules, pick)) orders.push(buildOrder(p, pick));
+    const sp = p.batiments.synthetiseur_plasmide || 0;
+    const candidates = [];
+    // Garder mines/extracteurs équilibrés (extracteur prioritaire pour la recherche).
+    if (el < mf - 1) candidates.push('extracteur_lumen');
+    if (mf < 3) candidates.push('mine_ferrum');
+    if (el < 3) candidates.push('extracteur_lumen');
+    if (sp < 1) candidates.push('synthetiseur_plasmide');
+    if (lab < 8) candidates.push('laboratoire');
+    if (el < lab + 2) candidates.push('extracteur_lumen');
+    if (mf < lab) candidates.push('mine_ferrum');
+    if (sp < Math.floor(lab / 2)) candidates.push('synthetiseur_plasmide');
+    candidates.push('extracteur_lumen', 'mine_ferrum', 'synthetiseur_plasmide');
+    for (const b of candidates) {
+      if (canAffordChantier(p, rules, b)) { orders.push(buildOrder(p, b)); break; }
+    }
   }
 
   // Recherche : monte robotique, automation_miniere, fusion_controlee en boucle.
@@ -253,22 +270,30 @@ function colonRush(emp, manifest, rules, tick) {
   const p = emp.planetes[0];
   const orders = [];
 
-  // Économie + chantier pour produire des colons.
+  // Économie + chantier + laboratoire (drives_impulsion requis pour colon).
   if (isQueueFree(p)) {
     const mf = p.batiments.mine_ferrum || 0;
     const el = p.batiments.extracteur_lumen || 0;
     const sp = p.batiments.synthetiseur_plasmide || 0;
     const ur = p.batiments.usine_robotique || 0;
     const cs = p.batiments.chantier_spatial || 0;
-    let pick = null;
-    if (mf < 5) pick = 'mine_ferrum';
-    else if (el < 5) pick = 'extracteur_lumen';
-    else if (sp < 3) pick = 'synthetiseur_plasmide';
-    else if (ur < 2) pick = 'usine_robotique';
-    else if (cs < 2) pick = 'chantier_spatial';
-    else if (mf < 8) pick = 'mine_ferrum';
-    else if (el < 8) pick = 'extracteur_lumen';
-    if (pick && canAffordChantier(p, rules, pick)) orders.push(buildOrder(p, pick));
+    const lab = p.batiments.laboratoire || 0;
+    const candidates = [];
+    if (mf < 3) candidates.push('mine_ferrum');
+    if (el < 3) candidates.push('extracteur_lumen');
+    if (sp < 1) candidates.push('synthetiseur_plasmide');
+    if (lab < 3) candidates.push('laboratoire');
+    if (mf < 5) candidates.push('mine_ferrum');
+    if (el < 5) candidates.push('extracteur_lumen');
+    if (sp < 3) candidates.push('synthetiseur_plasmide');
+    if (ur < 2) candidates.push('usine_robotique');
+    if (cs < 2) candidates.push('chantier_spatial');
+    if (mf < 8) candidates.push('mine_ferrum');
+    if (el < 8) candidates.push('extracteur_lumen');
+    candidates.push('mine_ferrum', 'extracteur_lumen', 'synthetiseur_plasmide');
+    for (const b of candidates) {
+      if (canAffordChantier(p, rules, b)) { orders.push(buildOrder(p, b)); break; }
+    }
   }
 
   // Recherche drives_impulsion 3 (requis pour vaisseau_colon).

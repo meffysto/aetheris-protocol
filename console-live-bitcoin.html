@@ -1009,6 +1009,66 @@ h2.sect .rule {
 .foot .seg span { color: var(--bone-dim); }
 .foot .seg span b { color: var(--bone); font-weight: 500; }
 
+/* Tick landing — heartbeat du jeu : balayage doré sur tout l'écran +
+   pulsation du footer quand un nouveau tick atterrit. */
+body.tick-pulsed::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: linear-gradient(110deg,
+    transparent 30%,
+    rgba(196,180,138,0.10) 48%,
+    rgba(218,212,94,0.18) 50%,
+    rgba(196,180,138,0.10) 52%,
+    transparent 70%);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: tick-sweep 1.6s ease-out forwards;
+}
+@keyframes tick-sweep {
+  0%   { background-position: -120% 0; opacity: 0; }
+  15%  { opacity: 1; }
+  100% { background-position: 120% 0; opacity: 0; }
+}
+.foot.tick-flash {
+  animation: foot-flash 1.6s ease-out;
+}
+@keyframes foot-flash {
+  0%   { border-top-color: var(--hairline); box-shadow: 0 -2px 0 0 transparent; }
+  20%  { border-top-color: rgba(218,212,94,0.8); box-shadow: 0 -2px 16px -2px rgba(218,212,94,0.5); }
+  100% { border-top-color: var(--hairline); box-shadow: 0 -2px 0 0 transparent; }
+}
+/* Cellules dont la valeur a changé : flash bref */
+.cell-changed { animation: cell-flash 1.4s ease-out; }
+@keyframes cell-flash {
+  0%   { background-color: transparent; color: inherit; }
+  15%  { background-color: rgba(218,212,94,0.22); color: var(--brass); }
+  100% { background-color: transparent; color: inherit; }
+}
+
+/* Singularité produite — moment rare, mérite un éclat. */
+.sing-burst {
+  animation: sing-burst 2.4s ease-out;
+  position: relative;
+}
+@keyframes sing-burst {
+  0%   { transform: scale(1); text-shadow: 0 0 0 transparent; }
+  8%   { transform: scale(1.5); text-shadow: 0 0 14px rgba(218,212,94,0.95), 0 0 28px rgba(218,212,94,0.6); color: var(--brass); }
+  35%  { transform: scale(1.1); text-shadow: 0 0 8px rgba(218,212,94,0.5); }
+  100% { transform: scale(1); text-shadow: 0 0 0 transparent; color: inherit; }
+}
+.sing-burst::before, .sing-burst::after {
+  content: "✦"; position: absolute; top: 50%; left: 50%;
+  font-size: 14px; color: rgba(218,212,94,0.9);
+  pointer-events: none;
+  animation: sing-particle 1.8s ease-out forwards;
+}
+.sing-burst::before { animation-delay: 0.05s; --tx: -22px; --ty: -18px; }
+.sing-burst::after  { animation-delay: 0.12s; --tx:  22px; --ty: -16px; }
+@keyframes sing-particle {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  20%  { transform: translate(calc(-50% + var(--tx) * 0.4), calc(-50% + var(--ty) * 0.4)) scale(1.1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.6); opacity: 0; }
+}
+
 /* scrollbars */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -2462,8 +2522,54 @@ function fmtCountdown(s) {
 }
 
 /* ───────────────────────────── Render ───────────────────────────────────── */
+// Mémoire du dernier tick affiché — pour fire l'animation tick-landing
+// uniquement quand le moteur avance, pas à chaque re-render.
+let __lastSeenTick = -1;
+let __lastResourceSnapshot = null;  // { [planete|res]: stock } pour diff cellules
+function __snapshotResources(emp) {
+  const snap = {};
+  for (const p of (emp?.planetes || [])) {
+    for (const [res, info] of Object.entries(p.ressources || {})) {
+      snap[`${p.nom}|${res}`] = info?.stock || 0;
+    }
+  }
+  return snap;
+}
+function __fireTickPulse() {
+  document.body.classList.add('tick-pulsed');
+  const foot = document.querySelector('.foot');
+  if (foot) foot.classList.add('tick-flash');
+  setTimeout(() => {
+    document.body.classList.remove('tick-pulsed');
+    if (foot) foot.classList.remove('tick-flash');
+  }, 1700);
+  // Flash les compteurs Fe/Lu/Pl du strip ressources qui ont changé.
+  if (__lastResourceSnapshot) {
+    requestAnimationFrame(() => {
+      document.querySelectorAll('[data-stock-cell]').forEach(el => {
+        const key = el.getAttribute('data-stock-cell');
+        const newVal = parseFloat(el.getAttribute('data-stock-value') || '0');
+        const oldVal = __lastResourceSnapshot[key];
+        if (oldVal != null && newVal !== oldVal) {
+          el.classList.remove('cell-changed');
+          // force reflow pour relancer l'anim
+          void el.offsetWidth;
+          el.classList.add('cell-changed');
+          setTimeout(() => el.classList.remove('cell-changed'), 1500);
+        }
+      });
+    });
+  }
+}
+
 function render() {
   const m = state.manifest;
+  const currentTick = m?.tick ?? -1;
+
+  // Détection avancement tick : on déclenche AVANT le render (pour saisir
+  // l'ancien snapshot ressources) et on flash APRÈS (pour voir les
+  // nouvelles valeurs en surbrillance).
+  const tickAdvanced = (__lastSeenTick >= 0 && currentTick > __lastSeenTick);
 
   // header
   document.getElementById('tickValue').textContent = m ? String(m.tick).padStart(3, '0') : '—';
@@ -2510,6 +2616,13 @@ function render() {
     new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   if (p) maybeAdvanceOnboarding(p, emp);
+
+  // Anim post-render : si le tick a avancé, balayage doré + flash des
+  // ressources qui ont changé. La snapshot ressources se met à jour
+  // après pour servir de référence au prochain tick.
+  if (tickAdvanced) __fireTickPulse();
+  __lastSeenTick = currentTick;
+  __lastResourceSnapshot = __snapshotResources(emp);
 }
 
 function renderNavCounts(p, emp) {
@@ -2539,10 +2652,11 @@ function renderResourceStrip(p) {
     const warn = pct >= 90;
     const prod = info.production_par_utj || 0;
     const tip = resourceTooltip(r.k, info);
+    const stockKey = `${p?.nom || ''}|${r.k}`;
     html += `<div class="res" data-r="${r.k}" data-tip="${escapeHtml(tip)}">
       <div class="ico">${icons[r.k]}</div>
       <div class="nm">${r.l}</div>
-      <div class="stock">${fmtCompact(info.stock)}</div>
+      <div class="stock" data-stock-cell="${escapeHtml(stockKey)}" data-stock-value="${info.stock || 0}">${fmtCompact(info.stock)}</div>
       <div class="meta ${warn ? 'warn' : ''} ${prod === 0 ? 'zero' : ''}">${warn ? 'plein' : (prod > 0 ? '+' + prod + '/utj' : '—')}</div>
     </div>`;
   }
@@ -2606,7 +2720,7 @@ function renderPlanetHead(p, emp) {
       <span><b>${built}/${total}</b> ouvrages debout</span>
       <span class="chip ${p.type || ''}">${p.type || 'planète'}</span>
       <span>militaire <b>${fmt(emp?.points_militaires ?? 0)}</b></span>
-      ${(emp?.ressources_globales?.singularite || 0) > 0 ? `<span title="Singularités quantiques produites par tes anomalies colonisées">Σ <b>${emp.ressources_globales.singularite}</b></span>` : ''}
+      ${(emp?.ressources_globales?.singularite || 0) > 0 ? `<span data-singularite-chip title="Singularités quantiques produites par tes anomalies colonisées">Σ <b>${emp.ressources_globales.singularite}</b></span>` : ''}
       ${(emp?.ressources_globales?.influence || 0) > 0 ? `<span title="Influence diplomatique">∞ <b>${fmt(Math.floor(emp.ressources_globales.influence))}</b></span>` : ''}
       ${(emp?.malus_moral_jusqu_tick || 0) > tickCur ? `<span style="color:var(--red)" title="Malus moral après rupture de trêve : production −15% jusqu'au tick ${emp.malus_moral_jusqu_tick}">⚡ malus ${emp.malus_moral_jusqu_tick - tickCur}t</span>` : ''}
       <span style="margin-left:auto"><b>${p.champs?.utilises ?? 0}/${p.champs?.total ?? 0}</b> champs</span>
@@ -5151,7 +5265,28 @@ function detectNotifs() {
     if (b.attaquant === me || b.defenseur === me) reportKeys.add(`battle|${b.filename}`);
   }
 
-  notifSnap[me] = { tick, chantiers, research, incoming, stockFull, reports: reportKeys };
+  // Singularité produite — moment rare, mérite un toast doré + un éclat
+  // sur le badge Σ du sub-header.
+  const singCur = emp?.ressources_globales?.singularite || 0;
+  if (prev && singCur > (prev.singularite || 0)) {
+    const delta = singCur - prev.singularite;
+    toast(
+      '✦ Singularité quantique condensée',
+      `Tes anomalies colonisées ont produit <b>${delta}</b> singularité${delta > 1 ? 's' : ''}. Total : <b>${singCur}</b>.`,
+      false,
+    );
+    requestAnimationFrame(() => {
+      const chip = document.querySelector('[data-singularite-chip]');
+      if (chip) {
+        chip.classList.remove('sing-burst');
+        void chip.offsetWidth;
+        chip.classList.add('sing-burst');
+        setTimeout(() => chip.classList.remove('sing-burst'), 2500);
+      }
+    });
+  }
+
+  notifSnap[me] = { tick, chantiers, research, incoming, stockFull, reports: reportKeys, singularite: singCur };
   refreshNotifUI();
 }
 

@@ -288,7 +288,18 @@ export async function runTick({
             const base = def.production_base || 30;
             const bonus = def.bonus_planete?.[planete.type] || 1.0;
             const baseline = { ferrum: 30, lumen: 20, plasmide: 0 }[res] || 0;
-            const prod = Math.floor(base * niv * Math.pow(1.1, niv) * bonus);
+            // Le synthétiseur de plasmide subit l'efficacité thermique de
+            // l'étoile-hôte : `temp = temperature_k / 100` ∈ [50,70] →
+            // multiplicateur (1.44 − 0.004·temp) ∈ [1.16, 1.24]. Étoiles
+            // froides ≈ rendement supérieur (formule rules.yaml:40).
+            let thermal = 1.0;
+            if (done.batiment === 'synthetiseur_plasmide') {
+              const [g, s] = planete.coordonnees || [];
+              const tempK = galaxie?.systemes?.[`${g}:${s}`]?.etoile?.temperature_k ?? 6000;
+              const temp = tempK / 100;
+              thermal = Math.max(0.5, 1.44 - 0.004 * temp);
+            }
+            const prod = Math.floor(base * niv * Math.pow(1.1, niv) * bonus * thermal);
             if (planete.ressources?.[res]) {
               planete.ressources[res].production_par_utj = baseline + prod;
             }

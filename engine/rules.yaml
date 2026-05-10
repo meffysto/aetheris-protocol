@@ -37,7 +37,8 @@ batiments:
     duree_base_utj: 1.5
     multiplicateur_duree: 1.5
     production_base: 10
-    formule_production: "10 * niveau * 1.1^niveau * (1.44 - 0.004*temp)"
+    # temp = temperature_k(etoile) / 100 ; étoiles froides → rendement +
+    formule_production: "10 * niveau * 1.1^niveau * (1.44 - 0.004*temp) * bonus_planete"
     bonus_planete: { volcanique: 1.30 }
 
   centrale_solaire:

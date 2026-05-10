@@ -147,8 +147,13 @@ engagements:
   - id: spy-helios-002
     hash: sha256:2a7b3c89...91f4
     type: renseignement
+  - id: col-1042-001
+    hash: sha256:1c9f8a73...2bd1
+    type: colonial         # revendication d'une planète inhabitée
 signature: ed25519:<base64>
 ```
+
+Types d'`engagements` reconnus : `militaire`, `renseignement`, `colonial`.
 
 ### 4.3 `joueurs/<toi>/revelations.yaml`
 
@@ -171,6 +176,18 @@ revelations:
       cuirasse: 46
     vitesse: 80
     nonce: e4f1a2b8c9d0   # le sel utilisé pour le hash
+  - id: col-1042-001
+    type: colonisation
+    depuis: aetheris-prima
+    cible: { systeme: "1:42", position: 5 }   # adresse galaxie, pas un nom
+    nom_colonie: ferrolune                     # optionnel; sinon <joueur>-c<n>
+    flotte:
+      vaisseau_colon: 1
+      chasseur_leger: 50                       # escorte optionnelle
+    cargaison:
+      ferrum: 50000
+      lumen: 30000
+    nonce: 9a7c2f0e1b3d
 signature: ed25519:<base64>
 ```
 
@@ -178,6 +195,28 @@ signature: ed25519:<base64>
 ton attaque en clair au tick T-1, ta cible la verrait et sauverait sa flotte.
 Avec commit-reveal, l'adversaire voit qu'il y a *quelque chose* de militaire
 qui se prépare, sans savoir où ça va.
+
+**Colonisation : pourquoi scellée ?** Un `vaisseau_colon` a 0 d'attaque et 3000
+de coque — il s'intercepte facilement. Si la course pour une case libre était
+publique, tout système contesté se transformerait en bataille rangée. Le sceau
+protège la trajectoire jusqu'à révélation.
+
+**Règles de la colonisation** :
+- Adresse : `{ systeme: "g:s", position: N }`. La case doit exister, être de
+  type `planete`, et avoir `proprietaire: null` au moment de l'envoi ET de
+  l'arrivée (double-check).
+- Cap : `manifest.parametres.planetes_max_par_joueur` (par défaut 9). Le check
+  d'envoi compte les colons déjà en vol, pas seulement les planètes possédées.
+- Nom : `[a-z][a-z0-9\-]{2,39}`, unique globalement. Le format
+  `<joueur>-c<n>` est réservé au fallback automatique.
+- À l'arrivée réussie : 1 `vaisseau_colon` consommé, le reste de la flotte +
+  la cargaison atterrissent sur la nouvelle planète.
+- À l'arrivée échouée (cible occupée, cap atteint) : la flotte intacte
+  (vaisseau_colon non consommé) repart en `type_mission: retour` vers la
+  planète source. Durée retour = durée aller.
+- Tie-break (plusieurs colons même tick même case) : tri lex
+  `(proprietaire ASC, flotte.id ASC)`. Le premier verrouille la case, les
+  suivants échouent et repartent.
 
 ---
 
@@ -264,7 +303,10 @@ alliance: aura
 ### 5.3 `world/galaxie.yaml`
 
 Carte canonique. Le résolveur la modifie à chaque tick pour refléter colonisations,
-abandons, changements d'alliance.
+abandons, changements d'alliance. Concrètement, `engine/tick.mjs` réécrit
+`world/galaxie.yaml` après chaque tick — le fichier porte un `tick:` qui
+avance avec le manifest. Chaque case colonisée voit son `proprietaire` et
+`nom` posés au tick d'arrivée de la flotte.
 
 ```yaml
 version: 1
@@ -319,14 +361,16 @@ exécutions produisent le même hash de sortie. Cet ordre est normatif :
 6. **Appliquer** dans l'ordre :
    - 6a. Production de ressources (× 6 UTJ)
    - 6b. Avancement des chantiers et recherches
-   - 6c. Mouvements de flotte (résolution des arrivées)
+   - 6c. Mouvements de flotte (résolution des arrivées : transport/retour,
+         puis recyclage, puis colonisation — tri lex par `(proprietaire, id)`
+         pour le tie-break multi-colons même cible).
    - 6d. Espionnage (sondes → rapports)
    - 6e. Combats (résolution déterministe à 6 rondes max)
    - 6f. Pillage et création de champs de débris
    - 6g. Recyclage
    - 6h. Marché (matching des offres compatibles)
    - 6i. Actions diplomatiques
-7. **Écrire** chaque `joueurs/<X>/empire.yaml`, `empire.md`, et les events publics.
+7. **Écrire** chaque `joueurs/<X>/empire.yaml`, `empire.md`, `world/galaxie.yaml` (mutations de territoire) et les events publics.
 8. **Snapshotter** dans `history/tick-{T+1}.tar.gz`.
 9. **Mettre à jour** `manifest.yaml` (tick++, nouveau hash_etat).
 10. **Commit** sur `main` avec message `tick {T+1}: N ordres, M batailles`.

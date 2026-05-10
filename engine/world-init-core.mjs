@@ -62,11 +62,18 @@ export function spawnEmpireFromJoin({ joinData, galaxie, tick = 0, rng }) {
   // Coordonnées
   const [g, s] = chosen.sys.split(':').map(Number);
 
-  // Champs (déterministe via rng)
-  let champsTotal;
-  if (chosen.classe === 'tellurique')      champsTotal = 200 + Math.floor(rng() * 80);
-  else if (chosen.classe === 'cristalline') champsTotal = 130 + Math.floor(rng() * 90);
-  else                                       champsTotal = 100 + Math.floor(rng() * 100);
+  // Planète vierge déterministe (champs via rng)
+  const planete = createBlankPlanete({
+    classe: chosen.classe,
+    coordonnees: [g, s, chosen.p],
+    nom: planetName,
+    rng,
+  });
+  // Starter pack du nouveau joueur (ne s'applique PAS à la colonisation)
+  planete.ressources.ferrum.stock = 500;
+  planete.ressources.ferrum.production_par_utj = 30;
+  planete.ressources.lumen.stock = 500;
+  planete.ressources.lumen.production_par_utj = 20;
 
   const empire = {
     version: 1,
@@ -76,29 +83,7 @@ export function spawnEmpireFromJoin({ joinData, galaxie, tick = 0, rng }) {
     points_militaires: 0,
     rang: 999,
     alliance,
-    planetes: [{
-      nom: planetName,
-      coordonnees: [g, s, chosen.p],
-      type: chosen.classe,
-      champs: { utilises: 0, total: champsTotal },
-      ressources: {
-        ferrum:   { stock: 500, production_par_utj: 30, capacite: 100000 },
-        lumen:    { stock: 500, production_par_utj: 20, capacite: 100000 },
-        plasmide: { stock: 0,   production_par_utj: 0,  capacite: 100000 },
-      },
-      energie: { production: 0, consommation: 0 },
-      batiments: {
-        mine_ferrum: 0, extracteur_lumen: 0, synthetiseur_plasmide: 0,
-        centrale_solaire: 0, depot: 0, usine_robotique: 0,
-        chantier_spatial: 0, laboratoire: 0,
-        reacteur_fusion: 0, silo_missiles: 0,
-        terminal_marchand: 0, centre_diplomatique: 0,
-      },
-      file_chantier: [],
-      file_construction: [],
-      flotte_au_sol: {},
-      defenses: {},
-    }],
+    planetes: [planete],
     flottes_en_vol: [],
     recherche: {},
     file_recherche: [],
@@ -109,6 +94,53 @@ export function spawnEmpireFromJoin({ joinData, galaxie, tick = 0, rng }) {
   };
 
   return { empire };
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// createBlankPlanete : planète vierge déterministe — base partagée entre
+// l'inscription d'un joueur (spawnEmpireFromJoin) et la colonisation
+// (engine/colonisation.mjs). Aucun stock/prod starter ici : c'est
+// l'appelant qui décide d'ajouter un bonus de bienvenue si pertinent.
+// ════════════════════════════════════════════════════════════════════════
+
+/**
+ * @param {object} params
+ * @param {string} params.classe       tellurique | cristalline | volcanique | glacee | gazeuse
+ * @param {[number,number,number]} params.coordonnees   [galaxie, systeme, position]
+ * @param {string} params.nom          nom canonique de la planète
+ * @param {function} params.rng        RNG déterministe (consommé exactement 1 fois)
+ * @returns {object} planète au format empire.planetes[]
+ */
+export function createBlankPlanete({ classe, coordonnees, nom, rng }) {
+  if (typeof rng !== 'function') throw new Error('createBlankPlanete: rng requis');
+  let champsTotal;
+  if (classe === 'tellurique')       champsTotal = 200 + Math.floor(rng() * 80);
+  else if (classe === 'cristalline') champsTotal = 130 + Math.floor(rng() * 90);
+  else                               champsTotal = 100 + Math.floor(rng() * 100);
+
+  return {
+    nom,
+    coordonnees,
+    type: classe,
+    champs: { utilises: 0, total: champsTotal },
+    ressources: {
+      ferrum:   { stock: 0, production_par_utj: 0, capacite: 100000 },
+      lumen:    { stock: 0, production_par_utj: 0, capacite: 100000 },
+      plasmide: { stock: 0, production_par_utj: 0, capacite: 100000 },
+    },
+    energie: { production: 0, consommation: 0 },
+    batiments: {
+      mine_ferrum: 0, extracteur_lumen: 0, synthetiseur_plasmide: 0,
+      centrale_solaire: 0, depot: 0, usine_robotique: 0,
+      chantier_spatial: 0, laboratoire: 0,
+      reacteur_fusion: 0, silo_missiles: 0,
+      terminal_marchand: 0, centre_diplomatique: 0,
+    },
+    file_chantier: [],
+    file_construction: [],
+    flotte_au_sol: {},
+    defenses: {},
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════════

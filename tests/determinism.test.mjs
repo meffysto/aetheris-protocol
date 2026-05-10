@@ -12,8 +12,8 @@ import * as combat from '../engine/combat.mjs';
 import { loadFixtures, clone, hashState } from './helpers.mjs';
 
 async function runN(n, fixtures) {
-  let { manifest, empires } = clone(fixtures);
-  const { rules, galaxie, identites } = fixtures;
+  let { manifest, empires, galaxie } = clone(fixtures);
+  const { rules, identites } = fixtures;
   for (let i = 0; i < n; i++) {
     const result = await runTick({
       manifest, rules, galaxie,
@@ -22,8 +22,9 @@ async function runN(n, fixtures) {
     });
     manifest = result.newManifest;
     empires = result.newEmpires;
+    galaxie = result.newGalaxie || galaxie;
   }
-  return { manifest, empires };
+  return { manifest, empires, galaxie };
 }
 
 test('runTick est déterministe sur 50 ticks (état réel)', async () => {
@@ -62,7 +63,7 @@ test('runTick fait avancer manifest.tick de 1', async () => {
   const result = await runTick({
     manifest: clone(fixtures.manifest),
     rules: fixtures.rules,
-    galaxie: fixtures.galaxie,
+    galaxie: clone(fixtures.galaxie),
     empires: clone(fixtures.empires),
     orders: {},
     identites: fixtures.identites,

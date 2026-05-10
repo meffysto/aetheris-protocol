@@ -9,6 +9,7 @@
 // puis persiste le résultat (fs ou IndexedDB).
 
 import { sha256 } from '@noble/hashes/sha256';
+import { queueColonisation, resolveColonisationArrivee } from './colonisation.mjs';
 
 // ════════════════════════════════════════════════════════════════════════
 // 1.  YAML mini (sous-ensemble suffisant pour notre schéma)
@@ -473,6 +474,10 @@ export async function runTick({
       case 'recyclage':    return queueRecyclage(emp, action, playerName);
       case 'diplomatie':   return queueDiplomatie(emp, action, playerName);
       case 'marche-poser': return queueMarchePoser(emp, action, playerName);
+      case 'colonisation': return queueColonisation(emp, action, {
+        galaxie, rules, manifest, log, playerName, tickSuivant, rng,
+        computeDistanceToCoords,
+      });
       default:
         log(`  · ${playerName}: type d'ordre non implémenté: ${action.type}`);
     }
@@ -860,11 +865,27 @@ export async function runTick({
       if (dst) break;
     }
     if (!src || !dst) return 100;
-    const [g1, s1, p1] = src.coordonnees;
-    const [g2, s2, p2] = dst.coordonnees;
+    return computeDistanceFromCoords(src.coordonnees, dst.coordonnees);
+  }
+
+  // Distance entre deux paires de coordonnées brutes [g, s, p].
+  // Partagée par computeDistance (planète→planète) et computeDistanceToCoords
+  // (planète→case inhabitée, utilisé par la colonisation).
+  function computeDistanceFromCoords([g1, s1, p1], [g2, s2, p2]) {
     if (g1 !== g2) return 20000 + Math.abs(g1 - g2) * 5000;
     if (s1 !== s2) return 2700 + Math.abs(s1 - s2) * 95;
     return 1000 + Math.abs(p1 - p2) * 5;
+  }
+
+  // Distance depuis une planète possédée vers des coordonnées arbitraires
+  // (typiquement une case galaxie inhabitée). Renvoie 100 (fallback court)
+  // si la planète source est introuvable, comportement aligné sur
+  // computeDistance pour ne pas surprendre les call-sites existants.
+  function computeDistanceToCoords(fromName, dstCoords, playerName) {
+    const emp = empires[playerName];
+    const src = emp?.planetes?.find(p => p.nom === fromName);
+    if (!src || !Array.isArray(dstCoords) || dstCoords.length !== 3) return 100;
+    return computeDistanceFromCoords(src.coordonnees, dstCoords);
   }
 
   // ─── Phase 3.5 — Matching marché galactique ────────────────────────────
@@ -1046,6 +1067,22 @@ export async function runTick({
     log(`  ♻ ${arr.proprietaire}: recyclage sur ${flt.vers.planete} → ferrum=${pris.ferrum} lumen=${pris.lumen}`);
   }
 
+  // Colonisations : tie-break déterministe (joueur ASC, id ASC). Le premier
+  // de la liste qui résout sur une case libre la verrouille ; les suivants
+  // arrivant sur la même cible ce tick verront proprietaire != null et
+  // échoueront en retour automatique.
+  const arrCol = arrivees
+    .filter(a => a.flotte.type_mission === 'colonisation')
+    .sort((x, y) =>
+      (x.proprietaire < y.proprietaire ? -1 : x.proprietaire > y.proprietaire ? 1 : 0) ||
+      (x.flotte.id < y.flotte.id ? -1 : x.flotte.id > y.flotte.id ? 1 : 0)
+    );
+  for (const arr of arrCol) {
+    resolveColonisationArrivee(arr, {
+      galaxie, manifest, empires, log, events, reports, rng, tickSuivant,
+    });
+  }
+
   // ─── Phase 5 — Combats & espionnage ─────────────────────────────────────
   log(`▸ Phase 5/6 — Combats & espionnage`);
   const arrAttaques = arrivees.filter(a => a.flotte.type_mission === 'attaque');
@@ -1198,6 +1235,9 @@ export async function runTick({
     emp.score_total = Math.floor(score);
   }
 
+  // ─── Galaxie : tick avancé (mutation in-place, cohérente avec empires) ─
+  galaxie.tick = tickSuivant;
+
   // ─── Manifest avec hash chain ───────────────────────────────────────────
   const previousTickHash = manifest.tick_hash || 'genesis';
   const newManifest = { ...manifest };
@@ -1231,6 +1271,7 @@ export async function runTick({
   return {
     newManifest,
     newEmpires: empires,
+    newGalaxie: galaxie,
     events,
     reports,
     eventsLog,

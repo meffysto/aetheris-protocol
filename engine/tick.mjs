@@ -116,6 +116,9 @@ const result = await runTick({
 
 console.log(`\n▸ Écriture des fichiers`);
 wr('world/manifest.yaml', '# Généré par engine/tick.mjs — ne pas éditer.\n' + ystringify(result.newManifest));
+if (result.newGalaxie) {
+  wr('world/galaxie.yaml', '# Généré par engine/tick.mjs — ne pas éditer.\n' + ystringify(result.newGalaxie));
+}
 for (const f of result.empireFiles) {
   wr(`joueurs/${f.player}/empire.yaml`, f.yaml);
   wr(`joueurs/${f.player}/empire.md`, f.md);

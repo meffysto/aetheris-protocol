@@ -879,6 +879,41 @@ h2.sect .rule {
 .qitem.pending .cancel-btn:hover { color: var(--phosphor); background: rgba(168,58,37,0.1); }
 .qitem.pending .cancel-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* ─── panier local (orders not yet inscribed) ─────────────── */
+.qitem.cart {
+  background: var(--ink-2);
+  border: 1px dashed var(--phosphor);
+  position: relative;
+}
+.qitem.cart .nm small { color: var(--phosphor); font-weight: 600; }
+.qitem.cart .cancel-btn {
+  position: absolute; top: 8px; right: 10px;
+  appearance: none; background: none; border: none;
+  color: var(--bone-dim); cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 4px 6px;
+  border-radius: 4px; transition: color .12s, background .12s;
+}
+.qitem.cart .cancel-btn:hover { color: var(--phosphor); background: rgba(109,194,202,0.08); }
+.qitem.cart .cancel-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.cart-inscribe {
+  display: block; width: 100%;
+  margin-top: 10px;
+  appearance: none; cursor: pointer;
+  background: var(--phosphor); color: var(--ink-1);
+  border: none; border-radius: 6px;
+  padding: 10px 14px;
+  font-family: var(--display); font-weight: 700; font-size: 13px;
+  letter-spacing: 0.02em;
+  transition: filter .12s, opacity .12s;
+}
+.cart-inscribe:hover:not(:disabled) { filter: brightness(1.1); }
+.cart-inscribe:disabled { opacity: 0.45; cursor: not-allowed; }
+.cart-hint {
+  margin-top: 6px;
+  font-family: var(--sans); font-size: 11px; color: var(--bone-dim);
+  text-align: center;
+}
+
 /* ─── onboarding modal ────────────────────────────────────── */
 .onboarding-bg {
   position: fixed; inset: 0; z-index: 100;
@@ -1960,6 +1995,10 @@ body.tick-pulsed::after {
 
   <!-- RIGHT RAIL -->
   <aside class="rail" id="rail">
+    <div class="group" id="qCartGroup" hidden>
+      <h3>Panier <span class="ct" id="qCartCt">—</span></h3>
+      <div id="qCart"></div>
+    </div>
     <div class="group">
       <h3>Chantier <span class="ct" id="qBatCt">—</span></h3>
       <div id="qBat"></div>
@@ -2594,6 +2633,22 @@ function render() {
   // l'ancien snapshot ressources) et on flash APRÈS (pour voir les
   // nouvelles valeurs en surbrillance).
   const tickAdvanced = (__lastSeenTick >= 0 && currentTick > __lastSeenTick);
+
+  // Tick avancé : vide les paniers (les ordres y restant visaient le tick
+  // qui vient de passer, donc plus pertinents). Les ordres déjà inscrits
+  // restent dans emp._ordres tant que le moteur ne les a pas consommés.
+  if (tickAdvanced) {
+    const newTickCible = currentTick + 1;
+    for (const name of Object.keys(localQueue)) {
+      const q = localQueue[name];
+      if (q.length > 0 && q[0].tickCible <= currentTick) {
+        delete localQueue[name];
+      } else if (q.length > 0 && q[0].tickCible !== newTickCible) {
+        // Réaligne le tickCible (resté à 0 entre boot et premier load)
+        for (const item of q) item.tickCible = newTickCible;
+      }
+    }
+  }
 
   // header
   document.getElementById('tickValue').textContent = m ? String(m.tick).padStart(3, '0') : '—';
@@ -3755,8 +3810,8 @@ async function submitMarchePoser({ depuis, vend, demande, expire_dans_ticks }) {
     const [vendRes, vendQty] = Object.entries(vend)[0];
     const [demRes, demQty] = Object.entries(demande)[0];
     const message = `${state.current}: marché ${vendQty} ${vendRes} → ${demQty} ${demRes} (depuis ${depuis})`;
-    await appendOrderAndPush({ type: 'marche-poser', depuis, vend, demande, expire_dans_ticks }, message);
-    toast('Ordre scellé', `Marché ${vendQty} ${vendRes} → ${demQty} ${demRes} posé.`);
+    const r = await appendOrderAndPush({ type: 'marche-poser', depuis, vend, demande, expire_dans_ticks }, message);
+    toast('Ajouté au panier', `Marché ${vendQty} ${vendRes} → ${demQty} ${demRes} en attente (${r.count} ordre${r.count > 1 ? 's' : ''}).`);
   } catch (e) {
     toast('Échec', e.message || String(e), true);
   } finally {
@@ -3813,7 +3868,57 @@ function renderClassement() {
   v.innerHTML = html;
 }
 
+// Résumé court d'un ordre en panier (titre + sous-titre).
+function summarizeQueuedOrder(o) {
+  const L = (k) => labels[k] || k;
+  if (o.type === 'chantier') return { nm: L(o.batiment), sub: `niveau ${o.niveau_cible}` };
+  if (o.type === 'construction') return { nm: L(o.unite), sub: `${o.quantite}× sur ${o.planete}` };
+  if (o.type === 'recherche') return { nm: L(o.technologie), sub: `niveau ${o.niveau_cible}` };
+  if (o.type === 'espionnage') return { nm: 'Espionnage', sub: `${o.depuis} → ${o.cible.joueur}/${o.cible.planete}` };
+  if (o.type === 'attaque') return { nm: 'Attaque', sub: `${o.depuis} → ${o.cible.joueur}/${o.cible.planete}` };
+  if (o.type === 'transport') return { nm: 'Transport', sub: `${o.depuis} → ${o.cible.joueur}/${o.cible.planete}` };
+  if (o.type === 'recyclage') return { nm: 'Recyclage', sub: `${o.depuis} → ${o.cible.joueur}/${o.cible.planete}` };
+  if (o.type === 'colonisation') return { nm: 'Colonisation', sub: `${o.depuis} → ${o.cible.systeme}:${o.cible.position}` };
+  if (o.type === 'marche-poser') {
+    const [vr, vq] = Object.entries(o.vend || {})[0] || [];
+    const [dr, dq] = Object.entries(o.demande || {})[0] || [];
+    return { nm: 'Marché', sub: `${vq} ${vr} → ${dq} ${dr}` };
+  }
+  return { nm: o.type, sub: '' };
+}
+
+function renderCart() {
+  const playerName = state.current;
+  const q = playerName ? getQueue(playerName) : [];
+  const group = document.getElementById('qCartGroup');
+  if (!group) return;
+  if (q.length === 0) {
+    group.hidden = true;
+    return;
+  }
+  group.hidden = false;
+  document.getElementById('qCartCt').textContent = q.length;
+  const tickCible = q[0].tickCible;
+  const locked = state.pending.has('inscribeQueue');
+  let html = '';
+  for (let i = 0; i < q.length; i++) {
+    const s = summarizeQueuedOrder(q[i].order);
+    html += `<div class="qitem cart">
+      <button class="cancel-btn" data-cart-remove="${i}" ${locked ? 'disabled' : ''} title="Retirer du panier">✕</button>
+      <div class="top">
+        <div class="nm">${s.nm}<small>${s.sub}</small></div>
+        <div class="tgt" style="color:var(--phosphor)">∙∙∙<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase">tick ${tickCible}</small></div>
+      </div>
+    </div>`;
+  }
+  const btnLabel = locked ? 'Inscription en cours…' : `Inscrire ${q.length} ordre${q.length > 1 ? 's' : ''}`;
+  html += `<button class="cart-inscribe" id="cartInscribeBtn" ${locked ? 'disabled' : ''}>${btnLabel}</button>`;
+  html += `<div class="cart-hint">Une seule inscription Bitcoin pour tout le panier.</div>`;
+  document.getElementById('qCart').innerHTML = html;
+}
+
 function renderRail(p, emp) {
+  renderCart();
   // Chantier — combine ordres en attente (depuis ordres.yaml) + chantiers actifs (file_chantier)
   const queue = p?.file_chantier || [];
   const tickCur = state.manifest?.tick ?? 0;
@@ -4116,12 +4221,27 @@ function serializeOrder(o) {
     if (o.nom_colonie) s += `\n    nom_colonie: ${o.nom_colonie}`;
     return s;
   }
+  if (o.type === 'recyclage') return `  - type: recyclage
+    depuis: ${o.depuis}
+    cible: { joueur: ${o.cible.joueur}, planete: ${o.cible.planete} }
+    flotte: ${inlineMap(o.flotte)}`;
+  if (o.type === 'marche-poser') {
+    return `  - type: marche-poser
+    depuis: ${o.depuis}
+    vend: ${inlineMap(o.vend)}
+    demande: ${inlineMap(o.demande)}
+    expire_dans_ticks: ${o.expire_dans_ticks || 12}`;
+  }
   throw new Error(`serializeOrder: type inconnu "${o.type}"`);
 }
 
 document.getElementById('rail').addEventListener('click', e => {
-  const btn = e.target.closest('button[data-cancel-idx]'); if (!btn) return;
-  cancelOrder(parseInt(btn.dataset.cancelIdx, 10));
+  const cancelBtn = e.target.closest('button[data-cancel-idx]');
+  if (cancelBtn) { cancelOrder(parseInt(cancelBtn.dataset.cancelIdx, 10)); return; }
+  const cartRm = e.target.closest('button[data-cart-remove]');
+  if (cartRm) { removeQueuedOrder(state.current, parseInt(cartRm.dataset.cartRemove, 10)); return; }
+  const inscribeBtn = e.target.closest('#cartInscribeBtn');
+  if (inscribeBtn) { inscribeQueuedOrders(); return; }
 });
 
 async function cancelOrder(idx) {
@@ -4148,36 +4268,139 @@ async function cancelOrder(idx) {
   }
 }
 
-// Empile un nouvel ordre dans ordres.yaml puis l'inscrit on-chain.
-// Mutex : sérialise les soumissions pour qu'un 2ème clic rapide ne consomme
-// pas en parallèle les mêmes UTXOs (ce qui ferait double-spend une des deux TX).
+// Mutex pour sérialiser les inscriptions Bitcoin (un seul push à la fois,
+// évite que deux clics rapides consomment les mêmes UTXOs côté wallet).
 let pushQueue = Promise.resolve();
 // Cache local des ordres soumis : survit aux load() pendant la fenêtre
 // "TX broadcastée → confirmée → scanned → appliquée au tick" (~30-60s sur
 // Mutinynet). Sinon l'UI semble perdre l'ordre fraîchement soumis pendant
 // que le scan suivant n'a pas encore vu l'inscription.
 const localOrdersCache = {};
-async function appendOrderAndPush(newOrder, message) {
-  // Capture state.current MAINTENANT (au clic). Si load() rafraîchit pendant
-  // que le push est en queue, le push doit partir au nom du joueur d'origine.
-  const playerName = state.current;
+
+// ─── Panier local : ordres ajoutés mais PAS encore inscrits on-chain ────
+// Architecture cart UX : on accumule plusieurs ordres côté client puis on
+// fait UNE seule inscription Bitcoin (un seul UTXO consommé, pas de conflit
+// RBF entre TXs concurrentes). Clé : nom du joueur → tableau de
+// { order, message, tickCible }. Reset après inscription réussie ou quand
+// le tick avance.
+const localQueue = {};
+let __lastQueueTick = -1;
+
+function getQueue(playerName) {
+  return localQueue[playerName] || [];
+}
+
+// Détecte si un ordre identique (même cible structurelle) est déjà en
+// panier ou déjà inscrit pour le prochain tick. Évite les doublons type
+// "améliorer mine ferrum" cliqué 2 fois.
+function findDuplicateOrder(playerName, newOrder) {
+  const queue = getQueue(playerName);
+  const emp = state.players[playerName];
   const tickCible = (state.manifest?.tick ?? 0) + 1;
+  const inscribed = (emp?._ordres?.tick_cible === tickCible)
+    ? (emp._ordres.ordres || [])
+    : [];
+  const all = [...queue.map(q => q.order), ...inscribed];
+  for (const o of all) {
+    if (o.type !== newOrder.type) continue;
+    if (o.type === 'chantier' && o.planete === newOrder.planete && o.batiment === newOrder.batiment) return o;
+    if (o.type === 'recherche' && o.technologie === newOrder.technologie) return o;
+    if (o.type === 'construction' && o.planete === newOrder.planete && o.unite === newOrder.unite) return o;
+    // missions / marche / colonisation : autorise plusieurs (cibles distinctes possibles)
+  }
+  return null;
+}
+
+// Ajoute un ordre au panier local (PAS de push Bitcoin). Le push se fait
+// en bloc via inscribeQueuedOrders() quand l'user clique "Inscrire N ordres".
+function queueOrderLocally(newOrder, message) {
+  const playerName = state.current;
+  if (!playerName) throw new Error('aucun joueur actif');
+  if (findDuplicateOrder(playerName, newOrder)) {
+    toast('Déjà au panier', 'Un ordre identique est déjà en attente ou inscrit pour ce tick.', true);
+    throw new Error('ordre dupliqué');
+  }
+  const tickCible = (state.manifest?.tick ?? 0) + 1;
+  if (!localQueue[playerName]) localQueue[playerName] = [];
+  localQueue[playerName].push({ order: newOrder, message, tickCible });
+  __lastQueueTick = tickCible;
+  render();
+  return localQueue[playerName].length;
+}
+
+function removeQueuedOrder(playerName, idx) {
+  const q = localQueue[playerName];
+  if (!q) return;
+  q.splice(idx, 1);
+  if (q.length === 0) delete localQueue[playerName];
+  render();
+}
+
+// Inscrit en UNE SEULE inscription Bitcoin tous les ordres du panier du
+// joueur courant + ceux déjà inscrits pour le même tick (cas où l'user a
+// déjà inscrit une première salve et veut ajouter d'autres ordres).
+async function inscribeQueuedOrders() {
+  const playerName = state.current;
+  if (!playerName) return;
+  const q = getQueue(playerName);
+  if (q.length === 0) return;
+  if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin dans les paramètres pour inscrire des ordres.', true); return; }
+  if (state.pending.has('inscribeQueue')) return;
+
+  const tickCible = q[0].tickCible;
+  // Si certains ordres du panier sont pour un autre tick (tick avancé entre-
+  // temps), refuse. Le clear-on-tick-advance devrait empêcher ce cas.
+  if (q.some(x => x.tickCible !== tickCible)) {
+    toast('File incohérente', 'Le tick a avancé. Le panier a été réinitialisé.', true);
+    delete localQueue[playerName];
+    render();
+    return;
+  }
+
+  state.pending.add('inscribeQueue'); render();
   const run = async () => {
     const emp = state.players[playerName];
     if (!emp) throw new Error(`joueur "${playerName}" introuvable`);
     const existing = emp._ordres && emp._ordres.tick_cible === tickCible ? emp._ordres : null;
-    const ordres = existing ? [...existing.ordres, newOrder] : [newOrder];
+    const allOrders = [
+      ...(existing ? existing.ordres : []),
+      ...q.map(x => x.order),
+    ];
     const nonce = randomNonce();
-    const orderBlocks = ordres.map(serializeOrder);
+    const orderBlocks = allOrders.map(serializeOrder);
     const body = buildOrdresYamlOrders({ joueur: playerName, tickCible, nonce, orderBlocks });
-    await pushSignedOrder(body, message);
-    const snapshot = { tick_cible: tickCible, ordres: [...ordres], nonce };
+    const summary = q.length === 1
+      ? q[0].message
+      : `${playerName}: ${q.length} ordres groupés (tick ${tickCible})`;
+    await pushSignedOrder(body, summary);
+    const snapshot = { tick_cible: tickCible, ordres: [...allOrders], nonce };
     emp._ordres = snapshot;
     localOrdersCache[playerName] = snapshot;
+    delete localQueue[playerName];
   };
   const task = pushQueue.then(run, run);
   pushQueue = task.catch(() => {});
-  return task;
+  try {
+    await task;
+    toast('Ordres scellés', `${q.length} ordre${q.length > 1 ? 's' : ''} inscrit${q.length > 1 ? 's' : ''} sur Mutinynet (tick ${tickCible}).`);
+  } catch (e) {
+    toast('Échec inscription', e.message || String(e), true);
+  } finally {
+    state.pending.delete('inscribeQueue'); render();
+  }
+}
+
+// Compat : ancien appel direct. Désormais redirige vers le panier local.
+// Toutes les call sites (submitImprove/Construction/Recherche/Mission/Marche)
+// passent par ici. Le toast "Ordre scellé" côté caller devient "Ajouté au
+// panier" — on le surcharge ici en levant une info structurée.
+async function appendOrderAndPush(newOrder, message) {
+  // queueOrderLocally throw 'ordre dupliqué' si déjà présent.
+  const count = queueOrderLocally(newOrder, message);
+  // Signale au caller : "ajouté au panier" plutôt que "scellé".
+  // Le caller peut détecter via err.code === 'QUEUED' mais on préfère
+  // retourner normalement et laisser le caller toaster.
+  return { queued: true, count };
 }
 
 // Sérialiseur YAML inline pour map { k: v, ... } — n'inclut que les valeurs > 0
@@ -4396,10 +4619,11 @@ async function submitImprove(batiment) {
   state.pending.add(batiment); render();
   try {
     const message = `${state.current}: chantier ${batiment} → niv ${niveauCible} (tick ${tickCible})`;
-    await appendOrderAndPush({ type: 'chantier', planete: planete.nom, batiment, niveau_cible: niveauCible }, message);
-    toast('Ordre scellé', `${labels[batiment] || batiment} → niveau ${niveauCible}. Le moteur le traitera au tick ${tickCible}.`);
+    const r = await appendOrderAndPush({ type: 'chantier', planete: planete.nom, batiment, niveau_cible: niveauCible }, message);
+    toast('Ajouté au panier', `${labels[batiment] || batiment} → niveau ${niveauCible} (${r.count} ordre${r.count > 1 ? 's' : ''} en attente).`);
   } catch (e) {
-    toast('Échec', e.message || String(e), true);
+    if (e?.message === 'ordre dupliqué') { /* déjà toasté par queueOrderLocally */ }
+    else toast('Échec', e.message || String(e), true);
   } finally {
     state.pending.delete(batiment); render();
   }
@@ -4425,10 +4649,11 @@ async function submitConstruction(planeteNom, unite, quantite) {
   state.pending.add(pendingKey); render();
   try {
     const message = `${state.current}: construction ${quantite}× ${unite} sur ${planeteNom} (tick ${tickCible})`;
-    await appendOrderAndPush({ type: 'construction', planete: planeteNom, unite, quantite }, message);
-    toast('Ordre scellé', `${quantite}× ${labels[unite] || unite} en construction sur ${planeteNom}.`);
+    const r = await appendOrderAndPush({ type: 'construction', planete: planeteNom, unite, quantite }, message);
+    toast('Ajouté au panier', `${quantite}× ${labels[unite] || unite} sur ${planeteNom} (${r.count} ordre${r.count > 1 ? 's' : ''} en attente).`);
   } catch (e) {
-    toast('Échec', e.message || String(e), true);
+    if (e?.message === 'ordre dupliqué') { /* déjà toasté */ }
+    else toast('Échec', e.message || String(e), true);
   } finally {
     state.pending.delete(pendingKey); render();
   }
@@ -4450,10 +4675,11 @@ async function submitRecherche(technologie, niveauCible) {
   state.pending.add(pendingKey); render();
   try {
     const message = `${state.current}: recherche ${technologie} → niv ${niveauCible} (tick ${tickCible})`;
-    await appendOrderAndPush({ type: 'recherche', technologie, niveau_cible: niveauCible }, message);
-    toast('Ordre scellé', `${labels[technologie] || technologie} → niveau ${niveauCible}.`);
+    const r = await appendOrderAndPush({ type: 'recherche', technologie, niveau_cible: niveauCible }, message);
+    toast('Ajouté au panier', `${labels[technologie] || technologie} → niveau ${niveauCible} (${r.count} ordre${r.count > 1 ? 's' : ''} en attente).`);
   } catch (e) {
-    toast('Échec', e.message || String(e), true);
+    if (e?.message === 'ordre dupliqué') { /* déjà toasté */ }
+    else toast('Échec', e.message || String(e), true);
   } finally {
     state.pending.delete(pendingKey); render();
   }
@@ -4512,11 +4738,12 @@ async function submitMission({ type, depuis, cibleJoueur, ciblePlanete, cibleSys
       ? `${cibleSysteme}:${ciblePosition}${nomColonie ? ' (' + nomColonie + ')' : ''}`
       : `${cibleJoueur}/${ciblePlanete}`;
     const message = `${state.current}: ${type} ${depuis} → ${dst} (tick ${tickCible})`;
-    await appendOrderAndPush(orderObj, message);
-    toast('Mission scellée', `${type} · ${depuis} → ${dst}.`);
+    const r = await appendOrderAndPush(orderObj, message);
+    toast('Ajouté au panier', `${type} · ${depuis} → ${dst} (${r.count} ordre${r.count > 1 ? 's' : ''} en attente).`);
     closeMission();
   } catch (e) {
-    toast('Échec', e.message || String(e), true);
+    if (e?.message === 'ordre dupliqué') { /* déjà toasté */ }
+    else toast('Échec', e.message || String(e), true);
   } finally {
     state.pending.delete(pendingKey); render();
   }

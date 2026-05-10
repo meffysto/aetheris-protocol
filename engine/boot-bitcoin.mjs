@@ -127,7 +127,19 @@ export async function bootBitcoin({
         if (parsed?.joueur && parsed?.tick_cible) {
           const T = parsed.tick_cible;
           if (!ordersByTick[T]) ordersByTick[T] = {};
-          if (!ordersByTick[T][parsed.joueur]) {
+          // Last-wins par (tick, joueur) : la dernière inscription remplace
+          // les précédentes pour le même tick cible. Côté UX, le client
+          // accumule les ordres dans un panier local et fait UNE inscription
+          // par tick — mais si jamais l'utilisateur force plusieurs pushes
+          // (edge case), c'est la plus récente qui fait foi.
+          // Tri : blockHeight DESC, txid lexicographique DESC en tiebreaker
+          // (txid est inversé little-endian, mais une comparaison stable
+          // suffit pour départager deux inscriptions dans le même bloc).
+          const prev = ordersByTick[T][parsed.joueur];
+          const isNewer = !prev
+            || ins.blockHeight > prev.blockHeight
+            || (ins.blockHeight === prev.blockHeight && ins.txid > prev.txid);
+          if (isNewer) {
             ordersByTick[T][parsed.joueur] = {
               parsed, raw: ins.yaml, blockHeight: ins.blockHeight, txid: ins.txid,
               inscriberPubKey: ins.inscriberPubKey,

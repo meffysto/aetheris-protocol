@@ -390,6 +390,19 @@ export async function runTick({
               planete.ressources[res].production_par_utj = baseline + prod;
             }
           }
+          // Dépôt : recompute la capacité de chaque ressource en fonction
+          // du niveau et du bonus_planete (e.g. glacée +50%).
+          if (done.batiment === 'depot') {
+            const def = rules.batiments.depot || {};
+            const base = def.capacite_base || 100000;
+            const mult = def.capacite_multiplicateur || 1.6;
+            const niv = done.niveau_cible;
+            const bonus = def.bonus_planete?.[planete.type] || 1.0;
+            const cap = Math.floor(base * Math.pow(mult, niv - 1) * bonus);
+            for (const info of Object.values(planete.ressources || {})) {
+              info.capacite = cap;
+            }
+          }
           events.push({ type: 'chantier-acheve', joueur: name, planete: planete.nom, batiment: done.batiment, niveau: done.niveau_cible });
         }
       }
@@ -505,7 +518,9 @@ export async function runTick({
 
     const niveauChantier = planete.batiments?.chantier_spatial || 0;
     const niveauUsine = planete.batiments?.usine_robotique || 0;
-    const vitesse = 1 + 0.10 * niveauChantier + 0.10 * niveauUsine;
+    const bonusUsine = rules.batiments?.usine_robotique?.bonus_vitesse_par_niveau ?? 0.10;
+    const bonusChantier = rules.batiments?.chantier_spatial?.bonus_vitesse_par_niveau ?? 0.10;
+    const vitesse = 1 + bonusChantier * niveauChantier + bonusUsine * niveauUsine;
     const dureeUTJ = Math.max(1, Math.ceil((def.duree_utj || 1) * qty / vitesse));
 
     planete.file_construction = planete.file_construction || [];

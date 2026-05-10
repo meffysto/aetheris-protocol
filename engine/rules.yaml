@@ -65,8 +65,11 @@ batiments:
     multiplicateur_cout: 2.0
     duree_base_utj: 1.0
     multiplicateur_duree: 2.0
+    # capacite(niv) = capacite_base × capacite_multiplicateur^(niveau−1) × bonus_planete
     capacite_base: 100000
-    formule_capacite: "100000 * 1.6^(niveau-1)"
+    capacite_multiplicateur: 1.6
+    bonus_planete: { glacee: 1.50 }
+    formule_capacite: "capacite_base × capacite_multiplicateur^(niveau-1) × bonus_planete"
 
   usine_robotique:
     categorie: industrie
@@ -74,7 +77,7 @@ batiments:
     multiplicateur_cout: 2.0
     duree_base_utj: 2.0
     multiplicateur_duree: 2.0
-    bonus_vitesse_chantier: "1 + 0.10 * niveau"
+    bonus_vitesse_par_niveau: 0.10   # accélère les chantiers de bâtiments
 
   chantier_spatial:
     categorie: militaire
@@ -83,7 +86,7 @@ batiments:
     multiplicateur_cout: 2.0
     duree_base_utj: 2.0
     multiplicateur_duree: 2.0
-    bonus_vitesse_construction: "1 + 0.10 * niveau"
+    bonus_vitesse_par_niveau: 0.10   # accélère la construction de vaisseaux & défenses
 
   laboratoire:
     categorie: recherche

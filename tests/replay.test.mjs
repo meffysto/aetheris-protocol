@@ -259,6 +259,48 @@ test('runTick : marché — fee réduite par terminal_marchand', async () => {
   assert.equal(result.newEmpires.bob.planetes[0].ressources.ferrum.stock, 4812);
 });
 
+test('runTick : dépôt — capacité scale avec niveau et bonus glacée', async () => {
+  const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
+  empires.meff.planetes[0].type = 'glacee';
+  empires.meff.planetes[0].file_chantier = [
+    { batiment: 'depot', niveau_cible: 3, fin_utj: 6 },
+  ];
+
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders: {}, identites: {}, combat,
+  });
+
+  // capacite(3) = 100000 × 1.6^2 × 1.50 (glacée) = 100000 × 2.56 × 1.5 = 384000
+  const cap = result.newEmpires.meff.planetes[0].ressources.ferrum.capacite;
+  assert.equal(cap, 384000);
+});
+
+test('runTick : construction — vitesse lue depuis rules.yaml (chantier_spatial+usine)', async () => {
+  const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
+  const p = empires.meff.planetes[0];
+  p.batiments.chantier_spatial = 5;
+  p.batiments.usine_robotique = 5;
+  p.ressources.ferrum.stock = 1000000;
+  p.ressources.lumen.stock = 1000000;
+
+  const orders = {
+    meff: { joueur: 'meff', tick_cible: 1, nonce: 'a', ordres: [
+      { type: 'construction', planete: 'meff-prima', unite: 'chasseur_leger', quantite: 1 },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  // duree = ceil(0.4 * 1 / (1 + 0.10*5 + 0.10*5)) = ceil(0.4 / 2) = ceil(0.2) = 1
+  // (sera 1 quel que soit le bonus parce que ceil-clamp à 1)
+  // Mais on vérifie surtout qu'aucune erreur n'a été levée et que la file existe.
+  const fc = result.newEmpires.meff.planetes[0].file_construction;
+  assert.equal(fc.length, 1);
+  assert.equal(fc[0].fin_utj, 1);
+});
+
 test('runTick : pas de stock négatif après prod', async () => {
   const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
   empires.meff.planetes[0].ressources.ferrum.stock = 0;

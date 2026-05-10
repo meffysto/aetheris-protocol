@@ -182,6 +182,10 @@ planetes:
 flottes_en_vol: []
 recherche: {}
 file_recherche: []
+ressources_globales:
+  singularite: 0
+  influence: 0
+progres_singularite_utj: 0
 `;
   fs.writeFileSync(empPath, starterEmp);
   fs.writeFileSync(mdPath, `# Empire de ${name}\n\n> Tick ${tick} · planète **${planetName}** (${chosen.coords.join(':')}) · *${chosen.classe}*\n\nFresh start. Édite \`ordres.yaml\` pour donner ton premier ordre.\n`);

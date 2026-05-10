@@ -100,6 +100,8 @@ export function spawnEmpireFromJoin({ joinData, galaxie, tick = 0, rng }) {
     flottes_en_vol: [],
     recherche: {},
     file_recherche: [],
+    ressources_globales: { singularite: 0, influence: 0 },
+    progres_singularite_utj: 0,
   };
 
   return { empire };

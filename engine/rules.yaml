@@ -373,6 +373,14 @@ espionnage:
   paliers: [1, 5, 25, 125, 625]
   proba_destruction_par_niveau: 0.20
 
+# ───────────────────────── SINGULARITÉ ─────────────────────────
+# Une anomalie colonisée produit lentement une singularité quantique.
+# 300 UTJ ≈ 50 ticks ≈ 12h35 par singularité. Cap à 5 par empire pour
+# éviter le farming sans plafond.
+singularite:
+  utj_par_unite: 300
+  cap_par_empire: 5
+
 # ───────────────────────── PLANÈTES ─────────────────────────
 
 types_planete:
@@ -381,4 +389,4 @@ types_planete:
   volcanique:    { bonus: { synthetiseur_plasmide: 1.30 }, champs_min: 100, champs_max: 200 }
   glacee:        { bonus: { depot: 1.50 }, champs_min: 90, champs_max: 180 }
   gazeuse:       { bonus: { centrale_solaire: 1.40 }, champs_min: 60, champs_max: 140 }
-  anomalie:      { bonus: { singularite: true }, champs_min: 50, champs_max: 100, rare: true }
+  anomalie:      { bonus: { laboratoire: 1.30 }, produit_singularite: true, champs_min: 50, champs_max: 100, rare: true }

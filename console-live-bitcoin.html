@@ -2600,6 +2600,8 @@ function renderPlanetHead(p, emp) {
       <span><b>${built}/${total}</b> ouvrages debout</span>
       <span class="chip ${p.type || ''}">${p.type || 'planète'}</span>
       <span>militaire <b>${fmt(emp?.points_militaires ?? 0)}</b></span>
+      ${(emp?.ressources_globales?.singularite || 0) > 0 ? `<span title="Singularités quantiques produites par tes anomalies colonisées">Σ <b>${emp.ressources_globales.singularite}</b></span>` : ''}
+      ${(emp?.ressources_globales?.influence || 0) > 0 ? `<span title="Influence diplomatique">∞ <b>${fmt(emp.ressources_globales.influence)}</b></span>` : ''}
       <span style="margin-left:auto"><b>${p.champs?.utilises ?? 0}/${p.champs?.total ?? 0}</b> champs</span>
     </div>
     <div class="news">
@@ -3103,9 +3105,13 @@ function renderUnitGrid(p, kind) {
       }
     }
     const costHtml = Object.entries(cost).map(([res, vv]) => {
-      const stock = p.ressources?.[res]?.stock || 0;
+      const isGlobal = res === 'singularite' || res === 'influence';
+      const stock = isGlobal
+        ? (emp?.ressources_globales?.[res] || 0)
+        : (p.ressources?.[res]?.stock || 0);
       const bad = stock < vv ? ' bad' : '';
-      return `<span><b class="${bad}">${fmtCompact(vv)}</b> ${ICOS[res] || res}</span>`;
+      const lbl = ICOS[res] || (res === 'singularite' ? 'Σ' : res === 'influence' ? '∞' : res);
+      return `<span><b class="${bad}">${fmtCompact(vv)}</b> ${lbl}</span>`;
     }).join(' ');
 
     const q = queueMap[unite];

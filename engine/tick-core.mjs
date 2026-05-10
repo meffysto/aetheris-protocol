@@ -257,11 +257,35 @@ export async function runTick({
 
   // ─── Phase 1 — Production ──────────────────────────────────────────────
   log(`▸ Phase 1/6 — Production de ressources (×${UTJ_PAR_TICK} UTJ)`);
-  for (const emp of Object.values(empires)) {
+  const utjParSingularite = rules.singularite?.utj_par_unite || 300;
+  const capSingularite = rules.singularite?.cap_par_empire || 5;
+  for (const [name, emp] of Object.entries(empires)) {
     for (const planete of emp.planetes || []) {
       for (const info of Object.values(planete.ressources || {})) {
         const prod = (info.production_par_utj || 0) * UTJ_PAR_TICK;
         info.stock = Math.min((info.stock || 0) + prod, info.capacite || Infinity);
+      }
+    }
+    // Singularité : produite passivement par chaque planète anomalie colonisée.
+    // Le progrès est cumulé en UTJ ; chaque palier `utjParSingularite` consomme
+    // le quota et incrémente la ressource empire (capée).
+    emp.ressources_globales = emp.ressources_globales || { singularite: 0, influence: 0 };
+    emp.progres_singularite_utj = emp.progres_singularite_utj || 0;
+    const anomaliesColonisees = (emp.planetes || []).filter(p => {
+      const def = rules.types_planete?.[p.type];
+      return def?.produit_singularite;
+    }).length;
+    if (anomaliesColonisees > 0 && emp.ressources_globales.singularite < capSingularite) {
+      emp.progres_singularite_utj += anomaliesColonisees * UTJ_PAR_TICK;
+      while (emp.progres_singularite_utj >= utjParSingularite && emp.ressources_globales.singularite < capSingularite) {
+        emp.progres_singularite_utj -= utjParSingularite;
+        emp.ressources_globales.singularite += 1;
+        events.push({ type: 'singularite-produite', joueur: name, total: emp.ressources_globales.singularite });
+      }
+      // Si le cap est atteint, on plafonne le progrès pour éviter l'accumulation
+      // qui se libérerait d'un coup si une singularité était dépensée plus tard.
+      if (emp.ressources_globales.singularite >= capSingularite) {
+        emp.progres_singularite_utj = Math.min(emp.progres_singularite_utj, utjParSingularite - 1);
       }
     }
   }
@@ -398,13 +422,22 @@ export async function runTick({
     }
     const cout = {};
     for (const [k, v] of Object.entries(def.cout || {})) cout[k] = v * qty;
+    // Ressources empire (singularité, influence) : pool global, pas planétaire.
+    const RESS_GLOBALES = new Set(['singularite', 'influence']);
+    emp.ressources_globales = emp.ressources_globales || { singularite: 0, influence: 0 };
     for (const [k, v] of Object.entries(cout)) {
-      if ((planete.ressources[k]?.stock || 0) < v) {
+      const dispo = RESS_GLOBALES.has(k)
+        ? (emp.ressources_globales[k] || 0)
+        : (planete.ressources[k]?.stock || 0);
+      if (dispo < v) {
         log(`  · ${playerName}: ressources insuffisantes pour ${qty}× ${action.unite} (manque ${k})`);
         return;
       }
     }
-    for (const [k, v] of Object.entries(cout)) planete.ressources[k].stock -= v;
+    for (const [k, v] of Object.entries(cout)) {
+      if (RESS_GLOBALES.has(k)) emp.ressources_globales[k] -= v;
+      else planete.ressources[k].stock -= v;
+    }
 
     const niveauChantier = planete.batiments?.chantier_spatial || 0;
     const niveauUsine = planete.batiments?.usine_robotique || 0;
@@ -530,7 +563,18 @@ export async function runTick({
     let payer = (emp.planetes || []).find(p => Object.entries(cout).every(([k, v]) => (p.ressources[k]?.stock || 0) >= v));
     if (!payer) { log(`  · ${emp.joueur}: aucune planète ne peut payer recherche ${action.technologie}`); return; }
     for (const [k, v] of Object.entries(cout)) payer.ressources[k].stock -= v;
-    const duree = (def.duree_base || 1) * Math.pow(2, niveauActuel);
+    // Vitesse de recherche = 1 + Σ (0.10 × niv_labo × bonus_planete[laboratoire]).
+    // Une anomalie multiplie la contribution de son labo par 1.30.
+    let vitesseRecherche = 1.0;
+    for (const p of emp.planetes || []) {
+      const niv = p.batiments?.laboratoire || 0;
+      if (niv > 0) {
+        const planetMult = rules.types_planete?.[p.type]?.bonus?.laboratoire || 1.0;
+        vitesseRecherche += 0.10 * niv * planetMult;
+      }
+    }
+    const dureeBase = (def.duree_base || 1) * Math.pow(2, niveauActuel);
+    const duree = dureeBase / vitesseRecherche;
     emp.file_recherche = emp.file_recherche || [];
     emp.file_recherche.push({ technologie: action.technologie, niveau_cible: action.niveau_cible, fin_utj: Math.ceil(duree) });
     log(`  ✓ ${emp.joueur}: recherche ${action.technologie} → ${action.niveau_cible} (${Math.ceil(duree)} UTJ)`);

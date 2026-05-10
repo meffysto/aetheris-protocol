@@ -381,6 +381,24 @@ singularite:
   utj_par_unite: 300
   cap_par_empire: 5
 
+# ───────────────────────── INFLUENCE / DIPLOMATIE ─────────────────────────
+# L'influence est produite par centre_diplomatique (déjà 0.5 × niv / UTJ
+# dans rules.batiments.centre_diplomatique). Elle finance les ordres
+# diplomatiques : trêve, rupture, alliance.
+influence:
+  cap_par_empire: 10000
+diplomatie:
+  treve:
+    cout_influence: 100
+    duree_ticks: 6
+    requiert_recherche: { diplomatie: 1 }
+  rupture:
+    cout_influence: 0
+    malus_moral_pct: 15        # production ×(1 − 0.15) tant qu'actif
+    malus_duree_ticks: 6
+  # Réduction du coût influence par niveau de recherche diplomatie
+  diplomatie_reduction_par_niveau: 0.05  # max −50% à niv 10
+
 # ───────────────────────── PLANÈTES ─────────────────────────
 
 types_planete:

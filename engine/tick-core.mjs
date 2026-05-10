@@ -255,16 +255,49 @@ export async function runTick({
   const events = [];
   const reports = { intel: [], alerts: [], battles: [] };
 
+  // ─── Phase 0 — Expiration des effets temporels (relations, moral) ──────
+  // Avant la production, on nettoie : trêves échues passent à 'neutre',
+  // malus moraux passés sont oubliés. Cela garantit que le tick courant
+  // applique des effets cohérents.
+  for (const emp of Object.values(empires)) {
+    emp.relations = emp.relations || {};
+    for (const [autre, rel] of Object.entries(emp.relations)) {
+      if (rel.status !== 'neutre' && rel.expire_tick != null && rel.expire_tick <= tickSuivant) {
+        emp.relations[autre] = { status: 'neutre', expire_tick: null };
+      }
+    }
+  }
+
   // ─── Phase 1 — Production ──────────────────────────────────────────────
   log(`▸ Phase 1/6 — Production de ressources (×${UTJ_PAR_TICK} UTJ)`);
   const utjParSingularite = rules.singularite?.utj_par_unite || 300;
   const capSingularite = rules.singularite?.cap_par_empire || 5;
+  const capInfluence = rules.influence?.cap_par_empire || 10000;
+  const malusMoralPct = (rules.diplomatie?.rupture?.malus_moral_pct || 15) / 100;
   for (const [name, emp] of Object.entries(empires)) {
+    // Malus moral après rupture de trêve : production réduite tant que
+    // tickSuivant ≤ malus_moral_jusqu_tick.
+    const moralActif = (emp.malus_moral_jusqu_tick || 0) >= tickSuivant;
+    const factMoral = moralActif ? (1 - malusMoralPct) : 1.0;
     for (const planete of emp.planetes || []) {
       for (const info of Object.values(planete.ressources || {})) {
-        const prod = (info.production_par_utj || 0) * UTJ_PAR_TICK;
+        const prod = (info.production_par_utj || 0) * UTJ_PAR_TICK * factMoral;
         info.stock = Math.min((info.stock || 0) + prod, info.capacite || Infinity);
       }
+    }
+    // Influence : produite par centre_diplomatique (0.5 × niv / UTJ).
+    emp.ressources_globales = emp.ressources_globales || { singularite: 0, influence: 0 };
+    let influenceParUtj = 0;
+    for (const p of emp.planetes || []) {
+      const nivCD = p.batiments?.centre_diplomatique || 0;
+      if (nivCD > 0) influenceParUtj += 0.5 * nivCD;
+    }
+    if (influenceParUtj > 0) {
+      const gain = influenceParUtj * UTJ_PAR_TICK;
+      emp.ressources_globales.influence = Math.min(
+        capInfluence,
+        (emp.ressources_globales.influence || 0) + gain,
+      );
     }
     // Singularité : produite passivement par chaque planète anomalie colonisée.
     // Le progrès est cumulé en UTJ ; chaque palier `utjParSingularite` consomme
@@ -396,6 +429,7 @@ export async function runTick({
       case 'construction': return queueConstruction(emp, action, playerName);
       case 'espionnage':   return queueEspionnage(emp, action, playerName);
       case 'recyclage':    return queueRecyclage(emp, action, playerName);
+      case 'diplomatie':   return queueDiplomatie(emp, action, playerName);
       default:
         log(`  · ${playerName}: type d'ordre non implémenté: ${action.type}`);
     }
@@ -449,6 +483,62 @@ export async function runTick({
     log(`  ✓ ${playerName}: construction ${qty}× ${action.unite} sur ${action.planete} (${dureeUTJ} UTJ)`);
   }
 
+  // Ordre `diplomatie {action: 'treve'|'rupture', vers: 'joueur', duree_ticks?}`.
+  // Trêve unilatérale : empêche l'émetteur d'attaquer la cible le temps voulu.
+  // Rupture : annule la trêve immédiatement et applique un malus moral à
+  // l'empire émetteur (production réduite N ticks).
+  function queueDiplomatie(emp, action, playerName) {
+    const cible = action.vers;
+    if (!cible || typeof cible !== 'string') {
+      log(`  · ${playerName}: diplomatie sans cible {vers: 'joueur'}`);
+      return;
+    }
+    if (cible === playerName) { log(`  · ${playerName}: diplomatie vers soi-même rejetée`); return; }
+    if (!empires[cible]) { log(`  · ${playerName}: diplomatie vers joueur inconnu ${cible}`); return; }
+
+    const conf = rules.diplomatie || {};
+    emp.relations = emp.relations || {};
+    emp.ressources_globales = emp.ressources_globales || { singularite: 0, influence: 0 };
+
+    if (action.action === 'treve') {
+      const niv = (emp.recherche || {}).diplomatie || 0;
+      const reqNiv = conf.treve?.requiert_recherche?.diplomatie || 1;
+      if (niv < reqNiv) {
+        log(`  · ${playerName}: trêve requiert recherche diplomatie ≥ ${reqNiv} (actuel ${niv})`);
+        return;
+      }
+      const coutBase = conf.treve?.cout_influence || 100;
+      const reduc = Math.min(0.5, niv * (conf.diplomatie_reduction_par_niveau || 0));
+      const cout = Math.ceil(coutBase * (1 - reduc));
+      if ((emp.ressources_globales.influence || 0) < cout) {
+        log(`  · ${playerName}: influence insuffisante pour trêve (${cout} requis, ${Math.floor(emp.ressources_globales.influence || 0)} dispo)`);
+        return;
+      }
+      const duree = parseInt(action.duree_ticks, 10) || conf.treve?.duree_ticks || 6;
+      emp.ressources_globales.influence -= cout;
+      emp.relations[cible] = { status: 'treve', expire_tick: tickSuivant + duree };
+      events.push({ type: 'treve-declaree', joueur: playerName, vers: cible, expire_tick: tickSuivant + duree, cout });
+      log(`  🕊 ${playerName}: trêve avec ${cible} jusqu'au tick ${tickSuivant + duree} (−${cout} influence)`);
+      return;
+    }
+
+    if (action.action === 'rupture') {
+      const rel = emp.relations[cible];
+      if (!rel || rel.status === 'neutre') {
+        log(`  · ${playerName}: rupture sans trêve active avec ${cible}`);
+        return;
+      }
+      const malusDuree = conf.rupture?.malus_duree_ticks || 6;
+      emp.relations[cible] = { status: 'neutre', expire_tick: null };
+      emp.malus_moral_jusqu_tick = tickSuivant + malusDuree;
+      events.push({ type: 'treve-rompue', joueur: playerName, vers: cible, malus_jusqu: tickSuivant + malusDuree });
+      log(`  ⚡ ${playerName}: rupture trêve avec ${cible} — malus moral ${malusDuree} ticks`);
+      return;
+    }
+
+    log(`  · ${playerName}: action diplomatie inconnue: ${action.action}`);
+  }
+
   function queueEspionnage(emp, action, playerName) {
     const src = (emp.planetes || []).find(p => p.nom === action.depuis);
     if (!src) return;
@@ -485,6 +575,14 @@ export async function runTick({
     if (!src) return;
     const cible = action.cible || {};
     if (!cible.joueur || !cible.planete) { log(`  · ${playerName}: attaque sans cible {joueur, planete}`); return; }
+    // Trêve unilatérale : si l'attaquant a déclaré une trêve avec la cible,
+    // l'ordre est rejeté tant qu'elle est active. Pour attaquer, il faut
+    // d'abord poser un ordre `rupture` (qui déclenche le malus moral).
+    const rel = emp.relations?.[cible.joueur];
+    if (rel && rel.status === 'treve' && (rel.expire_tick || 0) > tickSuivant) {
+      log(`  · ${playerName}: attaque rejetée — trêve active avec ${cible.joueur} jusqu'au tick ${rel.expire_tick}`);
+      return;
+    }
     for (const [ship, n] of Object.entries(action.flotte || {})) {
       if ((src.flotte_au_sol[ship] || 0) < n) { log(`  · ${playerName}: flotte insuffisante (${ship}) pour attaque depuis ${action.depuis}`); return; }
     }

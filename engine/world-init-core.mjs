@@ -91,6 +91,8 @@ export function spawnEmpireFromJoin({ joinData, galaxie, tick = 0, rng }) {
         mine_ferrum: 0, extracteur_lumen: 0, synthetiseur_plasmide: 0,
         centrale_solaire: 0, depot: 0, usine_robotique: 0,
         chantier_spatial: 0, laboratoire: 0,
+        reacteur_fusion: 0, silo_missiles: 0,
+        terminal_marchand: 0, centre_diplomatique: 0,
       },
       file_chantier: [],
       file_construction: [],
@@ -102,6 +104,8 @@ export function spawnEmpireFromJoin({ joinData, galaxie, tick = 0, rng }) {
     file_recherche: [],
     ressources_globales: { singularite: 0, influence: 0 },
     progres_singularite_utj: 0,
+    relations: {},
+    malus_moral_jusqu_tick: 0,
   };
 
   return { empire };

@@ -43,12 +43,27 @@ function parseArgs(argv) {
 // avec spawnEmpireFromJoin). Une mini-galaxie pour avoir des cibles si la
 // stratégie veut envoyer un colon.
 
+// Lit blocs_par_tick depuis genesis.yaml et dérive la durée d'un tick en
+// minutes réelles (Mutinynet 30s/bloc). Aligné sur boot-bitcoin.mjs pour
+// que la sim refléte exactement la cadence du serveur.
+function readTickDurationMin() {
+  try {
+    const genesis = yparse(fs.readFileSync(path.join(ROOT, 'genesis/genesis.yaml'), 'utf8'));
+    const blocsParTick = genesis?.parametres?.blocs_par_tick ?? 1;
+    const SEC_PAR_BLOC = 30;
+    return (blocsParTick * SEC_PAR_BLOC) / 60;
+  } catch {
+    return 3;  // fallback raisonnable si genesis absent (mode test)
+  }
+}
+
 function buildInitialState({ seed }) {
   const rules = yparse(fs.readFileSync(path.join(ROOT, 'engine/rules.yaml'), 'utf8'));
+  const dureeTickMin = readTickDurationMin();
   const manifest = {
     version: 1, serveur: 'balance-sim', tick: 0, seed,
     demarrage_iso: new Date().toISOString(),
-    duree_tick_min: 3,
+    duree_tick_min: dureeTickMin,
     parametres: {
       galaxies: 1, systemes_par_galaxie: 3, positions_par_systeme: 15,
       planetes_max_par_joueur: 9,
@@ -351,6 +366,7 @@ async function runSim({ strategie, ticks, seed }) {
   if (!fn) throw new Error(`Stratégie inconnue: ${strategie}. Voir --list.`);
 
   let state = buildInitialState({ seed });
+  const dureeTickMin = state.manifest.duree_tick_min;
   const csv = [];
   csv.push('tick,minutes,ferrum,lumen,plasmide,score,planetes,flotte_au_sol,recherches,en_vol');
 
@@ -381,7 +397,7 @@ async function runSim({ strategie, ticks, seed }) {
     const ships = Object.values(p.flotte_au_sol || {}).reduce((a, b) => a + b, 0);
     const techs = Object.entries(e2.recherche || {}).filter(([, v]) => v > 0).length;
     const enVol = (e2.flottes_en_vol || []).length;
-    const minutes = (t + 1) * 3;
+    const minutes = Math.round((t + 1) * dureeTickMin);
     csv.push([
       t + 1,
       minutes,
@@ -396,7 +412,7 @@ async function runSim({ strategie, ticks, seed }) {
     ].join(','));
   }
 
-  return { csv, finalState: state };
+  return { csv, finalState: state, dureeTickMin };
 }
 
 // ── Diagnostics ─────────────────────────────────────────────────────────
@@ -445,7 +461,7 @@ if (!args.strategie) {
   process.exit(2);
 }
 
-const { csv, finalState } = await runSim(args);
+const { csv, finalState, dureeTickMin } = await runSim(args);
 process.stdout.write(csv.join('\n') + '\n');
 
 const alerts = diagnose(csv);
@@ -456,7 +472,8 @@ if (alerts.length) {
 
 const e = finalState.empires.sim;
 const p = e.planetes[0];
-process.stderr.write(`\n✓ Sim terminée — ${args.ticks} ticks (~${args.ticks * 3} min de jeu réel)\n`);
+const totalMin = Math.round(args.ticks * dureeTickMin);
+process.stderr.write(`\n✓ Sim terminée — ${args.ticks} ticks × ${dureeTickMin} min/tick = ~${totalMin} min de jeu réel\n`);
 process.stderr.write(`  Stratégie  : ${args.strategie}\n`);
 process.stderr.write(`  Score final: ${e.score_total}\n`);
 process.stderr.write(`  Planètes   : ${e.planetes.length}\n`);

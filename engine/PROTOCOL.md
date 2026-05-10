@@ -94,8 +94,10 @@ T-15min        T-1min            T (tick résolu)         T+1min
 
 ### 4.1 `joueurs/<toi>/ordres.yaml`
 
-Ordres **publics** : transports, chantiers, recherche, marché, diplomatie.
-Visibles immédiatement par tout le monde dans le repo.
+Ordres **publics** : tous les types d'ordres actuellement implémentés y
+passent — chantier, recherche, transport, marché, diplomatie, espionnage,
+attaque, recyclage, colonisation. Visibles immédiatement par tout le monde
+dans le repo dès que la transaction Bitcoin qui les porte est confirmée.
 
 ```yaml
 version: 1
@@ -128,56 +130,7 @@ ordres:
     quantite: 500000
     prix_min_lumen: 480000
 
-signature: ed25519:<base64>
-```
-
-### 4.2 `joueurs/<toi>/ordres-scelles.yaml`
-
-Ordres **secrets** (attaques, espionnage). Le contenu est hashé ; seul le hash
-est public au tick T. Le contenu réel est révélé au tick T+1 dans `revelations.yaml`.
-
-```yaml
-version: 1
-joueur: kael
-tick_cible: 143
-engagements:
-  - id: atk-pyra-001
-    hash: sha256:8f4c2a91...d0e3
-    type: militaire        # indication large; le détail est dans la révélation
-  - id: spy-helios-002
-    hash: sha256:2a7b3c89...91f4
-    type: renseignement
-  - id: col-1042-001
-    hash: sha256:1c9f8a73...2bd1
-    type: colonial         # revendication d'une planète inhabitée
-signature: ed25519:<base64>
-```
-
-Types d'`engagements` reconnus : `militaire`, `renseignement`, `colonial`.
-
-### 4.3 `joueurs/<toi>/revelations.yaml`
-
-Le contenu réel des engagements scellés au tick T-1, à révéler au tick T.
-L'engine vérifie que `sha256(yaml_canonique(revelation)) == hash_du_tick_precedent`.
-
-```yaml
-version: 1
-joueur: kael
-tick_revele: 143
-revelations:
-  - id: atk-pyra-001
-    type: attaque
-    depuis: aetheris-prima
-    cible: { joueur: vexor, planete: pyra-ii }
-    flotte:
-      chasseur_leger: 4631
-      chasseur_lourd: 682
-      croiseur: 86
-      cuirasse: 46
-    vitesse: 80
-    nonce: e4f1a2b8c9d0   # le sel utilisé pour le hash
-  - id: col-1042-001
-    type: colonisation
+  - type: colonisation
     depuis: aetheris-prima
     cible: { systeme: "1:42", position: 5 }   # adresse galaxie, pas un nom
     nom_colonie: ferrolune                     # optionnel; sinon <joueur>-c<n>
@@ -187,19 +140,9 @@ revelations:
     cargaison:
       ferrum: 50000
       lumen: 30000
-    nonce: 9a7c2f0e1b3d
+
 signature: ed25519:<base64>
 ```
-
-**Pourquoi commit-reveal ?** Parce que tout le repo est public. Si tu commitais
-ton attaque en clair au tick T-1, ta cible la verrait et sauverait sa flotte.
-Avec commit-reveal, l'adversaire voit qu'il y a *quelque chose* de militaire
-qui se prépare, sans savoir où ça va.
-
-**Colonisation : pourquoi scellée ?** Un `vaisseau_colon` a 0 d'attaque et 3000
-de coque — il s'intercepte facilement. Si la course pour une case libre était
-publique, tout système contesté se transformerait en bataille rangée. Le sceau
-protège la trajectoire jusqu'à révélation.
 
 **Règles de la colonisation** :
 - Adresse : `{ systeme: "g:s", position: N }`. La case doit exister, être de
@@ -217,6 +160,67 @@ protège la trajectoire jusqu'à révélation.
 - Tie-break (plusieurs colons même tick même case) : tri lex
   `(proprietaire ASC, flotte.id ASC)`. Le premier verrouille la case, les
   suivants échouent et repartent.
+
+### 4.2 `joueurs/<toi>/ordres-scelles.yaml` *(planifié — non implémenté)*
+
+> **Statut : design seulement.** Ni le moteur (`engine/tick-core.mjs`) ni la
+> console ne lisent/écrivent ce fichier aujourd'hui. Tous les ordres, y
+> compris attaque/espionnage/colonisation, passent par `ordres.yaml` public
+> (§4.1). Cette section décrit le mécanisme commit-reveal envisagé pour les
+> actions militaires — à implémenter dans une phase future.
+
+Ordres **secrets** (attaques, espionnage, colonisation). Le contenu serait
+hashé ; seul le hash serait public au tick T. Le contenu réel serait révélé
+au tick T+1 dans `revelations.yaml`.
+
+```yaml
+version: 1
+joueur: kael
+tick_cible: 143
+engagements:
+  - id: atk-pyra-001
+    hash: sha256:8f4c2a91...d0e3
+    type: militaire        # indication large; le détail est dans la révélation
+  - id: spy-helios-002
+    hash: sha256:2a7b3c89...91f4
+    type: renseignement
+signature: ed25519:<base64>
+```
+
+### 4.3 `joueurs/<toi>/revelations.yaml` *(planifié — non implémenté)*
+
+> **Statut : design seulement.** Pendant du §4.2 ci-dessus.
+
+Le contenu réel des engagements scellés au tick T-1, à révéler au tick T.
+L'engine vérifierait que `sha256(yaml_canonique(revelation)) == hash_du_tick_precedent`.
+
+```yaml
+version: 1
+joueur: kael
+tick_revele: 143
+revelations:
+  - id: atk-pyra-001
+    type: attaque
+    depuis: aetheris-prima
+    cible: { joueur: vexor, planete: pyra-ii }
+    flotte:
+      chasseur_leger: 4631
+      chasseur_lourd: 682
+      croiseur: 86
+      cuirasse: 46
+    vitesse: 80
+    nonce: e4f1a2b8c9d0   # le sel utilisé pour le hash
+signature: ed25519:<base64>
+```
+
+**Pourquoi un commit-reveal serait utile (futur)** : tout le repo est public.
+Si un joueur commit son attaque en clair au tick T-1, sa cible la voit et
+sauve sa flotte avant l'arrivée. Avec commit-reveal, l'adversaire verrait
+qu'il y a *quelque chose* de militaire qui se prépare, sans savoir où ça va.
+Idem pour la colonisation : un `vaisseau_colon` a 0 d'attaque et 3000 de
+coque — s'intercepte facilement, donc une course publique pour une case
+libre dégénère en bataille rangée. Le sceau protégerait la trajectoire
+jusqu'à révélation.
 
 ---
 

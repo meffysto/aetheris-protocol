@@ -76,7 +76,15 @@ export async function broadcastTx(txHex, apiBase) {
     body: txHex,
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(`broadcastTx: ${res.status} ${text}`);
+  if (!res.ok) {
+    const err = new Error(`broadcastTx: ${res.status} ${text}`);
+    // Conflit UTXO : une TX précédente du même wallet est encore en mempool
+    // et dépense le même UTXO. Mutinynet refuse de remplacer sans fee bump.
+    if (/replacement-fee-rate|insufficient fee|txn-mempool-conflict|bad-txns-inputs-missingorspent|already in (block chain|mempool)/i.test(text)) {
+      err.code = 'RBF_CONFLICT';
+    }
+    throw err;
+  }
   return text.trim();
 }
 

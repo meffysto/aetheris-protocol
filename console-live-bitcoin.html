@@ -2602,6 +2602,22 @@ async function load() {
         ordres: entry.parsed?.ordres || [],
         nonce: entry.parsed?.nonce,
       };
+      // Le scan voit notre inscription on-chain → mempool drainé, on peut
+      // ré-inscrire. (Match par nonce si dispo, sinon par tick_cible.)
+      const inflight = inflightInscriptions[name];
+      if (inflight && (
+        (inflight.nonce && entry.parsed?.nonce === inflight.nonce) ||
+        (!inflight.nonce && inflight.tickCible === tickNext)
+      )) {
+        delete inflightInscriptions[name];
+      }
+    }
+    // Garde-fou : un inflight de plus de 5 min est forcément périmé (tick
+    // avancé, mempool drop, etc.) — on libère pour éviter un blocage permanent.
+    const now = Date.now();
+    for (const [name, info] of Object.entries(inflightInscriptions)) {
+      if (now - info.ts > 5 * 60 * 1000) delete inflightInscriptions[name];
+      else if (info.tickCible <= tickNow) delete inflightInscriptions[name];
     }
 
     // Re-injecte les ordres en attente de confirmation on-chain non encore
@@ -4017,20 +4033,28 @@ function renderCart() {
   document.getElementById('qCartCt').textContent = q.length;
   const tickCible = q[0].tickCible;
   const locked = state.pending.has('inscribeQueue');
+  const inflight = !!inflightInscriptions[playerName];
+  const disabled = locked || inflight;
   let html = '';
   for (let i = 0; i < q.length; i++) {
     const s = summarizeQueuedOrder(q[i].order);
     html += `<div class="qitem cart">
-      <button class="cancel-btn" data-cart-remove="${i}" ${locked ? 'disabled' : ''} title="Retirer du panier">✕</button>
+      <button class="cancel-btn" data-cart-remove="${i}" ${disabled ? 'disabled' : ''} title="Retirer du panier">✕</button>
       <div class="top">
         <div class="nm">${s.nm}<small>${s.sub}</small></div>
         <div class="tgt" style="color:var(--phosphor)">∙∙∙<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase">tick ${tickCible}</small></div>
       </div>
     </div>`;
   }
-  const btnLabel = locked ? 'Inscription en cours…' : `Inscrire ${q.length} ordre${q.length > 1 ? 's' : ''}`;
-  html += `<button class="cart-inscribe" id="cartInscribeBtn" ${locked ? 'disabled' : ''}>${btnLabel}</button>`;
-  html += `<div class="cart-hint">Une seule inscription Bitcoin pour tout le panier.</div>`;
+  let btnLabel;
+  if (locked) btnLabel = 'Inscription en cours…';
+  else if (inflight) btnLabel = 'TX Bitcoin en attente de confirmation';
+  else btnLabel = `Inscrire ${q.length} ordre${q.length > 1 ? 's' : ''}`;
+  html += `<button class="cart-inscribe" id="cartInscribeBtn" ${disabled ? 'disabled' : ''}>${btnLabel}</button>`;
+  const hint = inflight
+    ? 'Inscription précédente non confirmée (Mutinynet ≈ 30s). Le panier reste prêt.'
+    : 'Une seule inscription Bitcoin pour tout le panier.';
+  html += `<div class="cart-hint">${hint}</div>`;
   document.getElementById('qCart').innerHTML = html;
 }
 
@@ -4428,6 +4452,12 @@ async function cancelOrder(idx) {
 // Mutex pour sérialiser les inscriptions Bitcoin (un seul push à la fois,
 // évite que deux clics rapides consomment les mêmes UTXOs côté wallet).
 let pushQueue = Promise.resolve();
+// Inscriptions broadcastées mais pas encore confirmées on-chain. Tant que
+// c'est rempli pour un joueur, toute nouvelle inscription Bitcoin échouera
+// avec "replacement-fee-rate" (la TX précédente bloque l'UTXO en mempool).
+// Clé : nom du joueur → { nonce, tickCible, ts }. Cleared dans load() quand
+// le scan voit le même nonce on-chain.
+const inflightInscriptions = {};
 // Cache local des ordres soumis : survit aux load() pendant la fenêtre
 // "TX broadcastée → confirmée → scanned → appliquée au tick" (~30-60s sur
 // Mutinynet). Sinon l'UI semble perdre l'ordre fraîchement soumis pendant
@@ -4503,6 +4533,12 @@ async function inscribeQueuedOrders() {
   if (q.length === 0) return;
   if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin dans les paramètres pour inscrire des ordres.', true); return; }
   if (state.pending.has('inscribeQueue')) return;
+  if (inflightInscriptions[playerName]) {
+    toast('Inscription Bitcoin en attente',
+      'Ta précédente inscription est encore en mempool (~30s sur Mutinynet). Réessaie dans un instant — ton panier est conservé.',
+      true);
+    return;
+  }
 
   const tickCible = q[0].tickCible;
   // Si certains ordres du panier sont pour un autre tick (tick avancé entre-
@@ -4533,6 +4569,7 @@ async function inscribeQueuedOrders() {
     const snapshot = { tick_cible: tickCible, ordres: [...allOrders], nonce };
     emp._ordres = snapshot;
     localOrdersCache[playerName] = snapshot;
+    inflightInscriptions[playerName] = { nonce, tickCible, ts: Date.now() };
     delete localQueue[playerName];
   };
   const task = pushQueue.then(run, run);
@@ -4541,7 +4578,16 @@ async function inscribeQueuedOrders() {
     await task;
     toast('Ordres scellés', `${q.length} ordre${q.length > 1 ? 's' : ''} inscrit${q.length > 1 ? 's' : ''} sur Mutinynet (tick ${tickCible}).`);
   } catch (e) {
-    toast('Échec inscription', e.message || String(e), true);
+    if (e?.code === 'RBF_CONFLICT') {
+      // Une TX précédente du wallet est encore en mempool. On garde le
+      // panier intact et on bloque les retries jusqu'à confirmation.
+      inflightInscriptions[playerName] = inflightInscriptions[playerName] || { nonce: null, tickCible, ts: Date.now() };
+      toast('Inscription Bitcoin en attente',
+        'Une inscription précédente n\'est pas encore confirmée (Mutinynet ≈ 30s). Ton panier reste intact — réessaie dès que le prochain bloc tombe.',
+        true);
+    } else {
+      toast('Échec inscription', e.message || String(e), true);
+    }
   } finally {
     state.pending.delete('inscribeQueue'); render();
   }
@@ -4730,7 +4776,9 @@ async function pushSignedOrder(canonicalBody, message) {
       const hint = label === 'fork' && /403|404/.test(e.message)
         ? ' — verifie que ton PAT a le scope `public_repo` (PAT classique) ou Contents+Pull-Requests Read&Write (fine-grained)'
         : '';
-      throw new Error(`[${label}] ${e.message}${hint}`);
+      const wrapped = new Error(`[${label}] ${e.message}${hint}`);
+      if (e.code) wrapped.code = e.code;
+      throw wrapped;
     }
   };
 

@@ -13,3 +13,13 @@ Default canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, `read
 ### Domain docs
 
 Single-context layout (`CONTEXT.md` + `docs/adr/` at repo root). See `docs/agents/domain.md`.
+
+## Push workflow
+
+Quand l'utilisateur demande de commit/push (sur la branche `bitcoin/mvp`), pousser systématiquement sur **trois cibles** :
+
+1. `git push origin bitcoin/mvp` (GitHub)
+2. `git push codeberg bitcoin/mvp` (Codeberg mirror)
+3. `git push codeberg bitcoin/mvp:pages` (Codeberg Pages — sert le site live)
+
+L'étape 3 est critique : la branche `pages` côté Codeberg est ce que les joueurs voient en prod. Oublier ce push = bugfix invisible.

@@ -6,5 +6,6 @@ node_modules/
 .scratch/
 .claude/
 .btc-key
+.sealed-live-state.json
 .cache/
 *.key.pem

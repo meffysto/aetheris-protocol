@@ -18,7 +18,7 @@ import { resolveCombat, computeDebris, computePillage } from './combat.mjs';
 import * as cache from './cache.mjs';
 
 // Clé du cache scan (versionnée — bump si format change)
-const SCAN_CACHE_KEY = 'scan-v2';  // v2: inclut inscriberPubKey
+const SCAN_CACHE_KEY = 'scan-v3';  // v3: inclut sealedByTick + revealsByTick
 
 /**
  * @param {object} params
@@ -92,6 +92,11 @@ export async function bootBitcoin({
   // ─── Scan : collecte joins + ordres (incrémental) ───────────────────────
   const joins = cachedScan?.joins ? [...cachedScan.joins] : [];
   const ordersByTick = cachedScan?.ordersByTick ? { ...cachedScan.ordersByTick } : {};
+  // sealedByTick[T_depart][joueur] = { parsed, raw, txid, blockHeight, inscriberPubKey }
+  // revealsByTick[T_impact] = [{ parsed, raw, txid, blockHeight, inscriberPubKey, joueur }]
+  // (plusieurs reveals possibles par tick par joueur — un par sceau distinct)
+  const sealedByTick = cachedScan?.sealedByTick ? { ...cachedScan.sealedByTick } : {};
+  const revealsByTick = cachedScan?.revealsByTick ? { ...cachedScan.revealsByTick } : {};
   const lastCachedBlock = cachedScan?.lastBlock ?? blocGenesis;
   const scanFrom = fromBlock ?? (lastCachedBlock + 1);
 
@@ -122,6 +127,39 @@ export async function bootBitcoin({
             inscriberPubKey: ins.inscriberPubKey,  // pubkey Schnorr de l'inscripteur
           });
         }
+      } else if (ins.opType === 'sealed') {
+        const parsed = yparse(ins.yaml);
+        if (parsed?.joueur && Number.isInteger(parsed?.tick_depart)) {
+          const T = parsed.tick_depart;
+          if (!sealedByTick[T]) sealedByTick[T] = {};
+          // Un seul sceau actif par (tick_depart, joueur) — last-wins.
+          // Si un joueur veut sceller plusieurs attaques le même tick, il les
+          // groupera dans un seul commit en v2 (v1 = un sceau / tick).
+          const prev = sealedByTick[T][parsed.joueur];
+          const isNewer = !prev
+            || ins.blockHeight > prev.blockHeight
+            || (ins.blockHeight === prev.blockHeight && ins.txid > prev.txid);
+          if (isNewer) {
+            sealedByTick[T][parsed.joueur] = {
+              parsed, raw: ins.yaml, txid: ins.txid,
+              blockHeight: ins.blockHeight, inscriberPubKey: ins.inscriberPubKey,
+            };
+          }
+        }
+      } else if (ins.opType === 'reveal') {
+        const parsed = yparse(ins.yaml);
+        if (parsed?.joueur && Number.isInteger(parsed?.tick_impact)) {
+          const T = parsed.tick_impact;
+          if (!revealsByTick[T]) revealsByTick[T] = [];
+          // Dédupe par sealed_txid (le même reveal peut être réinscrit accidentellement)
+          if (!revealsByTick[T].some(r => r.parsed?.sealed_txid === parsed.sealed_txid)) {
+            revealsByTick[T].push({
+              parsed, raw: ins.yaml, txid: ins.txid,
+              blockHeight: ins.blockHeight, inscriberPubKey: ins.inscriberPubKey,
+              joueur: parsed.joueur,
+            });
+          }
+        }
       } else if (ins.opType === 'order') {
         const parsed = yparse(ins.yaml);
         if (parsed?.joueur && parsed?.tick_cible) {
@@ -151,7 +189,7 @@ export async function bootBitcoin({
 
     // Persist le cache scan (joins+orders+lastBlock)
     try {
-      await cache.set(SCAN_CACHE_KEY, { blocGenesis, lastBlock: tip, joins, ordersByTick });
+      await cache.set(SCAN_CACHE_KEY, { blocGenesis, lastBlock: tip, joins, ordersByTick, sealedByTick, revealsByTick });
     } catch (e) {
       log(`  ! cache write skipped: ${e.message}`);
     }
@@ -225,10 +263,38 @@ export async function bootBitcoin({
       ordersRawText[name] = entry.raw;
     }
 
+    // Sealed du tick T (sealed.tick_depart === T) : vérifie pubkey inscripteur.
+    // sealedOrders[name] = { parsed, txid }  — un sceau / joueur / tick (v1).
+    const sealedOrders = {};
+    for (const [name, entry] of Object.entries(sealedByTick[T] ?? {})) {
+      const expectedPk = identites[name]?.cle_publique;
+      const gotPk = entry.inscriberPubKey ? `schnorr:${entry.inscriberPubKey}` : null;
+      if (!expectedPk || !gotPk || expectedPk !== gotPk) {
+        log(`  ✗ sealed ${name} (tick ${T}) : pubkey ${gotPk?.slice(0,20)}… ≠ identité — REJETÉ`);
+        continue;
+      }
+      sealedOrders[name] = { parsed: entry.parsed, txid: entry.txid };
+    }
+
+    // Reveals du tick T (reveal.tick_impact === T) : vérifie pubkey inscripteur.
+    // revealOrders = [{ parsed, txid, joueur }] — plusieurs sceaux peuvent
+    // arriver à impact au même tick.
+    const revealOrders = [];
+    for (const entry of (revealsByTick[T] ?? [])) {
+      const expectedPk = identites[entry.joueur]?.cle_publique;
+      const gotPk = entry.inscriberPubKey ? `schnorr:${entry.inscriberPubKey}` : null;
+      if (!expectedPk || !gotPk || expectedPk !== gotPk) {
+        log(`  ✗ reveal ${entry.joueur} (tick ${T}) : pubkey ${gotPk?.slice(0,20)}… ≠ identité — REJETÉ`);
+        continue;
+      }
+      revealOrders.push({ parsed: entry.parsed, txid: entry.txid, joueur: entry.joueur });
+    }
+
     // Run le tick
     const result = await runTick({
       manifest, rules, galaxie,
       empires, orders, ordersRawText, identites,
+      sealedOrders, revealOrders,
       combat: { resolveCombat, computeDebris, computePillage },
       verifySignature,
       opts: { strict: false, log: () => {} },

@@ -161,66 +161,87 @@ signature: ed25519:<base64>
   `(proprietaire ASC, flotte.id ASC)`. Le premier verrouille la case, les
   suivants échouent et repartent.
 
-### 4.2 `joueurs/<toi>/ordres-scelles.yaml` *(planifié — non implémenté)*
+### 4.2 Sceau (op_type 0x03) — *(implémenté v1 : attaque uniquement)*
 
-> **Statut : design seulement.** Ni le moteur (`engine/tick-core.mjs`) ni la
-> console ne lisent/écrivent ce fichier aujourd'hui. Tous les ordres, y
-> compris attaque/espionnage/colonisation, passent par `ordres.yaml` public
-> (§4.1). Cette section décrit le mécanisme commit-reveal envisagé pour les
-> actions militaires — à implémenter dans une phase future.
+> **Statut v1 — option B "reveal à l'impact".** Implémenté pour les attaques
+> seulement. Espionnage et colonisation restent en clair (§4.1) pour l'instant.
+> Pas de caution forfaitaire (un sceau abandonné = bluff gratuit en v1).
 
-Ordres **secrets** (attaques, espionnage, colonisation). Le contenu serait
-hashé ; seul le hash serait public au tick T. Le contenu réel serait révélé
-au tick T+1 dans `revelations.yaml`.
+Inscription Bitcoin avec `type: sealed` dans le YAML — le CLI `inscribe.mjs`
+détecte automatiquement le type et place l'envelope en `op_type=0x03`.
 
-```yaml
-version: 1
-joueur: kael
-tick_cible: 143
-engagements:
-  - id: atk-pyra-001
-    hash: sha256:8f4c2a91...d0e3
-    type: militaire        # indication large; le détail est dans la révélation
-  - id: spy-helios-002
-    hash: sha256:2a7b3c89...91f4
-    type: renseignement
-signature: ed25519:<base64>
-```
-
-### 4.3 `joueurs/<toi>/revelations.yaml` *(planifié — non implémenté)*
-
-> **Statut : design seulement.** Pendant du §4.2 ci-dessus.
-
-Le contenu réel des engagements scellés au tick T-1, à révéler au tick T.
-L'engine vérifierait que `sha256(yaml_canonique(revelation)) == hash_du_tick_precedent`.
+Champs **publics** (en clair on-chain) :
 
 ```yaml
+type: sealed
 version: 1
 joueur: kael
-tick_revele: 143
-revelations:
-  - id: atk-pyra-001
-    type: attaque
-    depuis: aetheris-prima
-    cible: { joueur: vexor, planete: pyra-ii }
-    flotte:
-      chasseur_leger: 4631
-      chasseur_lourd: 682
-      croiseur: 86
-      cuirasse: 46
-    vitesse: 80
-    nonce: e4f1a2b8c9d0   # le sel utilisé pour le hash
-signature: ed25519:<base64>
+tick_depart: 143             # tick auquel le sceau est enregistré
+planete_origine: aetheris-prima
+kind: militaire               # catégorie large (v1 : militaire uniquement)
+hash: 8f4c2a91...d0e3         # sha256 du secret canonicalisé
 ```
 
-**Pourquoi un commit-reveal serait utile (futur)** : tout le repo est public.
-Si un joueur commit son attaque en clair au tick T-1, sa cible la voit et
-sauve sa flotte avant l'arrivée. Avec commit-reveal, l'adversaire verrait
-qu'il y a *quelque chose* de militaire qui se prépare, sans savoir où ça va.
-Idem pour la colonisation : un `vaisseau_colon` a 0 d'attaque et 3000 de
-coque — s'intercepte facilement, donc une course publique pour une case
-libre dégénère en bataille rangée. Le sceau protégerait la trajectoire
-jusqu'à révélation.
+**Aucune information de timing dérivée de la cible n'est publique** : le
+défenseur ne sait ni quelle planète, ni quelle composition, ni quelle
+vitesse. Le tick d'impact dérive automatiquement du temps de vol calculé
+au reveal (`ceil(distance / vMin × 100) / UTJ_PAR_TICK`). La signature est
+implicite : la pubkey Schnorr de la TX d'inscription doit matcher
+l'identité du joueur (cf. §4.1 règle d'identité Bitcoin-native).
+
+### 4.3 Reveal (op_type 0x04)
+
+Inscription Bitcoin avec `type: reveal` dans le YAML. **Doit être publiée
+au tick d'arrivée physique** de la flotte, sinon rejet.
+
+```yaml
+type: reveal
+version: 1
+joueur: kael
+tick_impact: 145                # tick d'arrivée physique attendu
+sealed_txid: <commit_txid>      # référence vers le sceau §4.2
+secret:
+  type: attaque
+  depuis: aetheris-prima        # doit === sealed.planete_origine
+  cible: { joueur: vexor, planete: pyra-ii }
+  flotte:
+    chasseur_leger: 4631
+    chasseur_lourd: 682
+    croiseur: 86
+    cuirasse: 46
+  vitesse: 80
+  nonce: e4f1a2b8c9d0           # sel utilisé pour le hash
+```
+
+L'engine vérifie au reveal :
+
+1. **Hash** : `sha256(canonicalJSON(secret)) === sealed.hash`
+2. **Cohérence** : `secret.depuis === sealed.planete_origine`
+3. **Physique du vol** : `reveal.tick_impact === sealed.tick_depart + ceil(distance(depuis, cible) / vMin × 100 / UTJ_PAR_TICK)`
+   où `vMin = min(rules.vaisseaux[s].vitesse pour s dans flotte)`
+
+Tout matche → la flotte est débitée de `planete_origine` et le combat est
+résolu **immédiatement au tick_impact** via `combat.resolveCombat`. Sinon →
+rejet, sceau consommé (le secret est déjà leaké on-chain).
+
+**Forfait (v1)** : un sceau qui n'est pas révélé reste en `sealedPending`
+indéfiniment, **jusqu'à dépasser `SEALED_MAX_PATIENCE_TICKS`** (constante
+`engine/sealed-protocol.mjs` — par défaut 1000 ticks ≈ 10 jours mutinynet).
+À ce moment-là, le sceau expire silencieusement (event `sealed-forfait`).
+Aucun coût n'est appliqué (bluff gratuit toléré — sera durci en v2 avec une
+caution ressource bloquée au commit).
+
+**Pourquoi c'est nécessaire** : tout le contenu inscrit sur Bitcoin est
+public. Sans sceau, un ordre d'attaque en clair au tick T-1 = la cible
+évacue sa flotte avant l'arrivée. Avec le sceau, l'adversaire voit qu'**une**
+action militaire part de `planete_origine` au tick `tick_depart`, mais ne
+sait ni la cible ni la composition jusqu'à l'impact au tick `tick_impact`.
+Le défenseur doit donc garder sa flotte par défaut (paranoïa coûteuse) ou
+parier.
+
+**État interne** : les sceaux en attente sont stockés dans
+`manifest.sealedPending[txid]` et survivent aux ticks jusqu'au reveal ou à
+l'expiration.
 
 ---
 

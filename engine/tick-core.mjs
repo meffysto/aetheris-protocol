@@ -10,6 +10,7 @@
 
 import { sha256 } from '@noble/hashes/sha256';
 import { queueColonisation, resolveColonisationArrivee } from './colonisation.mjs';
+import { computeSealHash, validateSealedShape, validateRevealShape, SEALED_MAX_PATIENCE_TICKS } from './sealed-protocol.mjs';
 
 // ════════════════════════════════════════════════════════════════════════
 // 1.  YAML mini (sous-ensemble suffisant pour notre schéma)
@@ -245,6 +246,7 @@ export function blockHeightForTick(targetTick, genesisBlock, blocsParTick = 1, t
 export async function runTick({
   manifest, rules, galaxie,
   empires, orders, ordersRawText = {}, identites = {},
+  sealedOrders = {}, revealOrders = [],
   combat, verifySignature = null, opts = {},
 }) {
   const { resolveCombat, computeDebris, computePillage } = combat;
@@ -255,6 +257,11 @@ export async function runTick({
   const rng = rngFromSeed(`${manifest.seed}:${tickSuivant}`);
   const events = [];
   const reports = { intel: [], alerts: [], battles: [] };
+
+  // Table des sceaux en attente de reveal — persiste à travers les ticks via manifest.
+  // Clé = sealed_txid (immutable). Valeur = { joueur, tick_depart, tick_impact,
+  // planete_origine, kind, hash }.
+  manifest.sealedPending = manifest.sealedPending || {};
 
   // ─── Phase 0 — Expiration des effets temporels (relations, moral, marché)
   // Avant la production, on nettoie : trêves échues passent à 'neutre',
@@ -436,6 +443,107 @@ export async function runTick({
     }
   }
 
+  // ─── Phase 2.5 — Résolution des reveals scellés (option B) ─────────────
+  // Pour chaque reveal du tick courant : matche le sealed dans sealedPending,
+  // vérifie le hash, et — si valide — enqueue une attaque avec impact immédiat
+  // (arrivee_utj = UTJ_PAR_TICK → décrément Phase 4 → résolution Phase 5).
+  //
+  // Tri déterministe par sealed_txid pour garantir reproductibilité du replay
+  // (l'ordre du scan parallèle n'est pas garanti).
+  log(`▸ Phase 2.5/6 — Résolution des sceaux révélés`);
+  const sortedReveals = [...revealOrders].sort((a, b) =>
+    (a.parsed?.sealed_txid || '') < (b.parsed?.sealed_txid || '') ? -1 :
+    (a.parsed?.sealed_txid || '') > (b.parsed?.sealed_txid || '') ? 1 : 0
+  );
+  for (const rev of sortedReveals) {
+    const errR = validateRevealShape(rev.parsed);
+    if (errR) { log(`  ✗ reveal ${rev.joueur}: ${errR}`); continue; }
+
+    const sealed = manifest.sealedPending[rev.parsed.sealed_txid];
+    if (!sealed) {
+      log(`  ✗ reveal ${rev.joueur}: sealed_txid ${rev.parsed.sealed_txid.slice(0, 16)}… introuvable — IGNORÉ`);
+      continue;
+    }
+    if (sealed.joueur !== rev.joueur) {
+      log(`  ✗ reveal ${rev.joueur}: sceau appartient à ${sealed.joueur} — REJETÉ`);
+      continue;
+    }
+    if (rev.parsed.tick_impact !== tickSuivant) {
+      log(`  ✗ reveal ${rev.joueur}: reveal.tick_impact ${rev.parsed.tick_impact} ≠ tick courant ${tickSuivant} — IGNORÉ`);
+      continue;
+    }
+
+    // Cœur du protocole : recalcul + comparaison stricte
+    const computed = computeSealHash(rev.parsed.secret);
+    if (computed !== sealed.hash) {
+      log(`  ✗ reveal ${rev.joueur}: hash ${computed.slice(0, 12)}… ≠ sealed.hash ${sealed.hash.slice(0, 12)}… — REJETÉ (sceau consommé)`);
+      delete manifest.sealedPending[rev.parsed.sealed_txid];
+      events.push({ type: 'reveal-hash-mismatch', joueur: rev.joueur, sealed_txid: rev.parsed.sealed_txid });
+      continue;
+    }
+    if (rev.parsed.secret.depuis !== sealed.planete_origine) {
+      log(`  ✗ reveal ${rev.joueur}: depuis=${rev.parsed.secret.depuis} ≠ planete_origine=${sealed.planete_origine} — REJETÉ`);
+      delete manifest.sealedPending[rev.parsed.sealed_txid];
+      continue;
+    }
+
+    // Vérification physique : le tick_impact déclaré doit correspondre à
+    // ceil(distance / vMin × 100) UTJ ÷ UTJ_PAR_TICK depuis tick_depart.
+    // Empêche un joueur de révéler trop tôt ou trop tard sa flotte.
+    const distance = computeDistance(rev.parsed.secret.depuis, rev.parsed.secret.cible.planete, rev.joueur);
+    const vMin = Math.min(
+      ...Object.keys(rev.parsed.secret.flotte || {}).map(s => rules.vaisseaux[s]?.vitesse || 1000)
+    );
+    if (!Number.isFinite(vMin) || vMin <= 0) {
+      log(`  ✗ reveal ${rev.joueur}: flotte vide ou vaisseaux inconnus — REJETÉ`);
+      delete manifest.sealedPending[rev.parsed.sealed_txid];
+      continue;
+    }
+    const flightUTJ = Math.max(1, Math.ceil(distance / vMin * 100));
+    const flightTicks = Math.ceil(flightUTJ / UTJ_PAR_TICK);
+    const expectedImpact = sealed.tick_depart + flightTicks;
+    if (expectedImpact !== tickSuivant) {
+      log(`  ✗ reveal ${rev.joueur}: tick_impact ${tickSuivant} ≠ tick_depart+flight ${expectedImpact} (distance=${distance}, vMin=${vMin}, flightTicks=${flightTicks}) — REJETÉ`);
+      delete manifest.sealedPending[rev.parsed.sealed_txid];
+      events.push({ type: 'reveal-timing-mismatch', joueur: rev.joueur, sealed_txid: rev.parsed.sealed_txid, expectedImpact, actualImpact: tickSuivant });
+      continue;
+    }
+
+    // Match valide → enqueue attaque avec impact immédiat
+    const emp = empires[rev.joueur];
+    if (!emp) {
+      log(`  ✗ reveal ${rev.joueur}: empire introuvable`);
+      delete manifest.sealedPending[rev.parsed.sealed_txid];
+      continue;
+    }
+    const action = {
+      type: 'attaque',
+      depuis: rev.parsed.secret.depuis,
+      cible: rev.parsed.secret.cible,
+      flotte: rev.parsed.secret.flotte,
+    };
+    const beforeLen = (emp.flottes_en_vol || []).length;
+    queueAttaque(emp, action, rev.joueur);
+    const afterLen = (emp.flottes_en_vol || []).length;
+    if (afterLen > beforeLen) {
+      // Force arrivée ce tick : décrément Phase 4 ramènera arrivee_utj à 0.
+      const flt = emp.flottes_en_vol[afterLen - 1];
+      flt.arrivee_utj = UTJ_PAR_TICK;
+      flt.duree_aller_utj = UTJ_PAR_TICK;
+      flt.scelle = true;
+      events.push({
+        type: 'reveal-resolu',
+        joueur: rev.joueur,
+        sealed_txid: rev.parsed.sealed_txid,
+        cible: action.cible,
+      });
+      log(`  ⚔ ${rev.joueur}: reveal scellé → impact immédiat sur ${action.cible.joueur}/${action.cible.planete}`);
+    } else {
+      log(`  ✗ reveal ${rev.joueur}: queueAttaque a échoué (flotte/trêve/etc.) — sceau consommé sans effet`);
+    }
+    delete manifest.sealedPending[rev.parsed.sealed_txid];
+  }
+
   // ─── Phase 3 — Validation des nouveaux ordres ──────────────────────────
   log(`▸ Phase 3/6 — Validation des nouveaux ordres`);
   for (const [name, ord] of Object.entries(orders)) {
@@ -459,6 +567,63 @@ export async function runTick({
       continue;
     }
     for (const action of ord.ordres) applyOrder(name, action);
+  }
+
+  // ─── Phase 3.6 — Enregistrement des nouveaux sceaux ────────────────────
+  // Les sealedOrders dont tick_depart === tickSuivant sont enregistrés dans
+  // manifest.sealedPending. Le reveal correspondant devra être inscrit au
+  // tick_impact pour matérialiser l'action.
+  //
+  // Tri par joueur ASC pour déterminisme (l'ordre d'insertion dans un objet
+  // affecte canonicalJSON si on hashait l'état).
+  log(`▸ Phase 3.6/6 — Enregistrement des nouveaux sceaux`);
+  const sealedNames = Object.keys(sealedOrders).sort();
+  for (const name of sealedNames) {
+    const entry = sealedOrders[name];
+    const errS = validateSealedShape(entry.parsed);
+    if (errS) { log(`  ✗ sealed ${name}: ${errS}`); continue; }
+    if (entry.parsed.tick_depart !== tickSuivant) {
+      log(`  · sealed ${name}: tick_depart ${entry.parsed.tick_depart} ≠ ${tickSuivant} — IGNORÉ`);
+      continue;
+    }
+    if (entry.parsed.joueur !== name) {
+      log(`  ✗ sealed ${name}: joueur YAML '${entry.parsed.joueur}' ≠ identité '${name}' — REJETÉ`);
+      continue;
+    }
+    const emp = empires[name];
+    const src = (emp?.planetes || []).find(p => p.nom === entry.parsed.planete_origine);
+    if (!src) {
+      log(`  ✗ sealed ${name}: planete_origine '${entry.parsed.planete_origine}' introuvable — REJETÉ`);
+      continue;
+    }
+    manifest.sealedPending[entry.txid] = {
+      joueur: name,
+      tick_depart: entry.parsed.tick_depart,
+      planete_origine: entry.parsed.planete_origine,
+      kind: entry.parsed.kind,
+      hash: entry.parsed.hash,
+    };
+    events.push({
+      type: 'sealed-enregistre',
+      joueur: name,
+      txid: entry.txid,
+      tick_depart: entry.parsed.tick_depart,
+    });
+    log(`  🔒 ${name}: sceau ${entry.txid.slice(0, 12)}… enregistré au tick_depart ${entry.parsed.tick_depart}`);
+  }
+
+  // ─── Phase 3.7 — Forfait des sceaux non-révélés ────────────────────────
+  // Un sceau expire si tickSuivant - tick_depart > SEALED_MAX_PATIENCE_TICKS,
+  // càd que le joueur a eu le temps maximal possible (couvre toute la galaxie
+  // au vaisseau le plus lent) sans publier de reveal. V1 : pas de coût.
+  const sealedTxids = Object.keys(manifest.sealedPending).sort();
+  for (const txid of sealedTxids) {
+    const sealed = manifest.sealedPending[txid];
+    if (tickSuivant - sealed.tick_depart > SEALED_MAX_PATIENCE_TICKS) {
+      log(`  ⌧ ${sealed.joueur}: sceau ${txid.slice(0, 12)}… expiré (patience dépassée, ${tickSuivant - sealed.tick_depart} > ${SEALED_MAX_PATIENCE_TICKS} ticks)`);
+      events.push({ type: 'sealed-forfait', joueur: sealed.joueur, txid, tick_depart: sealed.tick_depart });
+      delete manifest.sealedPending[txid];
+    }
   }
 
   function applyOrder(playerName, action) {

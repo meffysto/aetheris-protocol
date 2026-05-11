@@ -1870,6 +1870,19 @@ body.tick-pulsed::after {
     <label id="missionFleetLabel">Flotte</label>
     <div id="missionFleet"></div>
 
+    <div id="missionSealedBlock" style="display:none;margin-top:14px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:rgba(208,70,72,0.06);border:1px solid rgba(208,70,72,0.3);padding:10px 12px;border-radius:2px">
+        <input type="checkbox" id="missionSealedToggle" style="width:16px;height:16px;cursor:pointer"/>
+        <span style="flex:1">
+          <span style="font-weight:600;color:#d04648">⚙ Scellement (commit-reveal)</span>
+          <span style="display:block;font-size:11px;opacity:0.75;font-weight:400;text-transform:none;letter-spacing:0;margin-top:3px;color:var(--bone-dim)">
+            Cache la cible et la flotte jusqu'à l'impact. Tu devras être présent au tick d'arrivée pour publier le reveal (~15 min/tick).
+          </span>
+        </span>
+      </label>
+      <div id="missionSealedInfo" style="display:none;margin-top:8px;padding:8px 12px;background:var(--cardridge);border-left:2px solid #d04648;font-size:11.5px;font-family:var(--mono);color:var(--bone-dim);line-height:1.5"></div>
+    </div>
+
     <div id="missionCargoBlock" style="display:none">
       <label>Cargaison</label>
       <div class="cargo">
@@ -2081,6 +2094,10 @@ body.tick-pulsed::after {
       <h3>Panier <span class="ct" id="qCartCt">—</span></h3>
       <div id="qCart"></div>
     </div>
+    <div class="group" id="qSealedGroup" hidden>
+      <h3 style="color:#d04648">⚙ Sceaux actifs <span class="ct" id="qSealedCt">—</span></h3>
+      <div id="qSealed"></div>
+    </div>
     <div class="group">
       <h3>Chantier <span class="ct" id="qBatCt">—</span></h3>
       <div id="qBat"></div>
@@ -2133,9 +2150,10 @@ try {
     { bootBitcoin },
     { inscribe, API_URLS },
     { fetchTipHeight },
-    { tickFromBlockHeight },
+    { tickFromBlockHeight, blockHeightForTick },
     { makeBrowserAdapter },
     { initCache },
+    { computeSealHash },
     btc,
     { schnorr },
   ] = await Promise.all([
@@ -2145,6 +2163,7 @@ try {
     import('./engine/tick-core.mjs'),
     import('./engine/cache-browser.mjs'),
     import('./engine/cache.mjs'),
+    import('./engine/sealed-protocol.mjs'),
     import('@scure/btc-signer'),
     import('@noble/curves/secp256k1'),
   ]);
@@ -2154,7 +2173,8 @@ try {
 
   window.aetherisBitcoin = {
     bootBitcoin, inscribe, API_URLS,
-    fetchTipHeight, tickFromBlockHeight,
+    fetchTipHeight, tickFromBlockHeight, blockHeightForTick,
+    computeSealHash,
     btc, schnorr, cacheAdapter,
     ready: true,
   };
@@ -2589,6 +2609,9 @@ async function load() {
     applySrcUI();
     render();
     try { detectNotifs(); } catch (e) { console.warn('notif detect failed', e); }
+    // Auto-revealer : publie les reveals des sceaux dont le tick_impact est
+    // atteint. Async, ne bloque pas l'UI. Erreurs catchées en interne.
+    runAutoRevealer().catch(e => console.warn('autoRevealer error:', e));
   } catch (e) {
     const err = document.getElementById('err');
     err.innerHTML = `⚠ liaison rompue · ${escapeHtml(e.message || 'erreur')}<button class="close" aria-label="Fermer" onclick="this.parentElement.classList.remove('on')">×</button>`;
@@ -3995,8 +4018,48 @@ function renderCart() {
   document.getElementById('qCart').innerHTML = html;
 }
 
+function renderSealedActive() {
+  const list = loadSealedList();
+  const group = document.getElementById('qSealedGroup');
+  const slot = document.getElementById('qSealed');
+  const ct = document.getElementById('qSealedCt');
+  if (!group || !slot) return;
+  // Garde seulement sceaux pas encore confirmés (pending ou broadcast).
+  const active = list.filter(s => s.revealStatus !== 'confirmed');
+  if (active.length === 0) { group.hidden = true; return; }
+  group.hidden = false;
+  if (ct) ct.textContent = active.length;
+
+  const tickCur = state.manifest?.tick ?? 0;
+  const bpt = state.bitcoin?.blocsParTick ?? 30;
+  const tip = state.bitcoin?.tip ?? 0;
+  const blocGenesis = state.bitcoin?.blocGenesis;
+
+  let html = '';
+  for (const s of active) {
+    const ticksRemaining = s.tick_impact - tickCur;
+    const blocksRemaining = blocGenesis
+      ? Math.max(0, (window.aetherisBitcoin?.blockHeightForTick?.(s.tick_impact, blocGenesis, bpt, 0) ?? 0) - tip)
+      : 0;
+    const minutes = Math.round(blocksRemaining * 30 / 60);
+    let status, color;
+    if (s.revealStatus === 'broadcast') { status = 'reveal publié · attente confirm'; color = '#dad45e'; }
+    else if (ticksRemaining <= 0)        { status = 'impact imminent · auto-reveal'; color = '#d04648'; }
+    else                                  { status = `vol · ${ticksRemaining} tick(s) · ~${minutes} min`; color = 'var(--phosphor)'; }
+    const cible = `${s.secret.cible.joueur}/${s.secret.cible.planete}`;
+    html += `<div class="qitem cart" style="border-left:2px solid #d04648">
+      <div class="top">
+        <div class="nm">⚙ ${s.planete_origine} → ${cible}<small>tick_impact ${s.tick_impact}</small></div>
+        <div class="tgt" style="color:${color}">${status}<small style="font-family:var(--sans);font-size:9.5px;font-weight:600;letter-spacing:0.04em;color:var(--bone-dim);display:block;margin-top:4px;text-align:right;text-transform:uppercase">${s.sealed_txid.slice(0, 10)}…</small></div>
+      </div>
+    </div>`;
+  }
+  slot.innerHTML = html;
+}
+
 function renderRail(p, emp) {
   renderCart();
+  renderSealedActive();
   // Chantier — combine ordres en attente (depuis ordres.yaml) + chantiers actifs (file_chantier)
   const queue = p?.file_chantier || [];
   const tickCur = state.manifest?.tick ?? 0;
@@ -4827,6 +4890,303 @@ async function submitMission({ type, depuis, cibleJoueur, ciblePlanete, cibleSys
   }
 }
 
+/* ─────────────────── Sealed attacks (commit-reveal protocol) ──────────────
+ * Permet au joueur de lancer une attaque dont la cible + composition sont
+ * cachées on-chain jusqu'à l'impact. Le secret est stocké en localStorage,
+ * un auto-revealer surveille la hauteur du bloc et publie le reveal quand
+ * la flotte arrive physiquement (tick_depart + flight_time).
+ *
+ * localStorage shape :
+ *   aetheris.sealed.<network>.<pubkey> = [ { sealed_txid, joueur, tick_depart,
+ *     tick_impact, planete_origine, hash, secret, revealStatus, ... }, ... ]
+ */
+
+const SEALED_KEY_PREFIX = 'aetheris.sealed';
+
+function sealedStorageKey() {
+  const wallet = state.wallet;
+  const network = wallet?.network || 'mutinynet';
+  const pubkey = wallet?.pubKeyHex || 'anon';
+  return `${SEALED_KEY_PREFIX}.${network}.${pubkey}`;
+}
+
+function loadSealedList() {
+  try {
+    const raw = localStorage.getItem(sealedStorageKey());
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveSealedList(list) {
+  try { localStorage.setItem(sealedStorageKey(), JSON.stringify(list)); }
+  catch (e) { console.warn('saveSealedList failed:', e); }
+}
+
+function addSealedRecord(record) {
+  const list = loadSealedList();
+  list.push(record);
+  saveSealedList(list);
+  return list.length;
+}
+
+function updateSealedRecord(sealed_txid, patch) {
+  const list = loadSealedList();
+  const idx = list.findIndex(s => s.sealed_txid === sealed_txid);
+  if (idx < 0) return;
+  list[idx] = { ...list[idx], ...patch };
+  saveSealedList(list);
+}
+
+function removeSealedRecord(sealed_txid) {
+  const list = loadSealedList().filter(s => s.sealed_txid !== sealed_txid);
+  saveSealedList(list);
+}
+
+// Reproduit la logique de tick-core.mjs::queueAttaque : flight_ticks =
+// ceil(ceil(distance/vMin*100) / UTJ_PAR_TICK). Distance se calcule via
+// les coordonnées des planètes (cf. computeDistanceFromCoords).
+function computeFlightTicks(distance, fleet) {
+  const rules = state.rules;
+  const UTJ_PAR_TICK = rules?.duree_utj_par_tick || 6;
+  const ships = Object.keys(fleet || {});
+  if (ships.length === 0) return null;
+  const vMin = Math.min(...ships.map(s => rules?.vaisseaux?.[s]?.vitesse || 1000));
+  if (!Number.isFinite(vMin) || vMin <= 0) return null;
+  const flightUTJ = Math.max(1, Math.ceil(distance / vMin * 100));
+  return Math.ceil(flightUTJ / UTJ_PAR_TICK);
+}
+
+// Distance entre deux planètes du jeu — réplique computeDistanceFromCoords
+// de tick-core.mjs. Si l'une est introuvable → fallback 100 (comme moteur).
+function computeDistanceUI(origineNom, cibleJoueur, cibleNom) {
+  function findPlanet(name) {
+    for (const emp of Object.values(state.players || {})) {
+      const p = (emp.planetes || []).find(p => p.nom === name);
+      if (p) return p;
+    }
+    return null;
+  }
+  const src = findPlanet(origineNom);
+  const dst = findPlanet(cibleNom);
+  if (!src?.coordonnees || !dst?.coordonnees) return 100;
+  const [g1, s1, p1] = src.coordonnees;
+  const [g2, s2, p2] = dst.coordonnees;
+  if (g1 !== g2) return 20000 + Math.abs(g1 - g2) * 5000;
+  if (s1 !== s2) return 2700 + Math.abs(s1 - s2) * 95;
+  return 1000 + Math.abs(p1 - p2) * 5;
+}
+
+function buildSealedYamlClient({ joueur, tick_depart, planete_origine, hash }) {
+  return [
+    'type: sealed',
+    'version: 1',
+    `joueur: ${joueur}`,
+    `tick_depart: ${tick_depart}`,
+    `planete_origine: ${planete_origine}`,
+    'kind: militaire',
+    `hash: ${hash}`,
+    '',
+  ].join('\n');
+}
+
+function buildRevealYamlClient({ joueur, tick_impact, sealed_txid, secret }) {
+  const fleetLines = Object.entries(secret.flotte || {})
+    .map(([k, n]) => `    ${k}: ${n}`)
+    .join('\n');
+  return [
+    'type: reveal',
+    'version: 1',
+    `joueur: ${joueur}`,
+    `tick_impact: ${tick_impact}`,
+    `sealed_txid: ${sealed_txid}`,
+    'secret:',
+    `  type: ${secret.type}`,
+    `  depuis: ${secret.depuis}`,
+    '  cible:',
+    `    joueur: ${secret.cible.joueur}`,
+    `    planete: ${secret.cible.planete}`,
+    '  flotte:',
+    fleetLines || '    chasseur_leger: 0',
+    `  vitesse: ${secret.vitesse}`,
+    `  nonce: ${secret.nonce}`,
+    '',
+  ].join('\n');
+}
+
+function randomSealNonce() {
+  const a = new Uint8Array(8); crypto.getRandomValues(a);
+  return [...a].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Met à jour l'aperçu sealed dans le compositeur de mission (distance + tick
+// d'impact prédit + temps d'attente). Appelé quand toggle/fleet/from/target
+// changent.
+function updateSealedPreview() {
+  const info = document.getElementById('missionSealedInfo');
+  const toggle = document.getElementById('missionSealedToggle');
+  if (!info || !toggle) return;
+  if (mission.type !== 'attaque' || !toggle.checked) { info.style.display = 'none'; return; }
+
+  const flotte = {};
+  document.querySelectorAll('#missionFleet input[data-ship]').forEach(inp => {
+    const n = parseInt(inp.value, 10) || 0;
+    if (n > 0) flotte[inp.dataset.ship] = n;
+  });
+  if (Object.keys(flotte).length === 0) {
+    info.style.display = '';
+    info.innerHTML = '<span style="color:#d27d2c">⚠ Sélectionne au moins 1 vaisseau pour estimer le tick d\'impact</span>';
+    return;
+  }
+
+  const distance = computeDistanceUI(mission.depuis, mission.cibleJoueur, mission.ciblePlanete);
+  const flightTicks = computeFlightTicks(distance, flotte);
+  if (flightTicks === null) {
+    info.style.display = '';
+    info.innerHTML = '<span style="color:#d27d2c">⚠ Composition invalide</span>';
+    return;
+  }
+  const tickCourant = state.manifest?.tick ?? 0;
+  const tick_depart = tickCourant + 1;
+  const tick_impact = tick_depart + flightTicks;
+  const bpt = state.bitcoin?.blocsParTick ?? 30;
+  const waitSec = (tick_impact - tickCourant) * bpt * 30;
+  const waitMin = Math.round(waitSec / 60);
+
+  info.style.display = '';
+  info.innerHTML = `
+    <div><span style="color:#d04648">●</span> distance ${distance} · vMin ${Math.min(...Object.keys(flotte).map(s => state.rules?.vaisseaux?.[s]?.vitesse || 0))} · vol ${flightTicks} tick(s)</div>
+    <div>tick_depart : <strong style="color:var(--bone)">${tick_depart}</strong> → tick_impact : <strong style="color:#d04648">${tick_impact}</strong></div>
+    <div style="margin-top:4px;color:var(--bone-dim)">⏱ Tu devras revenir dans ~${waitMin} min pour publier le reveal (onglet ouvert = auto)</div>
+  `;
+}
+
+// Construit + inscrit un sceau. À la fin, sauve le secret en localStorage
+// pour que l'auto-revealer puisse publier le reveal au tick_impact.
+async function submitSealedAttack({ depuis, cibleJoueur, ciblePlanete, flotte }) {
+  if (!cfg.ready) { openSettings(); toast('Wallet requis', 'Configure ton wallet Bitcoin.', true); return; }
+  if (Object.keys(flotte || {}).length === 0) {
+    toast('Flotte vide', 'Inclus au moins 1 vaisseau dans la composition.', true);
+    return;
+  }
+  const ab = window.aetherisBitcoin;
+  if (!ab?.ready) { toast('Bitcoin pas prêt', 'Module Bitcoin non chargé.', true); return; }
+
+  const pendingKey = `sealed:${depuis}:${cibleJoueur}:${ciblePlanete}`;
+  if (state.pending.has(pendingKey)) return;
+
+  const distance = computeDistanceUI(depuis, cibleJoueur, ciblePlanete);
+  const flightTicks = computeFlightTicks(distance, flotte);
+  if (flightTicks === null) { toast('Composition invalide', 'Impossible de calculer le temps de vol.', true); return; }
+
+  const tickCourant = state.manifest?.tick ?? 0;
+  const tick_depart = tickCourant + 1;
+  const tick_impact = tick_depart + flightTicks;
+
+  const nonce = randomSealNonce();
+  const secret = {
+    type: 'attaque',
+    depuis,
+    cible: { joueur: cibleJoueur, planete: ciblePlanete },
+    flotte: { ...flotte },
+    vitesse: 100,
+    nonce,
+  };
+  const hash = ab.computeSealHash(secret);
+  const yamlText = buildSealedYamlClient({
+    joueur: state.current, tick_depart, planete_origine: depuis, hash,
+  });
+
+  state.pending.add(pendingKey); render();
+  try {
+    const result = await pushSignedOrder(yamlText, `${state.current}: SEALED attaque depuis ${depuis} (tick_depart ${tick_depart})`);
+    const record = {
+      sealed_txid: result.revealTxid,
+      sealed_commit_txid: result.commitTxid,
+      joueur: state.current,
+      tick_depart, tick_impact,
+      planete_origine: depuis,
+      distance,
+      hash,
+      secret,
+      revealStatus: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    addSealedRecord(record);
+    toast('Sceau publié', `Cible cachée jusqu'à tick ${tick_impact}. Le reveal sera auto-broadcasté à l'arrivée — garde l'onglet ouvert.`);
+    closeMission();
+    render();
+  } catch (e) {
+    toast('Échec sealed', e.message || String(e), true);
+  } finally {
+    state.pending.delete(pendingKey); render();
+  }
+}
+
+// Auto-revealer : pour chaque sealed local en pending, vérifie si le bloc
+// du tick_impact est atteint. Si oui, publie le reveal automatiquement.
+// Appelé après chaque boot et après chaque tick advance.
+let __autoRevealerBusy = false;
+async function runAutoRevealer() {
+  if (__autoRevealerBusy) return;
+  if (!state.wallet) return;
+  const ab = window.aetherisBitcoin;
+  if (!ab?.ready) return;
+  const list = loadSealedList();
+  if (list.length === 0) return;
+
+  const bpt = state.bitcoin?.blocsParTick ?? 30;
+  const blocGenesis = state.bitcoin?.blocGenesis;
+  if (!blocGenesis) return;
+  const tip = state.bitcoin?.tip ?? 0;
+
+  __autoRevealerBusy = true;
+  try {
+    for (const sealed of list) {
+      if (sealed.revealStatus !== 'pending') continue;
+      const blockImpact = ab.blockHeightForTick(sealed.tick_impact, blocGenesis, bpt, 0);
+      if (tip < blockImpact) continue; // pas encore l'heure
+
+      // Construis et inscris le reveal
+      const revealYaml = buildRevealYamlClient({
+        joueur: sealed.joueur,
+        tick_impact: sealed.tick_impact,
+        sealed_txid: sealed.sealed_txid,
+        secret: sealed.secret,
+      });
+      try {
+        showStatus(`▸ auto-reveal sceau ${sealed.sealed_txid.slice(0, 8)}…`, true);
+        const result = await pushSignedOrder(revealYaml, `${sealed.joueur}: REVEAL sceau ${sealed.sealed_txid.slice(0, 12)}`);
+        updateSealedRecord(sealed.sealed_txid, {
+          revealStatus: 'broadcast',
+          reveal_txid: result.revealTxid,
+          reveal_commit_txid: result.commitTxid,
+          revealedAt: new Date().toISOString(),
+        });
+        toast('Reveal auto-publié', `Attaque ${sealed.secret.depuis} → ${sealed.secret.cible.joueur}/${sealed.secret.cible.planete} : impact en cours.`);
+      } catch (e) {
+        console.warn(`autoRevealer reveal failed for ${sealed.sealed_txid}:`, e);
+        toast('Reveal échoué', `Impossible de publier le reveal de ${sealed.sealed_txid.slice(0, 12)}… : ${e.message}`, true);
+      }
+    }
+
+    // Cleanup : retire les seal "broadcast" qui n'apparaissent plus dans
+    // sealedPending on-chain (= consommés par le moteur).
+    const pendingOnChain = state.manifest?.sealedPending || {};
+    const list2 = loadSealedList();
+    let changed = false;
+    for (const sealed of list2) {
+      if (sealed.revealStatus === 'broadcast' && !pendingOnChain[sealed.sealed_txid]) {
+        // Le moteur a consommé le sceau (match ou rejet hash/timing).
+        updateSealedRecord(sealed.sealed_txid, { revealStatus: 'confirmed' });
+        changed = true;
+      }
+    }
+    if (changed) render();
+  } finally {
+    __autoRevealerBusy = false;
+  }
+}
+
 /* ───────────────────────────── OAuth Device Flow ────────────────────────── */
 // Reutilise l'OAuth App + worker proxy de join.html. Le token recu remplace
 // le PAT manuel, mais est stocke sous la meme cle (cfg.pat) — c'est juste
@@ -5167,8 +5527,19 @@ function renderMissionFleet() {
   const wrap = document.getElementById('missionFleet');
   const cargoBlock = document.getElementById('missionCargoBlock');
   const nomBlock = document.getElementById('missionNomBlock');
+  const sealedBlock = document.getElementById('missionSealedBlock');
   // Le bloc "nom de la colonie" n'est visible qu'en mode colonisation.
   if (nomBlock) nomBlock.style.display = mission.type === 'colonisation' ? '' : 'none';
+  // Le toggle de scellement n'est offert qu'en mode attaque (v1).
+  if (sealedBlock) {
+    sealedBlock.style.display = mission.type === 'attaque' ? '' : 'none';
+    if (mission.type !== 'attaque') {
+      const t = document.getElementById('missionSealedToggle');
+      if (t) t.checked = false;
+      const info = document.getElementById('missionSealedInfo');
+      if (info) info.style.display = 'none';
+    }
+  }
 
   if (mission.type === 'espionnage') {
     lblEl.textContent = 'Sondes';
@@ -5256,12 +5627,33 @@ function renderMissionFleet() {
 
 document.getElementById('missionCancel').onclick = closeMission;
 document.getElementById('missionBg').onclick = e => { if (e.target.id === 'missionBg') closeMission(); };
+// Listeners pour réactualiser l'aperçu sealed dès qu'une input change.
+document.addEventListener('input', (e) => {
+  if (e.target.closest && e.target.closest('#missionFleet')) updateSealedPreview();
+});
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'missionSealedToggle') updateSealedPreview();
+});
+
 document.getElementById('missionSubmit').onclick = () => {
   const flotte = {};
   document.querySelectorAll('#missionFleet input[data-ship]').forEach(inp => {
     const n = parseInt(inp.value, 10) || 0;
     if (n > 0) flotte[inp.dataset.ship] = n;
   });
+
+  // Mode scellement : court-circuit le panier classique, broadcast direct.
+  const sealedToggle = document.getElementById('missionSealedToggle');
+  if (mission.type === 'attaque' && sealedToggle?.checked) {
+    submitSealedAttack({
+      depuis: mission.depuis,
+      cibleJoueur: mission.cibleJoueur,
+      ciblePlanete: mission.ciblePlanete,
+      flotte,
+    });
+    return;
+  }
+
   const payload = {
     type: mission.type,
     depuis: mission.depuis,

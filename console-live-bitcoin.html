@@ -2582,11 +2582,13 @@ async function load() {
       }
     }
 
-    // Sélectionne le 1er joueur si rien n'est choisi (et garde l'actuel s'il
-    // est encore dans la liste — évite de switch involontaire pendant un push).
+    // Garde le joueur courant s'il est encore dans la liste.
+    // Ne sélectionne PAS automatiquement le 1er joueur pour les visiteurs anonymes :
+    // un visiteur sans joueur dans l'URL ni localStorage verrait sinon l'empire
+    // d'un autre joueur par défaut.
     const playerNames = Object.keys(state.players);
-    if (!state.current || !state.players[state.current]) {
-      state.current = playerNames[0] || null;
+    if (state.current && !state.players[state.current]) {
+      state.current = null;
     }
 
     showStatus(`✓ tick ${state.manifest.tick} · ${playerNames.length} empire(s) · bloc ${state.bitcoin.tip}`);

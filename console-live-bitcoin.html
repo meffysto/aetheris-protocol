@@ -2742,13 +2742,15 @@ function render() {
   document.getElementById('hash').textContent = m && m.hash_etat ? String(m.hash_etat).slice(7, 19) : '—';
   document.getElementById('whoLabel').innerHTML = state.current
     ? `${state.current}<small>commandant</small>`
-    : `vacant<small>commandant</small>`;
+    : `—`;
 
   // player select
   const sel = document.getElementById('playerSelect');
   const names = Object.keys(state.players);
-  sel.innerHTML = names.map(n => `<option value="${n}"${n === state.current ? ' selected' : ''}>${n}</option>`).join('') || '<option>—</option>';
+  const placeholder = state.current ? '' : '<option value="" disabled selected hidden>— joueur —</option>';
+  sel.innerHTML = placeholder + (names.map(n => `<option value="${n}"${n === state.current ? ' selected' : ''}>${n}</option>`).join('') || '<option>—</option>');
   sel.onchange = e => {
+    if (!e.target.value) return;
     state.current = e.target.value;
     localStorage.setItem('aetheris.player', state.current);
     notif.load();

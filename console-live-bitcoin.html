@@ -2587,11 +2587,27 @@ async function load() {
       lastBlockSeenAt: previousTip !== result.tip ? Date.now() : (state.bitcoin?.lastBlockSeenAt || Date.now()),
     };
 
-    // Re-injecte les ordres en attente de confirmation on-chain : pour chaque
-    // entrée du cache local dont le tick_cible n'a pas encore été dépassé, on
-    // l'ajoute à player._ordres pour que l'UI montre le pending. Si le tick
-    // est passé (l'ordre a soit été appliqué soit raté), on purge.
+    // Projette les ordres on-chain du prochain tick dans player._ordres pour
+    // que l'UI affiche les chantiers/recherches/constructions pending même
+    // après un refresh complet (où localOrdersCache est vide).
+    // ordersByTick contient TOUS les ordres scannés indexés par tick_cible ;
+    // on prend ceux du tick suivant (= seuls non encore exécutés).
     const tickNow = state.manifest?.tick ?? 0;
+    const tickNext = tickNow + 1;
+    const ordresProchaintick = state.bitcoin.ordersByTick?.[tickNext] || {};
+    for (const [name, entry] of Object.entries(ordresProchaintick)) {
+      if (!state.players[name]) continue;
+      state.players[name]._ordres = {
+        tick_cible: tickNext,
+        ordres: entry.parsed?.ordres || [],
+        nonce: entry.parsed?.nonce,
+      };
+    }
+
+    // Re-injecte les ordres en attente de confirmation on-chain non encore
+    // scannés (push fraîchement émis pas encore dans un bloc). Le local cache
+    // gagne sur on-chain : si l'user a poussé du nouveau, on l'affiche tout
+    // de suite. Sinon le on-chain (ci-dessus) prend le relais après scan.
     for (const [name, cached] of Object.entries(localOrdersCache)) {
       if (cached.tick_cible > tickNow && state.players[name]) {
         state.players[name]._ordres = cached;

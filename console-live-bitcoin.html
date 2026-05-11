@@ -2262,7 +2262,7 @@ const state = {
   galaxie: null,
   rules: null,
   players: {},
-  current: (new URLSearchParams(location.search).get('joueur')) || localStorage.getItem('aetheris.player') || null,
+  current: null, // résolu dans render() par la pubkey Schnorr du wallet
   view: localStorage.getItem('aetheris.view') || 'overview',
   source: 'bitcoin',
   pending: new Set(),
@@ -2279,8 +2279,6 @@ const state = {
   identites: {},
   reports: { intelByPlayer: {}, alertsByPlayer: {}, battles: [] },
 };
-// Sync URL-derived player to localStorage pour les refresh suivants.
-if (state.current) localStorage.setItem('aetheris.player', state.current);
 
 // Repo et branche canoniques — hardcodes. Ils ne sont plus exposes dans l'UI
 // pour eviter qu'un joueur pointe par erreur vers son propre fork.
@@ -2582,14 +2580,9 @@ async function load() {
       }
     }
 
-    // Garde le joueur courant s'il est encore dans la liste.
-    // Ne sélectionne PAS automatiquement le 1er joueur pour les visiteurs anonymes :
-    // un visiteur sans joueur dans l'URL ni localStorage verrait sinon l'empire
-    // d'un autre joueur par défaut.
+    // Le joueur courant est résolu dans render() par la pubkey du wallet.
+    // On ne touche pas state.current ici — render() le verrouille.
     const playerNames = Object.keys(state.players);
-    if (state.current && !state.players[state.current]) {
-      state.current = null;
-    }
 
     showStatus(`✓ tick ${state.manifest.tick} · ${playerNames.length} empire(s) · bloc ${state.bitcoin.tip}`);
     document.getElementById('err').classList.remove('on');
@@ -2740,23 +2733,22 @@ function render() {
   document.getElementById('srv').textContent = m ? m.serveur : '—';
   document.getElementById('seed').textContent = m ? String(m.seed).slice(0, 10) + '…' : '—';
   document.getElementById('hash').textContent = m && m.hash_etat ? String(m.hash_etat).slice(7, 19) : '—';
+  // Identité verrouillée sur la pubkey Schnorr du wallet : seul ton propre
+  // empire est accessible. Sans wallet, la console est en lecture seule (rien).
+  const walletPk = state.wallet?.pubKeyHex;
+  const authorizedPlayer = walletPk ? playerByPubkey(walletPk) : null;
+  if (authorizedPlayer) state.current = authorizedPlayer;
+  else state.current = null;
+
   document.getElementById('whoLabel').innerHTML = state.current
     ? `${state.current}<small>commandant</small>`
     : `—`;
 
-  // player select
+  // Dropdown masqué : le joueur est déterminé exclusivement par le wallet.
   const sel = document.getElementById('playerSelect');
-  const names = Object.keys(state.players);
-  const placeholder = state.current ? '' : '<option value="" disabled selected hidden>— joueur —</option>';
-  sel.innerHTML = placeholder + (names.map(n => `<option value="${n}"${n === state.current ? ' selected' : ''}>${n}</option>`).join('') || '<option>—</option>');
-  sel.onchange = e => {
-    if (!e.target.value) return;
-    state.current = e.target.value;
-    localStorage.setItem('aetheris.player', state.current);
-    notif.load();
-    render();
-    try { detectNotifs(); } catch {}
-  };
+  sel.innerHTML = '';
+  sel.style.display = 'none';
+  sel.onchange = null;
 
   const emp = state.players[state.current];
   const p = emp && (emp.planetes || [])[0];

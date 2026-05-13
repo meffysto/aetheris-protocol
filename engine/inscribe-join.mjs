@@ -12,9 +12,11 @@ import { spawnSync } from 'node:child_process';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
 const playerArg = args[args.indexOf('--player') + 1];
+const keyIdx = args.indexOf('--key');
+const keyArg = keyIdx >= 0 ? args[keyIdx + 1] : null;
 
 if (!playerArg) {
-  console.error('Usage: node engine/inscribe-join.mjs --player <nom> [--network mutinynet]');
+  console.error('Usage: node engine/inscribe-join.mjs --player <nom> [--key <path>] [--network mutinynet]');
   process.exit(1);
 }
 
@@ -55,10 +57,10 @@ async function main() {
   console.log('');
 
   // Lance inscribe.mjs
-  const result = spawnSync('node', [
-    path.join(ROOT, 'engine/inscribe.mjs'),
-    tmpPath,
-  ], {
+  const inscribeArgs = [path.join(ROOT, 'engine/inscribe.mjs')];
+  if (keyArg) inscribeArgs.push('--key', keyArg);
+  inscribeArgs.push(tmpPath);
+  const result = spawnSync('node', inscribeArgs, {
     cwd: ROOT,
     stdio: 'inherit',
     env: { ...process.env },

@@ -1,0 +1,23 @@
+# Configuration de l'agent Aurora — relue à chaque cycle.
+# Commit + push de ce fichier = la prochaine itération applique. Pas de restart.
+#
+# Stratégies disponibles : eco, turtle (voir agents/strategies/*.mjs).
+
+strategie: eco
+
+# Priorités optionnelles (la stratégie utilise ses défauts si omises).
+priorites_batiments:
+  - mine_ferrum
+  - extracteur_lumen
+  - synthetiseur_plasmide
+  - centrale_solaire
+  - depot
+  - usine_robotique
+  - laboratoire
+
+priorites_recherche:
+  - robotique
+  - automation_miniere
+  - fusion_controlee
+  - drives_impulsion
+  - armement

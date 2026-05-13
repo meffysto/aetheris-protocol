@@ -34,9 +34,12 @@ export {
 const ROOT = path.resolve(import.meta.dirname, '..');
 
 async function main() {
-  const yamlPath = process.argv[2];
+  const argv = process.argv.slice(2);
+  const keyIdx = argv.indexOf('--key');
+  const keyFile = keyIdx >= 0 ? argv[keyIdx + 1] : (process.env.AETH_KEY_FILE ?? path.join(ROOT, '.btc-key'));
+  const yamlPath = argv.find((a, i) => !a.startsWith('--') && (i === 0 || argv[i - 1] !== '--key'));
   if (!yamlPath) {
-    console.error('Usage: node engine/inscribe.mjs <ordres.yaml>');
+    console.error('Usage: node engine/inscribe.mjs [--key <path>] <ordres.yaml>');
     process.exit(1);
   }
 
@@ -44,7 +47,7 @@ async function main() {
   const feeRate = Number(process.env.AETH_FEE_RATE ?? '1');
 
   const yamlText = await fs.readFile(path.resolve(process.cwd(), yamlPath), 'utf8');
-  const keyData = JSON.parse(await fs.readFile(path.join(ROOT, '.btc-key'), 'utf8'));
+  const keyData = JSON.parse(await fs.readFile(path.resolve(keyFile), 'utf8'));
 
   if (keyData.network !== networkName && networkName !== 'mutinynet') {
     console.warn(`⚠ Attention: .btc-key est pour ${keyData.network}, AETH_NETWORK=${networkName}`);

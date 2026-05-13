@@ -1,18 +1,31 @@
 name: agent-aurora
 
-# NPC scripté qui joue automatiquement chaque tick.
-# Stratégie : eco-only (cf. agents/baseline.py).
+# Aurora — agent IA 100% autonome.
 #
-# Déclenchement : enchaîne après chaque aetheris-tick réussi.
-# Aurora écrit alors ses ordres pour tick+1, qui seront résolus au tick suivant.
-# (Pas de schedule cron — les triggers cron de GitHub Actions sont unreliable,
-# et le tick lui-même est piloté par engine/oauth-proxy/worker.js.)
+# Mode Bitcoin-native : Aurora possède un wallet taproot Mutinynet
+# (joueurs/aurora/.btc-key.json restauré depuis un secret GitHub) et inscrit
+# ses ordres directement sur la chain via engine/inscribe-core.mjs, comme
+# n'importe quel joueur humain. La pubkey Schnorr de son wallet est
+# l'identité que le moteur (boot-bitcoin) reconnaît.
+#
+# Kill switch : pose un fichier `agents/.killswitch-aurora` dans le repo
+# (commit + push), ou ajoute le secret `AURORA_KILL=1`. Le job sortira
+# proprement au prochain cycle.
+#
+# Déclenchement : workflow_run après chaque tick réussi + dispatch manuel.
+# Le job tourne UN SEUL cycle par invocation (max-iter=1) — la cadence
+# globale est donc la cadence des ticks (~15 min sur Mutinynet).
 
 on:
   workflow_run:
     workflows: ["aetheris-tick"]
     types: [completed]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Décider sans inscrire (dry-run)"
+        type: boolean
+        default: false
 
 concurrency:
   group: agent-aurora
@@ -20,64 +33,51 @@ concurrency:
 
 jobs:
   play:
-    # Skip si le tick a foiré (workflow_run se déclenche aussi sur failure).
-    # workflow_dispatch n'a pas de workflow_run.conclusion → toujours OK.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: bitcoin/mvp
+
+      - name: Honor in-repo kill switch
+        run: |
+          if [ -f agents/.killswitch-aurora ]; then
+            echo "✗ kill switch présent dans le repo — sortie sans jouer."
+            exit 0
+          fi
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - name: Install deps
+        run: npm ci || npm install
 
-      - name: Install pyyaml
-        run: pip install pyyaml
-
-      - name: Restore private key from secret
+      - name: Restore Aurora wallet from secret
         env:
-          AURORA_PRIVATE_KEY: ${{ secrets.AURORA_PRIVATE_KEY }}
+          AURORA_BTC_KEY: ${{ secrets.AURORA_BTC_KEY }}
         run: |
-          if [ -z "$AURORA_PRIVATE_KEY" ]; then
-            echo "✗ Secret AURORA_PRIVATE_KEY manquant"
+          if [ -z "$AURORA_BTC_KEY" ]; then
+            echo "✗ Secret AURORA_BTC_KEY manquant (JSON du wallet taproot)"
             exit 1
           fi
-          printf '%s' "$AURORA_PRIVATE_KEY" > joueurs/aurora/.key.pem
-          chmod 600 joueurs/aurora/.key.pem
+          mkdir -p joueurs/aurora
+          printf '%s' "$AURORA_BTC_KEY" > joueurs/aurora/.btc-key.json
+          chmod 600 joueurs/aurora/.btc-key.json
 
-      - name: Decide & write orders
-        run: python3 agents/baseline.py --player aurora --apply
+      - name: Run one autonomous cycle
+        env:
+          AETH_NETWORK: mutinynet
+          AURORA_POLL_SEC: "1"
+          AURORA_MAX_ITER: "1"
+          AURORA_MAX_SATS_SPENT: "5000"
+          AURORA_KILL: ${{ secrets.AURORA_KILL || '' }}
+          AURORA_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '' }}
+        run: node agents/aurora-autonomous.mjs --player aurora
 
-      - name: Sign orders
-        run: node engine/sign.mjs joueurs/aurora/ordres.yaml
-
-      - name: Wipe private key
+      - name: Wipe wallet
         if: always()
-        run: rm -f joueurs/aurora/.key.pem
-
-      - name: Commit & push
-        run: |
-          git config user.name "aurora-bot"
-          git config user.email "aurora@aetheris.local"
-          if git diff --quiet joueurs/aurora/ordres.yaml; then
-            echo "Aucun changement — pas de commit."
-            exit 0
-          fi
-          git add joueurs/aurora/ordres.yaml
-          TICK=$(grep '^tick_cible:' joueurs/aurora/ordres.yaml | awk '{print $2}')
-          git commit -m "aurora: tour $TICK (baseline)"
-          # Retry avec rebase si le tick worker a poussé entre-temps
-          for i in 1 2 3; do
-            if git push; then exit 0; fi
-            echo "push échoué (essai $i) — rebase et retry"
-            git pull --rebase origin main
-          done
-          exit 1
+        run: rm -f joueurs/aurora/.btc-key.json

@@ -438,7 +438,13 @@ export async function runTick({
               const temp = tempK / 100;
               thermal = Math.max(0.5, 1.44 - 0.004 * temp);
             }
-            const prod = Math.floor(base * niv * Math.pow(1.1, niv) * bonus * thermal);
+            // Recherche `automation_miniere` : +10%/niv sur la production des
+            // mines/extracteurs/synthétiseurs. Figé au moment de la complétion
+            // du chantier (cohérent avec le design existant : production_par_utj
+            // est snapshotté ici, pas recalculé chaque tick).
+            const nivAutomation = (emp.recherche || {}).automation_miniere || 0;
+            const factAutomation = 1 + 0.10 * nivAutomation;
+            const prod = Math.floor(base * niv * Math.pow(1.1, niv) * bonus * thermal * factAutomation);
             if (planete.ressources?.[res]) {
               planete.ressources[res].production_par_utj = prod;
             }

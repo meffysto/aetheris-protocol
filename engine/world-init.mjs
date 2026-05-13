@@ -28,7 +28,10 @@ function parseArgs() {
 const args = parseArgs();
 const ROOT = path.resolve('.');
 const NB_SYSTEMES = parseInt(args.systemes || 1, 10);
-const SERVEUR = args.serveur || 'aetheris-1';
+// Serveur lu depuis genesis.yaml (autoritaire) — override possible via --serveur.
+const genesisHeader = fs.readFileSync(path.join(ROOT, 'genesis/genesis.yaml'), 'utf8');
+const serveurMatch = genesisHeader.match(/^serveur:\s*(\S+)/m);
+const SERVEUR = args.serveur || serveurMatch?.[1] || 'aetheris-1';
 
 if (!args.confirm) {
   console.error('✗ Cette commande wipe joueurs/, history/, world/events/.');
@@ -65,7 +68,13 @@ console.log('▸ Wipe terminé');
 
 // 2. Galaxie : NB_SYSTEMES systèmes en galaxie 1, positions 1..15
 const types = ['tellurique', 'cristalline', 'volcanique', 'glacee', 'gazeuse'];
-const seed = '0x' + crypto.randomBytes(8).toString('hex');
+// Seed = pubkey du fondateur depuis genesis.yaml (inscrit on-chain).
+// Garantit qu'un auditeur peut régénérer la même galaxie depuis la TX Bitcoin
+// seule, sans dépendre du serveur Codeberg. Trustless on-chain.
+const genesisRaw = fs.readFileSync(path.join(ROOT, 'genesis/genesis.yaml'), 'utf8');
+const seedMatch = genesisRaw.match(/^seed:\s*(\S+)/m);
+if (!seedMatch) throw new Error('genesis.yaml: champ seed introuvable');
+const seed = seedMatch[1];
 // PRNG xoshiro128** seeded
 let s0, s1, s2, s3;
 {

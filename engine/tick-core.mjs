@@ -735,7 +735,9 @@ export async function runTick({
     const niveauUsine = planete.batiments?.usine_robotique || 0;
     const bonusUsine = rules.batiments?.usine_robotique?.bonus_vitesse_par_niveau ?? 0.10;
     const bonusChantier = rules.batiments?.chantier_spatial?.bonus_vitesse_par_niveau ?? 0.10;
-    const vitesse = 1 + bonusChantier * niveauChantier + bonusUsine * niveauUsine;
+    // Recherche `robotique` : +5%/niv sur la vitesse de construction (additive).
+    const nivRobotique = (emp.recherche || {}).robotique || 0;
+    const vitesse = 1 + bonusChantier * niveauChantier + bonusUsine * niveauUsine + 0.05 * nivRobotique;
     const dureeUTJ = Math.max(1, Math.ceil((def.duree_utj || 1) * qty / vitesse));
 
     planete.file_construction = planete.file_construction || [];
@@ -965,7 +967,9 @@ export async function runTick({
     // appliquée aux vaisseaux (tick-core.mjs:738).
     const bonusUsineBat = rules.batiments?.usine_robotique?.bonus_vitesse_par_niveau ?? 0;
     const niveauUsineBat = planete.batiments?.usine_robotique || 0;
-    const vitesseBat = 1 + bonusUsineBat * niveauUsineBat;
+    // Recherche `robotique` : +5%/niv sur la vitesse de chantier (additive).
+    const nivRobotiqueBat = (emp.recherche || {}).robotique || 0;
+    const vitesseBat = 1 + bonusUsineBat * niveauUsineBat + 0.05 * nivRobotiqueBat;
     const dureeUTJ = ((def.duree_base_utj || 1) * Math.pow(def.multiplicateur_duree || 1.5, niveauActuel)) / vitesseBat;
     planete.file_chantier = planete.file_chantier || [];
     planete.file_chantier.push({ batiment: action.batiment, niveau_cible: action.niveau_cible, fin_utj: Math.ceil(dureeUTJ) });

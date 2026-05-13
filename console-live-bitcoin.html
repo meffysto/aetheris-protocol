@@ -1736,6 +1736,187 @@ body.tick-pulsed::after {
 .pos.planete.enemy:hover { border-color: var(--phosphor); background: rgba(168,58,37,0.08); box-shadow: 0 0 0 2px rgba(168,58,37,0.18); }
 .pos.planete.enemy:hover .dot { box-shadow: 0 0 0 2px var(--phosphor), 0 0 8px var(--phosphor) !important; }
 
+/* ─── motion layer — UI inchangée, uniquement du feedback ─── */
+:root {
+  --motion-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.shell { animation: ui-enter 420ms var(--motion-out) both; }
+.head { animation: header-enter 360ms var(--motion-out) both; }
+.strip { animation: strip-enter 420ms var(--motion-out) 70ms both; }
+.nav { animation: rail-enter 460ms var(--motion-out) 110ms both; }
+.rail { animation: rail-enter 460ms var(--motion-out) 150ms both; }
+
+.planet-bar,
+.planet-head,
+.bulletin,
+.tbl,
+.empty-stamp,
+.system,
+.rail .group {
+  animation: panel-enter 440ms var(--motion-out) both;
+}
+
+.bcard {
+  animation: card-enter 420ms var(--motion-out) both;
+}
+.bcard:nth-child(2) { animation-delay: 35ms; }
+.bcard:nth-child(3) { animation-delay: 70ms; }
+.bcard:nth-child(4) { animation-delay: 105ms; }
+.bcard:nth-child(5) { animation-delay: 140ms; }
+.bcard:nth-child(6) { animation-delay: 175ms; }
+.bcard:nth-child(7) { animation-delay: 210ms; }
+.bcard:nth-child(8) { animation-delay: 245ms; }
+
+.brand .mark,
+.res .ico,
+.bell,
+.gear-btn,
+.src-btn,
+.nav button,
+.bcard,
+.qitem,
+.pos,
+.dec-btn,
+.mission-modal .seg-pick button {
+  will-change: transform;
+}
+
+.brand .mark {
+  animation: mark-settle 520ms var(--motion-out) 120ms both;
+}
+.nav button {
+  transition: background .15s var(--motion-fast), color .15s var(--motion-fast), transform .15s var(--motion-fast), box-shadow .15s var(--motion-fast);
+}
+.nav button:hover { transform: translateX(2px); }
+.nav button:active { transform: translateX(1px) scale(0.99); }
+
+.bcard {
+  transition: transform .16s var(--motion-fast), box-shadow .16s var(--motion-fast), filter .16s var(--motion-fast);
+}
+.bcard:active { transform: translateY(0) scale(0.995); }
+.bcard:hover .codex-img { animation: sprite-lift 900ms var(--motion-out) both; }
+
+.res .stock,
+.tick-block .value,
+.qitem .tgt,
+.bcard .lvl {
+  transition: color .18s var(--motion-fast), text-shadow .18s var(--motion-fast), transform .18s var(--motion-fast);
+}
+.res:hover .stock,
+.bcard:hover .lvl {
+  transform: translateY(-1px);
+}
+
+.qitem {
+  overflow: hidden;
+  transition: transform .16s var(--motion-fast), box-shadow .16s var(--motion-fast), opacity .16s var(--motion-fast);
+}
+.qitem:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(28,20,8,0.06); }
+.qitem.pending { animation: pending-breathe 2.8s ease-in-out infinite; }
+.qitem .tprog i { overflow: hidden; }
+.qitem .tprog i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  transform: translateX(-120%);
+  animation: progress-sheen 2.6s var(--motion-out) infinite;
+}
+
+.bcard .queue {
+  position: relative;
+  overflow: hidden;
+}
+.bcard .queue::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 0 38%, rgba(255,255,255,0.42) 48%, transparent 58% 100%);
+  transform: translateX(-120%);
+  animation: queue-sheen 4.2s var(--motion-out) infinite;
+  pointer-events: none;
+}
+
+.foot .live i {
+  animation: uplink-breathe 2.2s ease-in-out infinite;
+}
+.bell:not(.silent) {
+  animation: bell-attention 3.6s ease-in-out infinite;
+}
+.pos.planete .dot {
+  animation: planet-idle 4.8s ease-in-out infinite;
+}
+
+@keyframes ui-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes header-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes strip-enter {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rail-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes mark-settle {
+  from { opacity: 0; transform: scale(0.88) rotate(-4deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes sprite-lift {
+  0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 0 rgba(168,58,37,0)); }
+  45% { transform: translateY(-2px); filter: drop-shadow(0 8px 10px rgba(168,58,37,0.16)); }
+}
+@keyframes pending-breathe {
+  0%, 100% { box-shadow: 0 0 0 rgba(14,29,51,0); }
+  50% { box-shadow: 0 0 0 3px rgba(14,29,51,0.045); }
+}
+@keyframes progress-sheen {
+  0%, 44% { transform: translateX(-120%); }
+  86%, 100% { transform: translateX(120%); }
+}
+@keyframes queue-sheen {
+  0%, 58% { transform: translateX(-120%); }
+  88%, 100% { transform: translateX(120%); }
+}
+@keyframes uplink-breathe {
+  0%, 100% { opacity: 0.65; box-shadow: 0 0 0 3px rgba(90,122,58,0.18); }
+  50% { opacity: 1; box-shadow: 0 0 0 7px rgba(90,122,58,0); }
+}
+@keyframes bell-attention {
+  0%, 100% { transform: translateY(0); }
+  45% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+  55% { transform: translateY(0); }
+}
+@keyframes planet-idle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.16); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* mission modal */
 .mission-modal { width: 620px; }
 .mission-modal .seg-pick { display: flex; gap: 6px; margin-bottom: 4px; }
@@ -3224,8 +3405,16 @@ function batTooltip(k, lvl, p) {
 
 function renderBatGrid(p, max) {
   const all = Object.entries(p.batiments || {});
+  // ETA cumulé : chaque chantier en position N attend que les N-1 précédents
+  // se terminent. tick-core ne décrémente que file[0].fin_utj — donc fin_utj
+  // d'un chantier en queue représente sa durée propre, pas son ETA absolu.
   const queueMap = {};
-  for (const c of (p.file_chantier || [])) queueMap[c.batiment] = c;
+  let cumulUtj = 0;
+  let queueIdx = 0;
+  for (const c of (p.file_chantier || [])) {
+    cumulUtj += Math.max(0, c.fin_utj || 0);
+    queueMap[c.batiment] = { ...c, _etaUtj: cumulUtj, _queueIdx: queueIdx++ };
+  }
   const list = max ? all.slice(0, max) : all;
   if (list.length === 0) return `<div class="empty-stamp">néant</div>`;
 
@@ -3245,10 +3434,11 @@ function renderBatGrid(p, max) {
     const ico = codexImg(k, labels[k]) || icons[k] || icons.default_b;
     let footer = '';
     if (q) {
-      const remain = Math.max(0, q.fin_utj || 0);
+      const remain = Math.max(0, q._etaUtj ?? q.fin_utj ?? 0);
       const eta = chantierETA(remain);
+      const filePrefix = q._queueIdx > 0 ? `<span style="color:var(--brass);font-weight:600">file #${q._queueIdx + 1}</span> · ` : '';
       footer = `<div class="queue"><span class="pulse"></span>
-        ouvrage · niv ${q.niveau_cible} · <b style="color:var(--phosphor)">cycle ${eta.tickArrivee}</b> <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
+        ${filePrefix}ouvrage · niv ${q.niveau_cible} · <b style="color:var(--phosphor)">cycle ${eta.tickArrivee}</b> <span style="color:var(--bone-dim)">≈ ${eta.mins} min</span></div>`;
     } else if (pend) {
       footer = `<div class="queue" style="background:rgba(196,180,138,0.18);color:var(--brass)">
         <span class="pulse" style="background:var(--brass);box-shadow:0 0 0 0 rgba(196,180,138,0.6)"></span>

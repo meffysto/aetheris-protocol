@@ -61,14 +61,26 @@ body {
   text-rendering: geometricPrecision;
   overflow: hidden;
   background-image:
+    radial-gradient(ellipse 90% 60% at 15% -5%, rgba(255,250,235,0.7), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168,90,40,0.06), transparent 60%),
+    linear-gradient(180deg, #f6efde 0%, #ece1c6 100%);
+}
+/* En vue Galaxie : gradient parchment → navy pour révéler le parallax céleste */
+body[data-view="galaxie"] {
+  background-image:
     radial-gradient(ellipse 85% 72% at 15% -5%, rgba(244,236,220,0.88), transparent 52%),
     radial-gradient(ellipse 55% 46% at 88% 18%, rgba(168,58,37,0.18), transparent 58%),
     radial-gradient(ellipse 70% 58% at 55% 92%, rgba(14,29,51,0.92), transparent 62%),
     linear-gradient(155deg, #f2e8cf 0%, #d9c9a5 36%, #0e1d33 100%);
 }
-/* Carte céleste animée — grain cartographique drift lent */
+/* very faint cartographic grain */
 body::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><g fill='none' stroke='%23000' stroke-width='0.4' opacity='0.04'><circle cx='150' cy='200' r='80'/><circle cx='450' cy='350' r='120'/><circle cx='300' cy='100' r='60'/><circle cx='100' cy='500' r='100'/><path d='M0 300 Q 150 280 300 320 T 600 300'/><path d='M0 150 Q 200 130 400 170 T 600 150'/></g></svg>");
+  background-size: 700px 700px;
+}
+/* En vue Galaxie : grain cartographique élargi avec sky-drift animation */
+body[data-view="galaxie"]::before {
   background-image:
     radial-gradient(circle at 13% 18%, rgba(255,255,255,0.72) 0 1px, transparent 1.6px),
     radial-gradient(circle at 72% 28%, rgba(255,255,255,0.55) 0 1px, transparent 1.5px),
@@ -81,13 +93,22 @@ body::before {
 }
 body::after {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+  mix-blend-mode: multiply;
+  opacity: 0.10;
+}
+body[data-view="galaxie"]::after {
   background-image:
     radial-gradient(ellipse 45% 38% at 62% 38%, rgba(168,58,37,0.17), transparent 66%),
     radial-gradient(ellipse 70% 64% at 48% 92%, rgba(5,9,16,0.66), transparent 58%),
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
-  mix-blend-mode: multiply;
   opacity: 0.22;
 }
+/* Parallax masqué hors vue Galaxie */
+.astro-parallax { display: none; }
+body[data-view="galaxie"] .astro-parallax { display: block; }
+/* En galaxie, le strip cream devient transparent pour laisser passer le ciel */
+body[data-view="galaxie"] .strip { background: rgba(247, 240, 223, 0.18); }
 
 @keyframes sky-drift {
   from { background-position: 0 0, 120px 70px, 30px 160px, center 44%; }
@@ -4527,6 +4548,9 @@ function renderRail(p, emp) {
 
 /* ───────────────────────────── View switching ───────────────────────────── */
 function applyView() {
+  // Propage la vue courante au <body> pour les sélecteurs CSS scoped
+  // (e.g. parallax céleste actif uniquement en vue Galaxie).
+  document.body.dataset.view = state.view || '';
   document.querySelectorAll('.nav button').forEach(b => {
     b.classList.toggle('on', b.dataset.view === state.view);
   });

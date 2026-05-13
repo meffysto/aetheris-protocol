@@ -116,12 +116,21 @@ function cloneSide(s) {
   };
 }
 
+// Multiplicateur dreadnought lié à la recherche `distorsion_subluminique` :
+// +20%/niv sur coque, bouclier et attaque du dreadnought uniquement.
+// Stacke multiplicativement avec armement / bouclier_graviton.
+function dreadBonus(type, tech) {
+  if (type !== 'dreadnought') return 1.0;
+  return 1 + 0.20 * (tech.distorsion_subluminique || 0);
+}
+
 function initHullPool(side, rules) {
   for (const [type, count] of Object.entries(side.ships)) {
     const def = getUnitDef(rules, type);
     if (!def) continue;
     const techArmor = 1 + 0.10 * (side.tech.armement || 0);
-    side.hullPool[type] = count * def.coque * techArmor;
+    const dread = dreadBonus(type, side.tech);
+    side.hullPool[type] = count * def.coque * techArmor * dread;
   }
 }
 
@@ -150,12 +159,13 @@ function computeFire(attackerSide, defenderSide, rules) {
     if (atkCount <= 0) continue;
     const def = getUnitDef(rules, atkType);
     if (!def || !def.attaque) continue;
+    const dread = dreadBonus(atkType, attackerSide.tech);
 
     for (const [tgtType, tgtCount] of Object.entries(defenderSide.ships)) {
       if (tgtCount <= 0) continue;
       const bonus = def.bonus_contre?.[tgtType] || 1.0;
       const shots = atkCount * (tgtCount / totalDef);
-      fire[tgtType] = (fire[tgtType] || 0) + shots * def.attaque * techAtk * bonus;
+      fire[tgtType] = (fire[tgtType] || 0) + shots * def.attaque * techAtk * dread * bonus;
     }
   }
   return fire;
@@ -174,13 +184,14 @@ function applyDamage(side, damageMap, rules, rng) {
     const count = side.ships[type] || 0;
     if (count === 0) continue;
 
-    const shieldPool = count * def.bouclier * techShield;
+    const dread = dreadBonus(type, side.tech);
+    const shieldPool = count * def.bouclier * techShield * dread;
     const hullDamage = Math.max(0, dmg - shieldPool);
 
-    side.hullPool[type] = (side.hullPool[type] || count * def.coque * techArmor) - hullDamage;
+    side.hullPool[type] = (side.hullPool[type] || count * def.coque * techArmor * dread) - hullDamage;
     if (side.hullPool[type] < 0) side.hullPool[type] = 0;
 
-    const hullPerShip = def.coque * techArmor;
+    const hullPerShip = def.coque * techArmor * dread;
     const aliveAfterPool = Math.ceil(side.hullPool[type] / hullPerShip);
     const fullKills = Math.max(0, count - aliveAfterPool);
     let totalKills = fullKills;

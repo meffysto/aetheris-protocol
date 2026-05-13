@@ -128,9 +128,9 @@ export function queueColonisation(emp, action, ctx) {
   const cibleCoords = [g, s, p];
   const distance = computeDistanceToCoords(action.depuis, cibleCoords, playerName);
   // La vitesse limite la flotte = min des vitesses (déjà la convention transport).
-  // Recherche `drives_impulsion` : +5%/niv pour les vaisseaux sub-FTL (défaut).
-  // drive_hyperspatial sera branché dans un commit suivant.
-  const SHIPS_FTL = new Set();
+  // Recherches `drives_impulsion` (sub-FTL) et `drive_hyperspatial` (FTL) :
+  // +5%/niv. vaisseau_colon est FTL ; cargo_lourd est sub-FTL.
+  const SHIPS_FTL = new Set(['cuirasse', 'vaisseau_colon', 'recycleur']);
   const rech = emp.recherche || {};
   const vMin = Math.min(
     ...Object.keys(flotte).map(ship => {

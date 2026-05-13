@@ -264,10 +264,11 @@ export async function runTick({
   manifest.sealedPending = manifest.sealedPending || {};
 
   // Vitesse effective d'un vaisseau, en tenant compte des recherches.
-  //   - drives_impulsion : +5%/niv pour les vaisseaux sub-FTL (défaut)
-  // (Le tech drive_hyperspatial pour les FTL sera branché dans un commit
-  // suivant ; SHIPS_FTL est vide ici pour rester strictement additif.)
-  const SHIPS_FTL = new Set();
+  //   - drives_impulsion : +5%/niv pour les vaisseaux sub-FTL
+  //   - drive_hyperspatial : +5%/niv pour les vaisseaux long-range (FTL)
+  // Liste explicite des vaisseaux FTL (rules.yaml ne classifie pas par catégorie ;
+  // ce sont les vaisseaux long-range qui requièrent drive_hyperspatial).
+  const SHIPS_FTL = new Set(['cuirasse', 'vaisseau_colon', 'recycleur']);
   function shipSpeed(shipType, emp) {
     const base = rules.vaisseaux?.[shipType]?.vitesse || 1000;
     if (!emp) return base;

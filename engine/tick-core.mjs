@@ -1349,13 +1349,19 @@ export async function runTick({
 
     const sondesLancees = fleet.composition.sonde || 0;
     const techDef = (defEmp.recherche || {}).espionnage_profond || 0;
+    // Recherche `cryptographie` (défenseur) : -10%/niv visibilité aux sondes
+    // ennemies. Implémentée comme un boost effectif du tech de contre-espionnage
+    // dans le calcul du diff (chaque niveau ajoute 4 unités de seuil, soit la
+    // même contribution qu'un niveau d'espionnage_profond). Ne tue pas de sondes
+    // supplémentaires (pas de double contre-espionnage), mais durcit les paliers.
+    const techCrypto = (defEmp.recherche || {}).cryptographie || 0;
     const probaKill = rules.espionnage?.proba_destruction_par_niveau ?? 0.20;
     let detruites = 0;
     for (let i = 0; i < techDef; i++) if (rng() < probaKill) detruites++;
     detruites = Math.min(detruites, sondesLancees);
     const sondesSurvivantes = sondesLancees - detruites;
 
-    const diff = sondesSurvivantes - techDef * 4;
+    const diff = sondesSurvivantes - (techDef + techCrypto) * 4;
     const paliers = rules.espionnage?.paliers || [1, 5, 25, 125, 625];
     let niveau = 0;
     for (const seuil of paliers) { if (diff >= seuil) niveau++; else break; }

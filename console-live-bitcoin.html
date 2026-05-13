@@ -3255,7 +3255,7 @@ function renderBatGrid(p, max) {
         scellé · niv ${pend.niveau_cible} · <b style="color:var(--brass)">prochain cycle</b></div>`;
     } else if (state.rules && batDef(k)) {
       const cost = nextCost(k, lvl);
-      const dur = nextDureeUtj(k, lvl);
+      const dur = nextDureeUtj(k, lvl, p);
       const ticks = utjToTicks(dur);
       const afford = canAfford(p, cost);
       const pending = state.pending.has(k);
@@ -4305,9 +4305,13 @@ function nextCost(batiment, niveauActuel) {
   for (const [k, v] of Object.entries(def.cout_base || {})) out[k] = Math.floor(v * mult);
   return out;
 }
-function nextDureeUtj(batiment, niveauActuel) {
+function nextDureeUtj(batiment, niveauActuel, planete) {
   const def = batDef(batiment); if (!def) return null;
-  return Math.ceil((def.duree_base_utj || 1) * Math.pow(def.multiplicateur_duree || 1.5, niveauActuel));
+  // Vitesse accélérée par usine_robotique (cohérent avec tick-core.mjs:963).
+  const bonusUsine = state.rules?.batiments?.usine_robotique?.bonus_vitesse_par_niveau ?? 0;
+  const niveauUsine = planete?.batiments?.usine_robotique || 0;
+  const vitesse = 1 + bonusUsine * niveauUsine;
+  return Math.ceil(((def.duree_base_utj || 1) * Math.pow(def.multiplicateur_duree || 1.5, niveauActuel)) / vitesse);
 }
 function canAfford(planete, cost) {
   if (!cost) return false;

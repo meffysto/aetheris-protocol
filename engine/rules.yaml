@@ -80,7 +80,7 @@ batiments:
     multiplicateur_cout: 2.0
     duree_base_utj: 2.0
     multiplicateur_duree: 2.0
-    bonus_vitesse_par_niveau: 0.10   # accélère les chantiers de bâtiments
+    bonus_vitesse_par_niveau: 0.10   # accélère chantiers de bâtiments ET vaisseaux
 
   chantier_spatial:
     categorie: militaire

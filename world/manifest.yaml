@@ -1,0 +1,14 @@
+# CITADEL // manifest serveur — généré par world-init.mjs
+version: 1
+protocol_version: 0.2
+serveur: aetheris-1
+tick: 0
+seed: 0x3b88a3468a89965d
+demarrage_iso: 2026-05-13T20:51:47.525Z
+duree_tick_min: 15  # Mutinynet 30s × 30 blocs/tick — cohérent avec genesis.yaml
+parametres:
+  galaxies: 1
+  systemes_par_galaxie: 3
+  positions_par_systeme: 15
+  planetes_max_par_joueur: 9
+hash_etat: sha256:00000000000000000000000000000000

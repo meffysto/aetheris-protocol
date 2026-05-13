@@ -1,0 +1,58 @@
+# CITADEL // galaxie canonique — generée par world-init.mjs
+version: 1
+tick: 0
+systemes:
+  "1:1":
+    etoile: { nom: stelara-1, type: G, temperature_k: 6019 }
+    positions:
+      1: { type: asteroide }
+      2: { type: planete, proprietaire: null, classe: glacee }
+      3: { type: asteroide }
+      4: { type: planete, proprietaire: null, classe: tellurique }
+      5: { type: planete, proprietaire: null, classe: volcanique }
+      6: { type: asteroide }
+      7: { type: planete, proprietaire: null, classe: volcanique }
+      8: { type: planete, proprietaire: null, classe: tellurique }
+      9: { type: asteroide }
+      10: { type: planete, proprietaire: null, classe: cristalline }
+      11: { type: planete, proprietaire: null, classe: glacee }
+      12: { type: planete, proprietaire: null, classe: tellurique }
+      13: { type: asteroide }
+      14: { type: asteroide }
+      15: { type: asteroide }
+  "1:2":
+    etoile: { nom: stelara-2, type: G, temperature_k: 5949 }
+    positions:
+      1: { type: asteroide }
+      2: { type: planete, proprietaire: null, classe: tellurique }
+      3: { type: asteroide }
+      4: { type: asteroide }
+      5: { type: planete, proprietaire: null, classe: tellurique }
+      6: { type: planete, proprietaire: null, classe: tellurique }
+      7: { type: planete, proprietaire: null, classe: volcanique }
+      8: { type: planete, proprietaire: null, classe: volcanique }
+      9: { type: asteroide }
+      10: { type: asteroide }
+      11: { type: asteroide }
+      12: { type: planete, proprietaire: null, classe: volcanique }
+      13: { type: asteroide }
+      14: { type: asteroide }
+      15: { type: asteroide }
+  "1:3":
+    etoile: { nom: stelara-3, type: G, temperature_k: 6829 }
+    positions:
+      1: { type: planete, proprietaire: null, classe: cristalline }
+      2: { type: asteroide }
+      3: { type: asteroide }
+      4: { type: asteroide }
+      5: { type: asteroide }
+      6: { type: asteroide }
+      7: { type: asteroide }
+      8: { type: planete, proprietaire: null, classe: gazeuse }
+      9: { type: asteroide }
+      10: { type: asteroide }
+      11: { type: asteroide }
+      12: { type: asteroide }
+      13: { type: planete, proprietaire: null, classe: tellurique }
+      14: { type: planete, proprietaire: null, classe: tellurique }
+      15: { type: planete, proprietaire: null, classe: gazeuse }

@@ -111,7 +111,7 @@ console.log(`▸ Galaxie : ${NB_SYSTEMES} système(s) générés (1:1 .. 1:${NB_
 // 3. Manifest tick 0
 const manifestYaml = `# CITADEL // manifest serveur — généré par world-init.mjs
 version: 1
-protocol_version: 0.1
+protocol_version: 0.2
 serveur: ${SERVEUR}
 tick: 0
 seed: ${seed}

@@ -305,6 +305,51 @@ export async function runTick({
     manifest.marche.books[k] = restants;
   }
 
+  // ─── Phase 0.5 — Énergie (production, consommation, facteur production) ─
+  // Production = somme(centrale_solaire + reacteur_fusion) par planète.
+  // Consommation = somme(flotte_au_sol × conso_par_utj) + flottes en vol
+  //                (attribuées à la planète d'origine).
+  // Facteur production : si déficit, malus proportionnel sur prod ressources,
+  // floor 50%. Si surplus ou égalité, facteur 1.0.
+  for (const [, emp] of Object.entries(empires)) {
+    const planetByName = {};
+    for (const p of emp.planetes || []) planetByName[p.nom] = p;
+    for (const planete of emp.planetes || []) {
+      let prod = 0;
+      for (const bat of ['centrale_solaire', 'reacteur_fusion']) {
+        const niv = planete.batiments?.[bat] || 0;
+        if (niv <= 0) continue;
+        const base = rules.batiments?.[bat]?.production_base || 0;
+        prod += Math.floor(base * niv * Math.pow(1.1, niv));
+      }
+      let cons = 0;
+      for (const [ship, qty] of Object.entries(planete.flotte_au_sol || {})) {
+        if (qty <= 0) continue;
+        const u = rules.vaisseaux?.[ship]?.consommation_par_utj || 0;
+        cons += u * qty;
+      }
+      planete.energie = { production: prod, consommation: cons, facteur_production: 1.0 };
+    }
+    for (const flt of emp.flottes_en_vol || []) {
+      const orig = planetByName[flt.depuis?.planete];
+      if (!orig?.energie) continue;
+      let cons = 0;
+      for (const [ship, qty] of Object.entries(flt.composition || {})) {
+        if (qty <= 0) continue;
+        const u = rules.vaisseaux?.[ship]?.consommation_par_utj || 0;
+        cons += u * qty;
+      }
+      orig.energie.consommation += cons;
+    }
+    for (const planete of emp.planetes || []) {
+      const e = planete.energie;
+      if (e.consommation > e.production && e.consommation > 0) {
+        const ratio = 1 - (e.consommation - e.production) / e.consommation;
+        e.facteur_production = Math.max(0.5, ratio);
+      }
+    }
+  }
+
   // ─── Phase 1 — Production ──────────────────────────────────────────────
   log(`▸ Phase 1/6 — Production de ressources (×${UTJ_PAR_TICK} UTJ)`);
   const utjParSingularite = rules.singularite?.utj_par_unite || 300;
@@ -317,8 +362,9 @@ export async function runTick({
     const moralActif = (emp.malus_moral_jusqu_tick || 0) >= tickSuivant;
     const factMoral = moralActif ? (1 - malusMoralPct) : 1.0;
     for (const planete of emp.planetes || []) {
+      const factEnergie = planete.energie?.facteur_production ?? 1.0;
       for (const info of Object.values(planete.ressources || {})) {
-        const prod = (info.production_par_utj || 0) * UTJ_PAR_TICK * factMoral;
+        const prod = (info.production_par_utj || 0) * UTJ_PAR_TICK * factMoral * factEnergie;
         info.stock = Math.min((info.stock || 0) + prod, info.capacite || Infinity);
       }
     }
@@ -357,29 +403,6 @@ export async function runTick({
       if (emp.ressources_globales.singularite >= capSingularite) {
         emp.progres_singularite_utj = Math.min(emp.progres_singularite_utj, utjParSingularite - 1);
       }
-    }
-  }
-
-  // ─── Phase 1.5 — Énergie (tracking only — pas de conséquence gameplay) ─
-  // Production par planète = somme(centrale_solaire + reacteur_fusion).
-  // Consommation par planète = somme(flotte_au_sol × consommation_par_utj).
-  // Les flottes en vol seront comptabilisées en epoch 0.3.1.
-  for (const [, emp] of Object.entries(empires)) {
-    for (const planete of emp.planetes || []) {
-      let prod = 0;
-      for (const bat of ['centrale_solaire', 'reacteur_fusion']) {
-        const niv = planete.batiments?.[bat] || 0;
-        if (niv <= 0) continue;
-        const base = rules.batiments?.[bat]?.production_base || 0;
-        prod += Math.floor(base * niv * Math.pow(1.1, niv));
-      }
-      let cons = 0;
-      for (const [ship, qty] of Object.entries(planete.flotte_au_sol || {})) {
-        if (qty <= 0) continue;
-        const u = rules.vaisseaux?.[ship]?.consommation_par_utj || 0;
-        cons += u * qty;
-      }
-      planete.energie = { production: prod, consommation: cons };
     }
   }
 

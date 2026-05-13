@@ -2872,14 +2872,17 @@ function renderResourceStrip(p) {
       <div class="meta ${warn ? 'warn' : ''} ${prod === 0 ? 'zero' : ''}">${warn ? 'plein' : (prod > 0 ? '+' + prod + '/utj' : '—')}</div>
     </div>`;
   }
-  const en = p?.energie || { production: 0, consommation: 0 };
+  const en = p?.energie || { production: 0, consommation: 0, facteur_production: 1.0 };
   const balance = (en.production || 0) - (en.consommation || 0);
-  const enTip = `${descOf('energie')}\nProduction : ${en.production || 0}\nConsommation : ${en.consommation || 0}\nBalance : ${balance >= 0 ? '+' : ''}${balance}`;
+  const fact = en.facteur_production ?? 1.0;
+  const malusPct = fact < 1.0 ? Math.round((1 - fact) * 100) : 0;
+  const enTip = `${descOf('energie')}\nProduction : ${en.production || 0}/UTJ\nConsommation : ${en.consommation || 0}/UTJ\nBalance : ${balance >= 0 ? '+' : ''}${balance}${malusPct > 0 ? `\nMalus production ressources : −${malusPct}%` : ''}`;
+  const metaLabel = balance < 0 ? `−${malusPct}% prod` : 'stable';
   html += `<div class="res" data-r="energie" data-tip="${escapeHtml(enTip)}">
     <div class="ico">${icons.energie}</div>
     <div class="nm">Énergie</div>
     <div class="stock" style="color:${balance < 0 ? 'var(--phosphor)' : 'var(--bone-2)'}">${balance >= 0 ? '+' : ''}${balance}</div>
-    <div class="meta ${balance < 0 ? 'warn' : ''}">${balance < 0 ? 'déficit' : 'stable'}</div>
+    <div class="meta ${balance < 0 ? 'warn' : ''}">${metaLabel}</div>
   </div>`;
   document.getElementById('strip').innerHTML = html;
 }

@@ -7,7 +7,7 @@
 version: 1
 type: join
 serveur: citadel-mvp-1
-protocol_version: 0.1
+protocol_version: 0.2
 tick: 0
 seed: 0x5cb4da974b1fc38ab710729c6c3fba911bb40ab924bca1103cecace80bd5d6b7
 demarrage_iso: 2026-05-09T00:00:00Z

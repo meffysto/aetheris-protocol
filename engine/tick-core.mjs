@@ -381,7 +381,6 @@ export async function runTick({
             const niv = done.niveau_cible;
             const base = def.production_base || 30;
             const bonus = def.bonus_planete?.[planete.type] || 1.0;
-            const baseline = { ferrum: 30, lumen: 20, plasmide: 0 }[res] || 0;
             // Le synthétiseur de plasmide subit l'efficacité thermique de
             // l'étoile-hôte : `temp = temperature_k / 100` ∈ [50,70] →
             // multiplicateur (1.44 − 0.004·temp) ∈ [1.16, 1.24]. Étoiles
@@ -395,7 +394,7 @@ export async function runTick({
             }
             const prod = Math.floor(base * niv * Math.pow(1.1, niv) * bonus * thermal);
             if (planete.ressources?.[res]) {
-              planete.ressources[res].production_par_utj = baseline + prod;
+              planete.ressources[res].production_par_utj = prod;
             }
           }
           // Dépôt : recompute la capacité de chaque ressource en fonction

@@ -100,9 +100,9 @@ function buildInitialState({ seed }) {
       nom: 'sim-prima', coordonnees: [1, 1, 1], type: 'tellurique',
       champs: { utilises: 0, total: 240 },
       ressources: {
-        ferrum:   { stock: 500, production_par_utj: 30, capacite: 100000 },
-        lumen:    { stock: 500, production_par_utj: 20, capacite: 100000 },
-        plasmide: { stock: 0,   production_par_utj: 0,  capacite: 100000 },
+        ferrum:   { stock: 1000, production_par_utj: 0, capacite: 100000 },
+        lumen:    { stock: 500,  production_par_utj: 0, capacite: 100000 },
+        plasmide: { stock: 100,  production_par_utj: 0, capacite: 100000 },
       },
       energie: { production: 0, consommation: 0 },
       batiments: {

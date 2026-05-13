@@ -18,14 +18,14 @@ function buildCitadelScriptHex(opTypeByte, yamlStr) {
   const pubkey = new Uint8Array(32).fill(0xab);
 
   // Construction des bytes du script :
-  //   0x20 <pubkey:32> 0xac 0x00 0x63 0x04 "aeth" 0x01 0x01 0x01 <opType>
+  //   0x20 <pubkey:32> 0xac 0x00 0x63 0x04 "aeth" 0x01 0x02 0x01 <opType>
   //   <push payload> 0x68
   const parts = [];
   parts.push(0x20);
   for (const b of pubkey) parts.push(b);
   parts.push(0xac, 0x00, 0x63);
   parts.push(0x04, 0x61, 0x65, 0x74, 0x68); // "aeth"
-  parts.push(0x01, 0x01);                    // version = 1
+  parts.push(0x01, 0x02);                    // wire version = 2 (epoch 0.2)
   parts.push(0x01, opTypeByte);              // op_type
 
   // Push du payload (PUSHDATA2 si > 75 bytes, sinon OP_DATA_N)

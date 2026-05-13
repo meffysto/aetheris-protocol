@@ -3168,16 +3168,17 @@ function resourceTooltip(res, info) {
 }
 
 // Calcule la production d'une mine à un niveau donné (formule miroir du moteur).
+// Epoch 0.2 : baseline production retiré, formule pure base × niv × 1.1^niv × bonus.
 function simProd(k, lvl, p) {
   const CFG = {
-    mine_ferrum:           { base: 30, baseline: 30, bonusPlanet: { tellurique: 1.30 } },
-    extracteur_lumen:      { base: 20, baseline: 20, bonusPlanet: { cristalline: 1.30 } },
-    synthetiseur_plasmide: { base: 10, baseline: 0,  bonusPlanet: { volcanique: 1.30 } },
+    mine_ferrum:           { base: 30, bonusPlanet: { tellurique: 1.30 } },
+    extracteur_lumen:      { base: 20, bonusPlanet: { cristalline: 1.30 } },
+    synthetiseur_plasmide: { base: 10, bonusPlanet: { volcanique: 1.30 } },
   };
   const cfg = CFG[k];
   if (!cfg || lvl <= 0) return null;
   const bonus = cfg.bonusPlanet[p?.type] || 1.0;
-  return cfg.baseline + Math.floor(cfg.base * lvl * Math.pow(1.1, lvl) * bonus);
+  return Math.floor(cfg.base * lvl * Math.pow(1.1, lvl) * bonus);
 }
 
 // Tooltip plus long pour le hover (attribut title="").

@@ -122,10 +122,12 @@ function extractEnvelope(bytes) {
     let pos = i + marker.length;
 
     // version byte (0x01 = push 1 byte, puis le byte de version)
+    // Epoch 0x02 (rules v0.2) : baseline production retiré, stock initial bump.
+    // Les inscriptions 0x01 sont volontairement ignorées (legacy epoch).
     if (pos + 2 > bytes.length) continue;
     if (bytes[pos] !== 0x01) continue; // push 1 byte
     const versionByte = bytes[pos + 1];
-    if (versionByte !== 0x01) continue; // version 1 uniquement
+    if (versionByte !== 0x02) continue; // wire version 2 uniquement
     pos += 2;
 
     // op_type byte (0x01 = push 1 byte, puis le byte d'optype)

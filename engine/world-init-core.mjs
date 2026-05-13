@@ -69,11 +69,12 @@ export function spawnEmpireFromJoin({ joinData, galaxie, tick = 0, rng }) {
     nom: planetName,
     rng,
   });
-  // Starter pack du nouveau joueur (ne s'applique PAS à la colonisation)
-  planete.ressources.ferrum.stock = 500;
-  planete.ressources.ferrum.production_par_utj = 30;
+  // Starter pack du nouveau joueur (ne s'applique PAS à la colonisation).
+  // Production = 0 jusqu'à la première mine/extracteur/synthétiseur (symétrie
+  // avec les colonies). Stock initial compense le tick 1 sans production.
+  planete.ressources.ferrum.stock = 1000;
   planete.ressources.lumen.stock = 500;
-  planete.ressources.lumen.production_par_utj = 20;
+  planete.ressources.plasmide.stock = 100;
 
   const empire = {
     version: 1,

@@ -29,11 +29,14 @@ export const OP_TYPES = { join: 0x01, order: 0x02, sealed: 0x03, reveal: 0x04 };
 
 /**
  * Tapscript envelope :
- *   <pubkey> OP_CHECKSIG OP_FALSE OP_IF "aeth" 0x01 <op_type> <gzip(yaml)> OP_ENDIF
+ *   <pubkey> OP_CHECKSIG OP_FALSE OP_IF "aeth" 0x02 <op_type> <gzip(yaml)> OP_ENDIF
+ *
+ * Wire version 0x02 = epoch des règles 0.2 (baseline production retiré).
+ * Scanner refuse les inscriptions 0x01 (legacy).
  */
 export function buildEnvelopeScript(gzippedYaml, opTypeByte, signerPubKey, Script) {
   const tag = new TextEncoder().encode('aeth');
-  const version = new Uint8Array([0x01]);
+  const version = new Uint8Array([0x02]);
   const opType = new Uint8Array([opTypeByte]);
 
   const MAX_PUSH = 520;

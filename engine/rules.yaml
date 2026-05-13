@@ -16,8 +16,11 @@ batiments:
     multiplicateur_cout: 1.5
     duree_base_utj: 1.0
     multiplicateur_duree: 1.5
-    production_base: 30      # ferrum/UTJ au niv 1
-    formule_production: "30 * niveau * 1.1^niveau"
+    production_base: 30      # coefficient de la formule (PAS la prod niv 1)
+    # Production effective au niv N en ferrum/UTJ :
+    #   floor(production_base * N * 1.1^N * bonus_planete)
+    # Exemples : niv 1 = 33 Fe/UTJ ; niv 1 tellurique = 42 ; niv 5 = 242.
+    formule_production: "30 * niveau * 1.1^niveau * bonus_planete"
     bonus_planete: { tellurique: 1.30 }
 
   extracteur_lumen:
@@ -27,7 +30,7 @@ batiments:
     duree_base_utj: 1.2
     multiplicateur_duree: 1.6
     production_base: 20
-    formule_production: "20 * niveau * 1.1^niveau"
+    formule_production: "20 * niveau * 1.1^niveau * bonus_planete"
     bonus_planete: { cristalline: 1.30 }
 
   synthetiseur_plasmide:

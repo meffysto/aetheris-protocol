@@ -390,10 +390,14 @@ export async function runTick({
     }
     // Influence : produite par centre_diplomatique (0.5 × niv / UTJ).
     emp.ressources_globales = emp.ressources_globales || { singularite: 0, influence: 0 };
+    // Recherche `doctrine_imperiale` : +0.2/niv ajouté au bonus d'influence
+    // par niveau de centre_diplomatique (additif au 0.5 de base).
+    const nivDoctrine = (emp.recherche || {}).doctrine_imperiale || 0;
+    const cdBonus = 0.5 + 0.2 * nivDoctrine;
     let influenceParUtj = 0;
     for (const p of emp.planetes || []) {
       const nivCD = p.batiments?.centre_diplomatique || 0;
-      if (nivCD > 0) influenceParUtj += 0.5 * nivCD;
+      if (nivCD > 0) influenceParUtj += cdBonus * nivCD;
     }
     if (influenceParUtj > 0) {
       const gain = influenceParUtj * UTJ_PAR_TICK;

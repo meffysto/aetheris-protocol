@@ -360,6 +360,29 @@ export async function runTick({
     }
   }
 
+  // ─── Phase 1.5 — Énergie (tracking only — pas de conséquence gameplay) ─
+  // Production par planète = somme(centrale_solaire + reacteur_fusion).
+  // Consommation par planète = somme(flotte_au_sol × consommation_par_utj).
+  // Les flottes en vol seront comptabilisées en epoch 0.3.1.
+  for (const [, emp] of Object.entries(empires)) {
+    for (const planete of emp.planetes || []) {
+      let prod = 0;
+      for (const bat of ['centrale_solaire', 'reacteur_fusion']) {
+        const niv = planete.batiments?.[bat] || 0;
+        if (niv <= 0) continue;
+        const base = rules.batiments?.[bat]?.production_base || 0;
+        prod += Math.floor(base * niv * Math.pow(1.1, niv));
+      }
+      let cons = 0;
+      for (const [ship, qty] of Object.entries(planete.flotte_au_sol || {})) {
+        if (qty <= 0) continue;
+        const u = rules.vaisseaux?.[ship]?.consommation_par_utj || 0;
+        cons += u * qty;
+      }
+      planete.energie = { production: prod, consommation: cons };
+    }
+  }
+
   // ─── Phase 2 — Avancement chantiers / recherches / constructions ───────
   log(`▸ Phase 2/6 — Avancement chantiers, recherches & constructions`);
   for (const [name, emp] of Object.entries(empires)) {

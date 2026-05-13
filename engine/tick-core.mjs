@@ -314,13 +314,18 @@ export async function runTick({
   for (const [, emp] of Object.entries(empires)) {
     const planetByName = {};
     for (const p of emp.planetes || []) planetByName[p.nom] = p;
+    // Recherche `fusion_controlee` : +10%/niv sur la prod du reacteur_fusion
+    // uniquement (centrale_solaire non affectée).
+    const nivFusion = (emp.recherche || {}).fusion_controlee || 0;
+    const factFusion = 1 + 0.10 * nivFusion;
     for (const planete of emp.planetes || []) {
       let prod = 0;
       for (const bat of ['centrale_solaire', 'reacteur_fusion']) {
         const niv = planete.batiments?.[bat] || 0;
         if (niv <= 0) continue;
         const base = rules.batiments?.[bat]?.production_base || 0;
-        prod += Math.floor(base * niv * Math.pow(1.1, niv));
+        const mult = bat === 'reacteur_fusion' ? factFusion : 1.0;
+        prod += Math.floor(base * niv * Math.pow(1.1, niv) * mult);
       }
       let cons = 0;
       for (const [ship, qty] of Object.entries(planete.flotte_au_sol || {})) {

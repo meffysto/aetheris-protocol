@@ -61,21 +61,123 @@ body {
   text-rendering: geometricPrecision;
   overflow: hidden;
   background-image:
-    radial-gradient(ellipse 90% 60% at 15% -5%, rgba(255,250,235,0.7), transparent 55%),
-    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168,90,40,0.06), transparent 60%),
-    linear-gradient(180deg, #f6efde 0%, #ece1c6 100%);
+    radial-gradient(ellipse 85% 72% at 15% -5%, rgba(244,236,220,0.88), transparent 52%),
+    radial-gradient(ellipse 55% 46% at 88% 18%, rgba(168,58,37,0.18), transparent 58%),
+    radial-gradient(ellipse 70% 58% at 55% 92%, rgba(14,29,51,0.92), transparent 62%),
+    linear-gradient(155deg, #f2e8cf 0%, #d9c9a5 36%, #0e1d33 100%);
 }
-/* very faint cartographic grain */
+/* Carte céleste animée — grain cartographique drift lent */
 body::before {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><g fill='none' stroke='%23000' stroke-width='0.4' opacity='0.04'><circle cx='150' cy='200' r='80'/><circle cx='450' cy='350' r='120'/><circle cx='300' cy='100' r='60'/><circle cx='100' cy='500' r='100'/><path d='M0 300 Q 150 280 300 320 T 600 300'/><path d='M0 150 Q 200 130 400 170 T 600 150'/></g></svg>");
-  background-size: 700px 700px;
+  background-image:
+    radial-gradient(circle at 13% 18%, rgba(255,255,255,0.72) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 72% 28%, rgba(255,255,255,0.55) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 44% 76%, rgba(216,176,156,0.64) 0 1px, transparent 1.6px),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='900'><g fill='none' stroke='%23f4ecdc' stroke-width='0.7' opacity='0.13'><circle cx='452' cy='450' r='112'/><circle cx='452' cy='450' r='228'/><circle cx='452' cy='450' r='350'/><path d='M80 450H820M452 78V820'/><path d='M168 732 732 168M168 168 732 732'/></g><g fill='%23f4ecdc' opacity='0.34'><circle cx='150' cy='210' r='1.2'/><circle cx='270' cy='116' r='1'/><circle cx='690' cy='240' r='1.1'/><circle cx='795' cy='520' r='1.4'/><circle cx='330' cy='660' r='1.1'/><circle cx='590' cy='720' r='1.2'/></g></svg>");
+  background-size: 280px 280px, 420px 420px, 620px 620px, 900px 900px;
+  background-position: 0 0, 120px 70px, 30px 160px, center 44%;
+  animation: sky-drift 80s linear infinite;
+  opacity: 0.82;
 }
 body::after {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+  background-image:
+    radial-gradient(ellipse 45% 38% at 62% 38%, rgba(168,58,37,0.17), transparent 66%),
+    radial-gradient(ellipse 70% 64% at 48% 92%, rgba(5,9,16,0.66), transparent 58%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
   mix-blend-mode: multiply;
-  opacity: 0.10;
+  opacity: 0.22;
+}
+
+@keyframes sky-drift {
+  from { background-position: 0 0, 120px 70px, 30px 160px, center 44%; }
+  to { background-position: 280px 120px, -180px 220px, 210px -120px, center 44%; }
+}
+
+/* ─── Parallax céleste 4 couches (depth via translateZ) ─────── */
+.astro-parallax {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  perspective: 900px;
+  transform-style: preserve-3d;
+}
+.astro-parallax span {
+  position: absolute;
+  inset: -12%;
+  display: block;
+  will-change: transform, background-position;
+}
+.astro-parallax .far-stars {
+  transform: translateZ(-260px) scale(1.28);
+  opacity: 0.46;
+  filter: blur(0.4px);
+  background-image:
+    radial-gradient(circle at 10% 18%, rgba(255,255,255,0.95) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 31% 63%, rgba(244,236,220,0.78) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 82% 28%, rgba(255,255,255,0.76) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 65% 80%, rgba(216,176,156,0.72) 0 1px, transparent 1.8px);
+  background-size: 260px 220px, 330px 290px, 420px 360px, 520px 440px;
+  animation: parallax-far 150s linear infinite;
+}
+.astro-parallax .dust-field {
+  transform: translateZ(-90px) scale(1.10);
+  opacity: 0.54;
+  background:
+    radial-gradient(ellipse 34% 28% at 18% 32%, rgba(168,58,37,0.18), transparent 68%),
+    radial-gradient(ellipse 44% 36% at 76% 64%, rgba(14,29,51,0.44), transparent 68%),
+    radial-gradient(ellipse 24% 20% at 64% 24%, rgba(74,138,138,0.14), transparent 70%);
+  mix-blend-mode: multiply;
+  animation: parallax-dust 92s ease-in-out infinite alternate;
+}
+.astro-parallax .atlas-lines {
+  inset: -18%;
+  transform: translateZ(80px) scale(0.92);
+  opacity: 0.42;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1180' height='780'><g fill='none' stroke='%23f4ecdc' stroke-width='1' opacity='0.30'><circle cx='610' cy='390' r='110'/><circle cx='610' cy='390' r='226'/><circle cx='610' cy='390' r='352'/><ellipse cx='610' cy='390' rx='490' ry='146'/><path d='M70 390H1110M610 30V750M236 704 984 76M230 78 990 702'/></g><g fill='%23f4ecdc' opacity='0.55'><circle cx='225' cy='232' r='1.6'/><circle cx='782' cy='168' r='1.3'/><circle cx='918' cy='482' r='1.5'/><circle cx='385' cy='578' r='1.2'/></g></svg>");
+  background-repeat: repeat;
+  background-size: 1180px 780px;
+  animation: parallax-atlas 56s ease-in-out infinite alternate;
+}
+.astro-parallax .near-sparks {
+  transform: translateZ(150px) scale(0.82);
+  opacity: 0.58;
+  background-image:
+    radial-gradient(circle at 16% 78%, rgba(198,74,48,0.84) 0 1.5px, transparent 2.6px),
+    radial-gradient(circle at 88% 22%, rgba(244,236,220,0.90) 0 1.4px, transparent 2.5px),
+    radial-gradient(circle at 72% 73%, rgba(74,138,138,0.74) 0 1.5px, transparent 2.7px);
+  background-size: 460px 360px, 580px 420px, 620px 520px;
+  filter: drop-shadow(0 0 8px rgba(244,236,220,0.25));
+  animation: parallax-near 38s ease-in-out infinite alternate;
+}
+
+@keyframes parallax-far {
+  from { background-position: 0 0, 90px 140px, 200px 20px, 40px 260px; }
+  to { background-position: 260px 110px, -240px 430px, 620px -180px, -480px 520px; }
+}
+@keyframes parallax-dust {
+  from { transform: translate3d(-18px, -8px, -90px) scale(1.10); }
+  to { transform: translate3d(28px, 18px, -90px) scale(1.13); }
+}
+@keyframes parallax-atlas {
+  from { transform: translate3d(-32px, 16px, 80px) scale(0.92) rotate(-0.4deg); }
+  to { transform: translate3d(38px, -20px, 80px) scale(0.94) rotate(0.5deg); }
+}
+@keyframes parallax-near {
+  from { background-position: 0 0, 140px 90px, 300px 120px; transform: translate3d(-42px, 18px, 150px) scale(0.82); }
+  to { background-position: 420px -180px, -320px 260px, 620px 480px; transform: translate3d(54px, -24px, 150px) scale(0.84); }
+}
+
+/* Accessibilité : utilisateurs qui désactivent les animations OS */
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+  .astro-parallax span {
+    animation: none !important;
+    transform: translateZ(0) !important;
+  }
 }
 
 /* ─── shell ───────────────────────────────────────────────── */
@@ -1964,6 +2066,13 @@ body.tick-pulsed::after {
 </style>
 </head>
 <body>
+
+<div class="astro-parallax" aria-hidden="true">
+  <span class="far-stars"></span>
+  <span class="dust-field"></span>
+  <span class="atlas-lines"></span>
+  <span class="near-sparks"></span>
+</div>
 
 <div class="err" id="err"></div>
 <div class="toast" id="toast"></div>

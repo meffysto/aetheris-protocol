@@ -263,6 +263,20 @@ export async function runTick({
   // planete_origine, kind, hash }.
   manifest.sealedPending = manifest.sealedPending || {};
 
+  // Vitesse effective d'un vaisseau, en tenant compte des recherches.
+  //   - drives_impulsion : +5%/niv pour les vaisseaux sub-FTL (défaut)
+  // (Le tech drive_hyperspatial pour les FTL sera branché dans un commit
+  // suivant ; SHIPS_FTL est vide ici pour rester strictement additif.)
+  const SHIPS_FTL = new Set();
+  function shipSpeed(shipType, emp) {
+    const base = rules.vaisseaux?.[shipType]?.vitesse || 1000;
+    if (!emp) return base;
+    const rech = emp.recherche || {};
+    const ftl = SHIPS_FTL.has(shipType);
+    const tech = ftl ? (rech.drive_hyperspatial || 0) : (rech.drives_impulsion || 0);
+    return base * (1 + 0.05 * tech);
+  }
+
   // ─── Phase 0 — Expiration des effets temporels (relations, moral, marché)
   // Avant la production, on nettoie : trêves échues passent à 'neutre',
   // malus moraux passés sont oubliés, ordres marché expirés sont
@@ -547,8 +561,9 @@ export async function runTick({
     // ceil(distance / vMin × 100) UTJ ÷ UTJ_PAR_TICK depuis tick_depart.
     // Empêche un joueur de révéler trop tôt ou trop tard sa flotte.
     const distance = computeDistance(rev.parsed.secret.depuis, rev.parsed.secret.cible.planete, rev.joueur);
+    const empRev = empires[rev.joueur];
     const vMin = Math.min(
-      ...Object.keys(rev.parsed.secret.flotte || {}).map(s => rules.vaisseaux[s]?.vitesse || 1000)
+      ...Object.keys(rev.parsed.secret.flotte || {}).map(s => shipSpeed(s, empRev))
     );
     if (!Number.isFinite(vMin) || vMin <= 0) {
       log(`  ✗ reveal ${rev.joueur}: flotte vide ou vaisseaux inconnus — REJETÉ`);
@@ -883,7 +898,7 @@ export async function runTick({
     src.flotte_au_sol.sonde -= n;
 
     const distance = computeDistance(action.depuis, cible.planete, playerName);
-    const vitesse = rules.vaisseaux.sonde?.vitesse || 100000;
+    const vitesse = shipSpeed('sonde', emp);
     const dureeUTJ = Math.max(1, Math.ceil(distance / vitesse * 100));
 
     emp.flottes_en_vol = emp.flottes_en_vol || [];
@@ -919,7 +934,7 @@ export async function runTick({
     for (const [ship, n] of Object.entries(action.flotte || {})) src.flotte_au_sol[ship] -= n;
 
     const distance = computeDistance(action.depuis, cible.planete, playerName);
-    const vMin = Math.min(...Object.keys(action.flotte || {}).map(s => rules.vaisseaux[s]?.vitesse || 1000));
+    const vMin = Math.min(...Object.keys(action.flotte || {}).map(s => shipSpeed(s, emp)));
     const dureeUTJ = Math.max(1, Math.ceil(distance / vMin * 100));
 
     emp.flottes_en_vol = emp.flottes_en_vol || [];
@@ -1036,7 +1051,7 @@ export async function runTick({
     for (const [res, n] of Object.entries(action.cargaison || {})) src.ressources[res].stock -= n;
 
     const distance = computeDistance(action.depuis, ciblePlanete, playerName);
-    const vMin = Math.min(...Object.keys(action.flotte || {}).map(s => rules.vaisseaux[s]?.vitesse || 1000));
+    const vMin = Math.min(...Object.keys(action.flotte || {}).map(s => shipSpeed(s, emp)));
     const dureeUTJ = Math.max(1, Math.ceil(distance / vMin * 100));
 
     emp.flottes_en_vol = emp.flottes_en_vol || [];
@@ -1070,7 +1085,7 @@ export async function runTick({
     src.flotte_au_sol.recycleur -= recycleurs;
 
     const distance = computeDistance(action.depuis, ciblePlanete, playerName);
-    const vitesse = rules.vaisseaux.recycleur?.vitesse || 2000;
+    const vitesse = shipSpeed('recycleur', emp);
     const dureeUTJ = Math.max(1, Math.ceil(distance / vitesse * 100));
 
     emp.flottes_en_vol = emp.flottes_en_vol || [];

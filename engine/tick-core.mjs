@@ -551,6 +551,14 @@ export async function runTick({
     let categorie = 'vaisseau';
     if (!def) { def = rules.defenses?.[action.unite]; categorie = 'defense'; }
     if (!def) { log(`  · ${playerName}: unité inconnue: ${action.unite}`); return; }
+    // Gating chantier spatial : aucun vaisseau ni aucune défense ne se
+    // construit sans un chantier_spatial niv ≥ 1 sur la planète. Convention
+    // OGame, oubliée à l'origine — sans ce check, un joueur peut sortir
+    // un croiseur sur une planète vierge dès qu'il a les techs.
+    if ((planete.batiments?.chantier_spatial || 0) < 1) {
+      log(`  · ${playerName}: ${action.unite} requiert chantier_spatial niv 1 sur ${planete.nom}`);
+      return;
+    }
     if (!checkRequiert(def.requiert, planete, emp, playerName, `construction ${action.unite}`)) return;
 
     if (categorie === 'defense' && def.max_par_planete) {
@@ -830,6 +838,15 @@ export async function runTick({
     if (!def) return;
     const niveauActuel = (emp.recherche || {})[action.technologie] || 0;
     if (action.niveau_cible !== niveauActuel + 1) return;
+    // Gating laboratoire : impossible de researcher sans au moins un
+    // laboratoire niv ≥ 1 quelque part dans l'empire. Convention OGame
+    // standard, oubliée à l'origine — sans ce check, un joueur peut
+    // commencer une recherche niv 1 dès tick 1 (lent mais possible).
+    const aUnLabo = (emp.planetes || []).some(p => (p.batiments?.laboratoire || 0) >= 1);
+    if (!aUnLabo) {
+      log(`  · ${emp.joueur}: recherche ${action.technologie} requiert laboratoire niv 1`);
+      return;
+    }
     if (!checkRequiert(def.requiert, null, emp, emp.joueur, `recherche ${action.technologie}`)) return;
     const mult = Math.pow(def.mult || 2.0, niveauActuel);
     const cout = {};

@@ -301,6 +301,96 @@ test('runTick : construction — vitesse lue depuis rules.yaml (chantier_spatial
   assert.equal(fc[0].fin_utj, 1);
 });
 
+// ─── Gates de prérequis structurels (cf tick-core.mjs queueConstruction/queueRecherche) ──
+//
+// Convention OGame : on ne construit pas de vaisseau/défense sans chantier_spatial,
+// on ne research pas sans laboratoire. Sans ces gates, un joueur peut sortir un
+// croiseur sur une planète vierge ou lancer une recherche dès tick 1.
+
+test('runTick : construction REJETÉE sans chantier_spatial', async () => {
+  const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
+  const p = empires.meff.planetes[0];
+  // chantier_spatial = 0 (valeur par défaut de planet()).
+  // Stock < capacité pour pouvoir vérifier qu'il ne descend PAS.
+  p.ressources.ferrum.stock = 50000;
+  p.ressources.lumen.stock = 50000;
+
+  const orders = {
+    meff: { joueur: 'meff', tick_cible: 1, ordres: [
+      { type: 'construction', planete: 'meff-prima', unite: 'chasseur_leger', quantite: 1 },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  const fc = result.newEmpires.meff.planetes[0].file_construction;
+  assert.equal(fc.length, 0, 'construction doit être rejetée sans chantier_spatial');
+  // Et les ressources ne sont PAS consommées par un ordre rejeté.
+  // chasseur_leger coûte 3000 ferrum ; après tick : 50000 + 600 (prod) = 50600.
+  assert.equal(result.newEmpires.meff.planetes[0].ressources.ferrum.stock, 50000 + 600,
+    'ferrum non débité (ordre rejeté) — gain prod seul');
+});
+
+test('runTick : construction défense REJETÉE sans chantier_spatial', async () => {
+  const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
+  const p = empires.meff.planetes[0];
+  p.ressources.ferrum.stock = 1000000;
+
+  const orders = {
+    meff: { joueur: 'meff', tick_cible: 1, ordres: [
+      { type: 'construction', planete: 'meff-prima', unite: 'lance_missiles', quantite: 1 },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  assert.equal(result.newEmpires.meff.planetes[0].file_construction.length, 0);
+});
+
+test('runTick : recherche REJETÉE sans laboratoire', async () => {
+  const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
+  const p = empires.meff.planetes[0];
+  // laboratoire = 0 (valeur par défaut de planet()).
+  p.ressources.ferrum.stock = 1000000;
+  p.ressources.lumen.stock = 1000000;
+
+  const orders = {
+    meff: { joueur: 'meff', tick_cible: 1, ordres: [
+      { type: 'recherche', technologie: 'armement', niveau_cible: 1 },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  assert.equal((result.newEmpires.meff.file_recherche || []).length, 0,
+    'recherche doit être rejetée sans laboratoire');
+});
+
+test('runTick : recherche ACCEPTÉE si labo sur une AUTRE planète de l\'empire', async () => {
+  // Multi-planètes : un joueur peut researcher tant qu'au moins une planète
+  // de son empire a un laboratoire. Pas besoin que ce soit la planète qui paye.
+  const empires = { meff: emptyEmpire('meff', [planet('meff-prima'), planet('meff-secunda', [1, 2, 7])]) };
+  empires.meff.planetes[1].batiments.laboratoire = 1;
+  const payeur = empires.meff.planetes[0];
+  payeur.ressources.ferrum.stock = 1000000;
+  payeur.ressources.lumen.stock = 1000000;
+
+  const orders = {
+    meff: { joueur: 'meff', tick_cible: 1, ordres: [
+      { type: 'recherche', technologie: 'armement', niveau_cible: 1 },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  assert.equal(result.newEmpires.meff.file_recherche.length, 1,
+    'recherche acceptée car labo existe ailleurs dans l\'empire');
+});
+
 test('runTick : pas de stock négatif après prod', async () => {
   const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
   empires.meff.planetes[0].ressources.ferrum.stock = 0;

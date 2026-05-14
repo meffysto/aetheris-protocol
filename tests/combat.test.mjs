@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 
 import { resolveCombat, computeDebris, computePillage } from '../engine/combat.mjs';
 import { rngFromSeed } from '../engine/tick-core.mjs';
-import { readYaml } from './helpers.mjs';
+import { readYaml, readRules } from './helpers.mjs';
 
-const rules = readYaml('engine/rules.yaml');
+const rules = readRules();
 
 // 20 scénarios canoniques attaquant vs défenseur. Seed fixe pour le RNG.
 const SCENARIOS = [

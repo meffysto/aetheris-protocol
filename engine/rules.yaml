@@ -1,419 +1,464 @@
-# CITADEL // PROTOCOL — Constantes du jeu
+# CITADEL // PROTOCOL — Constantes du jeu (v2 — système d'epochs)
 # Tout ici est public, lu par l'engine ET par les agents qui veulent simuler.
-# Modifier ce fichier change l'équilibre — donc fork, ne PR pas (sauf serveur custom).
-
-version: 1
-duree_utj_par_tick: 6   # 6 UTJ par tick = 1 tick = 15 min IRL = 6 unités de jeu
-
-# ───────────────────────── BÂTIMENTS ─────────────────────────
-# cout_base × multiplicateur^(niveau-1) — formule classique du genre.
-# duree_utj suit la même règle.
-
-batiments:
-  mine_ferrum:
-    categorie: production
-    cout_base: { ferrum: 60, lumen: 15 }
-    multiplicateur_cout: 1.5
-    duree_base_utj: 1.0
-    multiplicateur_duree: 1.5
-    production_base: 30      # coefficient de la formule (PAS la prod niv 1)
-    # Production effective au niv N en ferrum/UTJ :
-    #   floor(production_base * N * 1.1^N * bonus_planete)
-    # Exemples : niv 1 = 33 Fe/UTJ ; niv 1 tellurique = 42 ; niv 5 = 242.
-    formule_production: "30 * niveau * 1.1^niveau * bonus_planete"
-    bonus_planete: { tellurique: 1.30 }
-
-  extracteur_lumen:
-    categorie: production
-    cout_base: { ferrum: 48, lumen: 24 }
-    multiplicateur_cout: 1.6
-    duree_base_utj: 1.2
-    multiplicateur_duree: 1.6
-    production_base: 20
-    formule_production: "20 * niveau * 1.1^niveau * bonus_planete"
-    bonus_planete: { cristalline: 1.30 }
-
-  synthetiseur_plasmide:
-    categorie: production
-    cout_base: { ferrum: 225, lumen: 75 }
-    multiplicateur_cout: 1.5
-    duree_base_utj: 1.5
-    multiplicateur_duree: 1.5
-    production_base: 10
-    # temp = temperature_k(etoile) / 100 ; étoiles froides → rendement +
-    formule_production: "10 * niveau * 1.1^niveau * (1.44 - 0.004*temp) * bonus_planete"
-    bonus_planete: { volcanique: 1.30 }
-
-  centrale_solaire:
-    categorie: energie
-    cout_base: { ferrum: 75, lumen: 30 }
-    multiplicateur_cout: 1.5
-    duree_base_utj: 1.0
-    multiplicateur_duree: 1.5
-    production_base: 20
-    formule_production: "20 * niveau * 1.1^niveau"
-
-  reacteur_fusion:
-    categorie: energie
-    requiert: { fusion_controlee: 5 }
-    cout_base: { ferrum: 900, lumen: 360, plasmide: 180 }
-    multiplicateur_cout: 1.8
-    duree_base_utj: 2.0
-    multiplicateur_duree: 1.8
-    production_base: 50
-
-  depot:
-    categorie: stockage
-    cout_base: { ferrum: 1000 }
-    multiplicateur_cout: 2.0
-    duree_base_utj: 1.0
-    multiplicateur_duree: 2.0
-    # capacite(niv) = capacite_base × capacite_multiplicateur^(niveau−1) × bonus_planete
-    capacite_base: 100000
-    capacite_multiplicateur: 1.6
-    bonus_planete: { glacee: 1.50 }
-    formule_capacite: "capacite_base × capacite_multiplicateur^(niveau-1) × bonus_planete"
-
-  usine_robotique:
-    categorie: industrie
-    cout_base: { ferrum: 400, lumen: 120, plasmide: 200 }
-    multiplicateur_cout: 2.0
-    duree_base_utj: 2.0
-    multiplicateur_duree: 2.0
-    bonus_vitesse_par_niveau: 0.10   # accélère chantiers de bâtiments ET vaisseaux
-
-  chantier_spatial:
-    categorie: militaire
-    requiert: { usine_robotique: 2 }
-    cout_base: { ferrum: 400, lumen: 200, plasmide: 100 }
-    multiplicateur_cout: 2.0
-    duree_base_utj: 2.0
-    multiplicateur_duree: 2.0
-    bonus_vitesse_par_niveau: 0.10   # accélère la construction de vaisseaux & défenses
-
-  laboratoire:
-    categorie: recherche
-    cout_base: { ferrum: 200, lumen: 400, plasmide: 200 }
-    multiplicateur_cout: 2.0
-    duree_base_utj: 1.5
-    multiplicateur_duree: 2.0
-    bonus_vitesse_recherche: "1 + 0.10 * niveau"
-
-  silo_missiles:
-    categorie: defense
-    requiert: { chantier_spatial: 1 }
-    cout_base: { ferrum: 20000, lumen: 20000, plasmide: 1000 }
-    multiplicateur_cout: 2.0
-    duree_base_utj: 4.0
-    multiplicateur_duree: 2.0
-    capacite_missiles_par_niveau: 10
-
-  terminal_marchand:
-    categorie: economie
-    cout_base: { ferrum: 1000, lumen: 1000 }
-    multiplicateur_cout: 2.0
-    duree_base_utj: 2.0
-    multiplicateur_duree: 2.0
-    bonus_ratio_marche: "1 + 0.05 * niveau"
-
-  centre_diplomatique:
-    categorie: politique
-    requiert: { terminal_marchand: 4 }
-    cout_base: { ferrum: 5000, lumen: 2000 }
-    multiplicateur_cout: 2.5
-    duree_base_utj: 3.0
-    multiplicateur_duree: 2.0
-    bonus_influence_par_utj: "0.5 * niveau"
-
-# ───────────────────────── VAISSEAUX ─────────────────────────
-
-vaisseaux:
-  sonde:
-    cout: { ferrum: 0, lumen: 1000, plasmide: 20 }
-    duree_utj: 0.05
-    coque: 10
-    bouclier: 0.1
-    attaque: 0
-    vitesse: 100000
-    cargo: 5
-    consommation_par_utj: 1
-    requiert: { espionnage_profond: 1 }
-
-  chasseur_leger:
-    cout: { ferrum: 3000, lumen: 1000 }
-    duree_utj: 0.4
-    coque: 400
-    bouclier: 10
-    attaque: 50
-    vitesse: 12500
-    cargo: 50
-    consommation_par_utj: 20
-    bonus_contre: { cargo_lourd: 2.0, sonde: 5.0 }
-
-  chasseur_lourd:
-    cout: { ferrum: 6000, lumen: 4000 }
-    duree_utj: 0.6
-    coque: 1000
-    bouclier: 25
-    attaque: 150
-    vitesse: 10000
-    cargo: 100
-    consommation_par_utj: 75
-    bonus_contre: { chasseur_leger: 2.0 }
-    requiert: { armement: 2, drives_impulsion: 2 }
-
-  croiseur:
-    cout: { ferrum: 20000, lumen: 7000, plasmide: 2000 }
-    duree_utj: 1.6
-    coque: 2700
-    bouclier: 50
-    attaque: 400
-    vitesse: 15000
-    cargo: 800
-    consommation_par_utj: 300
-    bonus_contre: { chasseur_leger: 6.0, chasseur_lourd: 3.0 }
-    requiert: { armement: 3, drives_impulsion: 4 }
-
-  fregate:
-    cout: { ferrum: 30000, lumen: 12000, plasmide: 3000 }
-    duree_utj: 2.4
-    coque: 3500
-    bouclier: 100
-    attaque: 700
-    vitesse: 12000
-    cargo: 500
-    consommation_par_utj: 250
-    bonus_contre: { croiseur: 3.0 }
-    requiert: { armement: 5 }
-
-  cuirasse:
-    cout: { ferrum: 45000, lumen: 15000 }
-    duree_utj: 4.0
-    coque: 6000
-    bouclier: 200
-    attaque: 1000
-    vitesse: 9000
-    cargo: 1500
-    consommation_par_utj: 500
-    requiert: { drive_hyperspatial: 4 }
-
-  destroyer:
-    cout: { ferrum: 60000, lumen: 50000, plasmide: 15000 }
-    duree_utj: 6.0
-    coque: 11000
-    bouclier: 500
-    attaque: 2000
-    vitesse: 5000
-    cargo: 2000
-    consommation_par_utj: 1000
-    bonus_contre: { cuirasse: 2.0 }
-    requiert: { armement: 8, drive_hyperspatial: 6 }
-
-  dreadnought:
-    cout: { ferrum: 5000000, lumen: 4000000, plasmide: 1000000, singularite: 1 }
-    duree_utj: 24.0
-    coque: 75000
-    bouclier: 5000
-    attaque: 25000
-    vitesse: 2500
-    cargo: 10000
-    consommation_par_utj: 10000
-    requiert: { armement: 12, distorsion_subluminique: 2 }
-
-  cargo_lourd:
-    cout: { ferrum: 6000, lumen: 6000 }
-    duree_utj: 0.5
-    coque: 1200
-    bouclier: 25
-    attaque: 5
-    vitesse: 7500
-    cargo: 25000
-    consommation_par_utj: 50
-
-  recycleur:
-    cout: { ferrum: 10000, lumen: 6000, plasmide: 2000 }
-    duree_utj: 0.8
-    coque: 1600
-    bouclier: 10
-    attaque: 1
-    vitesse: 2000
-    cargo: 20000
-    consommation_par_utj: 300
-    requiert: { drive_hyperspatial: 3 }
-
-  vaisseau_colon:
-    cout: { ferrum: 10000, lumen: 20000, plasmide: 10000 }
-    duree_utj: 4.0
-    coque: 3000
-    bouclier: 100
-    attaque: 0
-    vitesse: 2500
-    cargo: 7500
-    consommation_par_utj: 1000
-    requiert: { drives_impulsion: 3 }
-
-# ───────────────────────── DÉFENSES ─────────────────────────
-# Bâtiments stationnaires sur la planète. Combattent comme des vaisseaux mais
-# ne peuvent pas bouger. Les boucliers planétaires sont uniques (max 1).
-
-defenses:
-  lance_missiles:
-    cout: { ferrum: 2000 }
-    duree_utj: 0.05
-    coque: 200
-    bouclier: 20
-    attaque: 80
-    bonus_contre: { chasseur_leger: 1.5 }
-
-  canon_laser_leger:
-    cout: { ferrum: 1500, lumen: 500 }
-    duree_utj: 0.08
-    coque: 200
-    bouclier: 25
-    attaque: 100
-    requiert: { armement: 2 }
-
-  canon_laser_lourd:
-    cout: { ferrum: 6000, lumen: 2000 }
-    duree_utj: 0.5
-    coque: 800
-    bouclier: 100
-    attaque: 250
-    requiert: { armement: 4 }
-
-  canon_gauss:
-    cout: { ferrum: 20000, lumen: 15000, plasmide: 2000 }
-    duree_utj: 1.5
-    coque: 3500
-    bouclier: 200
-    attaque: 1100
-    bonus_contre: { croiseur: 2.0, cuirasse: 1.5 }
-    requiert: { armement: 6 }
-
-  canon_ionique:
-    cout: { ferrum: 5000, lumen: 3000 }
-    duree_utj: 1.0
-    coque: 800
-    bouclier: 500
-    attaque: 150
-    requiert: { bouclier_graviton: 4 }
-
-  canon_plasma:
-    cout: { ferrum: 50000, lumen: 50000, plasmide: 30000 }
-    duree_utj: 4.0
-    coque: 10000
-    bouclier: 300
-    attaque: 3000
-    bonus_contre: { cuirasse: 2.0, destroyer: 1.5 }
-    requiert: { armement: 8, bouclier_graviton: 6 }
-
-  petit_bouclier_planetaire:
-    cout: { ferrum: 10000, lumen: 10000 }
-    duree_utj: 2.0
-    coque: 2000
-    bouclier: 2000
-    attaque: 1
-    max_par_planete: 1
-    requiert: { bouclier_graviton: 2 }
-
-  grand_bouclier_planetaire:
-    cout: { ferrum: 50000, lumen: 50000 }
-    duree_utj: 6.0
-    coque: 10000
-    bouclier: 10000
-    attaque: 1
-    max_par_planete: 1
-    requiert: { bouclier_graviton: 6 }
-
-# ───────────────────────── CONSTRUCTION ─────────────────────────
-# La vitesse de construction = 1 + 0.10 × chantier_spatial + 0.10 × usine_robotique
-
-construction:
-  formule_vitesse: "1 + 0.10 * chantier_spatial + 0.10 * usine_robotique"
-
-# ───────────────────────── RECHERCHES ─────────────────────────
-
-recherches:
-  robotique:                { cout_base: { ferrum: 400, lumen: 120 }, mult: 2.0, duree_base: 1.0 }
-  automation_miniere:       { cout_base: { ferrum: 400, lumen: 200 }, mult: 1.8, duree_base: 1.0 }
-  fusion_controlee:         { cout_base: { ferrum: 800, lumen: 400, plasmide: 200 }, mult: 1.8, duree_base: 1.2 }
-  drives_impulsion:         { cout_base: { ferrum: 2000, lumen: 4000 }, mult: 2.0, duree_base: 1.5 }
-  drive_hyperspatial:       { cout_base: { ferrum: 10000, lumen: 20000, plasmide: 6000 }, mult: 2.0, duree_base: 2.0, requiert: { drives_impulsion: 3 } }
-  armement:                 { cout_base: { ferrum: 800, lumen: 200 }, mult: 2.0, duree_base: 1.0 }
-  bouclier_graviton:        { cout_base: { ferrum: 200, lumen: 1000 }, mult: 2.0, duree_base: 1.5 }
-  espionnage_profond:       { cout_base: { ferrum: 200, lumen: 1000, plasmide: 200 }, mult: 2.0, duree_base: 1.0 }
-  cryptographie:            { cout_base: { ferrum: 1000, lumen: 500 }, mult: 2.0, duree_base: 1.0 }
-  diplomatie:               { cout_base: { ferrum: 200, lumen: 200 }, mult: 1.5, duree_base: 0.8 }
-  doctrine_imperiale:       { cout_base: { ferrum: 5000, lumen: 5000 }, mult: 2.0, duree_base: 2.0, requiert: { diplomatie: 4 } }
-  distorsion_subluminique:  { cout_base: { ferrum: 200000, lumen: 400000, plasmide: 100000 }, mult: 2.5, duree_base: 4.0, requiert: { drive_hyperspatial: 6 } }
-
-# ───────────────────────── COMBAT ─────────────────────────
-
-combat:
-  rondes_max: 6
-  bouclier_regen_entre_rondes: 1.0    # 100 % entre rondes
-  seuil_destruction_coque: 0.30       # ≤ 30 % de coque → 70 % de chance de destruction
-  proba_destruction: 0.70
-  ratio_debris: 0.30                  # 30 % du métal des épaves devient un champ
-  pillage_max: 0.50                   # 50 % du non-protégé pillé
-
-# ───────────────────────── MARCHÉ ─────────────────────────
-
-marche:
-  ratio_base: { ferrum: 3.0, lumen: 2.0, plasmide: 1.0 }   # référence informationnelle
-  fee_base: 0.05                                           # 5% prélevés à chaque match
-  fee_reduction_par_terminal: 0.05                         # réduit à 0% à terminal niv 20
-  expire_ticks_default: 12                                 # ordres non remplis annulés après 12 ticks (~3h)
-  expire_ticks_max: 48
-
-# ───────────────────────── ESPIONNAGE ─────────────────────────
-# diff = nombre_sondes - tech_espionnage_defenseur × 4
-# niveau d'info révélé = palier atteint :
-#   diff ≥ 1   → niveau 1 (ressources)
-#   diff ≥ 5   → niveau 2 (+ flotte au sol)
-#   diff ≥ 25  → niveau 3 (+ défenses)
-#   diff ≥ 125 → niveau 4 (+ bâtiments)
-#   diff ≥ 625 → niveau 5 (+ recherches)
 #
-# Contre-espionnage : chaque niveau du défenseur détruit 1 sonde avec proba 0.20
-# Si toutes les sondes meurent → niveau 0 et alerte au défenseur.
+# Le ruleset est versionné par EPOCH (cf docs/adr/0011-rules-epochs-soft-fork.md).
+# - epoch[0] définit le ruleset complet, actif au tick 0.
+# - epochs[1..n] appliquent des PATCHES (clés dottées) à partir d'un
+#   activation_tick futur. Cela permet d'évoluer la balance sans hard reset :
+#   les bâtiments construits avant le switch gardent leur prod snapshottée,
+#   les nouvelles upgrades utilisent les nouveaux coûts/durées.
+#
+# Pour ajouter un epoch : append un objet { activation_tick, name, patches }
+# à la fin du tableau `epochs:`. activation_tick doit être > au précédent.
 
-espionnage:
-  paliers: [1, 5, 25, 125, 625]
-  proba_destruction_par_niveau: 0.20
+version: 2
+epochs:
+  - activation_tick: 0
+    name: "epoch 0.2 — calibration initiale Bitcoin MVP"
+    rules:
+      # Tout ici est public, lu par l'engine ET par les agents qui veulent simuler.
+      # Modifier ce fichier change l'équilibre — donc fork, ne PR pas (sauf serveur custom).
 
-# ───────────────────────── SINGULARITÉ ─────────────────────────
-# Une anomalie colonisée produit lentement une singularité quantique.
-# 300 UTJ ≈ 50 ticks ≈ 12h35 par singularité. Cap à 5 par empire pour
-# éviter le farming sans plafond.
-singularite:
-  utj_par_unite: 300
-  cap_par_empire: 5
+      duree_utj_par_tick: 6   # 6 UTJ par tick = 1 tick = 15 min IRL = 6 unités de jeu
 
-# ───────────────────────── INFLUENCE / DIPLOMATIE ─────────────────────────
-# L'influence est produite par centre_diplomatique (déjà 0.5 × niv / UTJ
-# dans rules.batiments.centre_diplomatique). Elle finance les ordres
-# diplomatiques : trêve, rupture, alliance.
-influence:
-  cap_par_empire: 10000
-diplomatie:
-  treve:
-    cout_influence: 100
-    duree_ticks: 6
-    requiert_recherche: { diplomatie: 1 }
-  rupture:
-    cout_influence: 0
-    malus_moral_pct: 15        # production ×(1 − 0.15) tant qu'actif
-    malus_duree_ticks: 6
-  # Réduction du coût influence par niveau de recherche diplomatie
-  diplomatie_reduction_par_niveau: 0.05  # max −50% à niv 10
+      # ───────────────────────── BÂTIMENTS ─────────────────────────
+      # cout_base × multiplicateur^(niveau-1) — formule classique du genre.
+      # duree_utj suit la même règle.
 
-# ───────────────────────── PLANÈTES ─────────────────────────
+      batiments:
+        mine_ferrum:
+          categorie: production
+          cout_base: { ferrum: 60, lumen: 15 }
+          multiplicateur_cout: 1.5
+          duree_base_utj: 1.0
+          multiplicateur_duree: 1.5
+          production_base: 30      # coefficient de la formule (PAS la prod niv 1)
+          # Production effective au niv N en ferrum/UTJ :
+          #   floor(production_base * N * 1.1^N * bonus_planete)
+          # Exemples : niv 1 = 33 Fe/UTJ ; niv 1 tellurique = 42 ; niv 5 = 242.
+          formule_production: "30 * niveau * 1.1^niveau * bonus_planete"
+          bonus_planete: { tellurique: 1.30 }
 
-types_planete:
-  tellurique:    { bonus: { mine_ferrum: 1.30 }, champs_min: 200, champs_max: 280 }
-  cristalline:   { bonus: { extracteur_lumen: 1.30 }, champs_min: 130, champs_max: 220 }
-  volcanique:    { bonus: { synthetiseur_plasmide: 1.30 }, champs_min: 100, champs_max: 200 }
-  glacee:        { bonus: { depot: 1.50 }, champs_min: 90, champs_max: 180 }
-  gazeuse:       { bonus: { centrale_solaire: 1.40 }, champs_min: 60, champs_max: 140 }
-  anomalie:      { bonus: { laboratoire: 1.30 }, produit_singularite: true, champs_min: 50, champs_max: 100, rare: true }
+        extracteur_lumen:
+          categorie: production
+          cout_base: { ferrum: 48, lumen: 24 }
+          multiplicateur_cout: 1.6
+          duree_base_utj: 1.2
+          multiplicateur_duree: 1.6
+          production_base: 20
+          formule_production: "20 * niveau * 1.1^niveau * bonus_planete"
+          bonus_planete: { cristalline: 1.30 }
+
+        synthetiseur_plasmide:
+          categorie: production
+          cout_base: { ferrum: 225, lumen: 75 }
+          multiplicateur_cout: 1.5
+          duree_base_utj: 1.5
+          multiplicateur_duree: 1.5
+          production_base: 10
+          # temp = temperature_k(etoile) / 100 ; étoiles froides → rendement +
+          formule_production: "10 * niveau * 1.1^niveau * (1.44 - 0.004*temp) * bonus_planete"
+          bonus_planete: { volcanique: 1.30 }
+
+        centrale_solaire:
+          categorie: energie
+          cout_base: { ferrum: 75, lumen: 30 }
+          multiplicateur_cout: 1.5
+          duree_base_utj: 1.0
+          multiplicateur_duree: 1.5
+          production_base: 20
+          formule_production: "20 * niveau * 1.1^niveau"
+
+        reacteur_fusion:
+          categorie: energie
+          requiert: { fusion_controlee: 5 }
+          cout_base: { ferrum: 900, lumen: 360, plasmide: 180 }
+          multiplicateur_cout: 1.8
+          duree_base_utj: 2.0
+          multiplicateur_duree: 1.8
+          production_base: 50
+
+        depot:
+          categorie: stockage
+          cout_base: { ferrum: 1000 }
+          multiplicateur_cout: 2.0
+          duree_base_utj: 1.0
+          multiplicateur_duree: 2.0
+          # capacite(niv) = capacite_base × capacite_multiplicateur^(niveau−1) × bonus_planete
+          capacite_base: 100000
+          capacite_multiplicateur: 1.6
+          bonus_planete: { glacee: 1.50 }
+          formule_capacite: "capacite_base × capacite_multiplicateur^(niveau-1) × bonus_planete"
+
+        usine_robotique:
+          categorie: industrie
+          cout_base: { ferrum: 400, lumen: 120, plasmide: 200 }
+          multiplicateur_cout: 2.0
+          duree_base_utj: 2.0
+          multiplicateur_duree: 2.0
+          bonus_vitesse_par_niveau: 0.10   # accélère chantiers de bâtiments ET vaisseaux
+
+        chantier_spatial:
+          categorie: militaire
+          requiert: { usine_robotique: 2 }
+          cout_base: { ferrum: 400, lumen: 200, plasmide: 100 }
+          multiplicateur_cout: 2.0
+          duree_base_utj: 2.0
+          multiplicateur_duree: 2.0
+          bonus_vitesse_par_niveau: 0.10   # accélère la construction de vaisseaux & défenses
+
+        laboratoire:
+          categorie: recherche
+          cout_base: { ferrum: 200, lumen: 400, plasmide: 200 }
+          multiplicateur_cout: 2.0
+          duree_base_utj: 1.5
+          multiplicateur_duree: 2.0
+          bonus_vitesse_recherche: "1 + 0.10 * niveau"
+
+        silo_missiles:
+          categorie: defense
+          requiert: { chantier_spatial: 1 }
+          cout_base: { ferrum: 20000, lumen: 20000, plasmide: 1000 }
+          multiplicateur_cout: 2.0
+          duree_base_utj: 4.0
+          multiplicateur_duree: 2.0
+          capacite_missiles_par_niveau: 10
+
+        terminal_marchand:
+          categorie: economie
+          cout_base: { ferrum: 1000, lumen: 1000 }
+          multiplicateur_cout: 2.0
+          duree_base_utj: 2.0
+          multiplicateur_duree: 2.0
+          bonus_ratio_marche: "1 + 0.05 * niveau"
+
+        centre_diplomatique:
+          categorie: politique
+          requiert: { terminal_marchand: 4 }
+          cout_base: { ferrum: 5000, lumen: 2000 }
+          multiplicateur_cout: 2.5
+          duree_base_utj: 3.0
+          multiplicateur_duree: 2.0
+          bonus_influence_par_utj: "0.5 * niveau"
+
+      # ───────────────────────── VAISSEAUX ─────────────────────────
+
+      vaisseaux:
+        sonde:
+          cout: { ferrum: 0, lumen: 1000, plasmide: 20 }
+          duree_utj: 0.05
+          coque: 10
+          bouclier: 0.1
+          attaque: 0
+          vitesse: 100000
+          cargo: 5
+          consommation_par_utj: 1
+          requiert: { espionnage_profond: 1 }
+
+        chasseur_leger:
+          cout: { ferrum: 3000, lumen: 1000 }
+          duree_utj: 0.4
+          coque: 400
+          bouclier: 10
+          attaque: 50
+          vitesse: 12500
+          cargo: 50
+          consommation_par_utj: 20
+          bonus_contre: { cargo_lourd: 2.0, sonde: 5.0 }
+
+        chasseur_lourd:
+          cout: { ferrum: 6000, lumen: 4000 }
+          duree_utj: 0.6
+          coque: 1000
+          bouclier: 25
+          attaque: 150
+          vitesse: 10000
+          cargo: 100
+          consommation_par_utj: 75
+          bonus_contre: { chasseur_leger: 2.0 }
+          requiert: { armement: 2, drives_impulsion: 2 }
+
+        croiseur:
+          cout: { ferrum: 20000, lumen: 7000, plasmide: 2000 }
+          duree_utj: 1.6
+          coque: 2700
+          bouclier: 50
+          attaque: 400
+          vitesse: 15000
+          cargo: 800
+          consommation_par_utj: 300
+          bonus_contre: { chasseur_leger: 6.0, chasseur_lourd: 3.0 }
+          requiert: { armement: 3, drives_impulsion: 4 }
+
+        fregate:
+          cout: { ferrum: 30000, lumen: 12000, plasmide: 3000 }
+          duree_utj: 2.4
+          coque: 3500
+          bouclier: 100
+          attaque: 700
+          vitesse: 12000
+          cargo: 500
+          consommation_par_utj: 250
+          bonus_contre: { croiseur: 3.0 }
+          requiert: { armement: 5 }
+
+        cuirasse:
+          cout: { ferrum: 45000, lumen: 15000 }
+          duree_utj: 4.0
+          coque: 6000
+          bouclier: 200
+          attaque: 1000
+          vitesse: 9000
+          cargo: 1500
+          consommation_par_utj: 500
+          requiert: { drive_hyperspatial: 4 }
+
+        destroyer:
+          cout: { ferrum: 60000, lumen: 50000, plasmide: 15000 }
+          duree_utj: 6.0
+          coque: 11000
+          bouclier: 500
+          attaque: 2000
+          vitesse: 5000
+          cargo: 2000
+          consommation_par_utj: 1000
+          bonus_contre: { cuirasse: 2.0 }
+          requiert: { armement: 8, drive_hyperspatial: 6 }
+
+        dreadnought:
+          cout: { ferrum: 5000000, lumen: 4000000, plasmide: 1000000, singularite: 1 }
+          duree_utj: 24.0
+          coque: 75000
+          bouclier: 5000
+          attaque: 25000
+          vitesse: 2500
+          cargo: 10000
+          consommation_par_utj: 10000
+          requiert: { armement: 12, distorsion_subluminique: 2 }
+
+        cargo_lourd:
+          cout: { ferrum: 6000, lumen: 6000 }
+          duree_utj: 0.5
+          coque: 1200
+          bouclier: 25
+          attaque: 5
+          vitesse: 7500
+          cargo: 25000
+          consommation_par_utj: 50
+
+        recycleur:
+          cout: { ferrum: 10000, lumen: 6000, plasmide: 2000 }
+          duree_utj: 0.8
+          coque: 1600
+          bouclier: 10
+          attaque: 1
+          vitesse: 2000
+          cargo: 20000
+          consommation_par_utj: 300
+          requiert: { drive_hyperspatial: 3 }
+
+        vaisseau_colon:
+          cout: { ferrum: 10000, lumen: 20000, plasmide: 10000 }
+          duree_utj: 4.0
+          coque: 3000
+          bouclier: 100
+          attaque: 0
+          vitesse: 2500
+          cargo: 7500
+          consommation_par_utj: 1000
+          requiert: { drives_impulsion: 3 }
+
+      # ───────────────────────── DÉFENSES ─────────────────────────
+      # Bâtiments stationnaires sur la planète. Combattent comme des vaisseaux mais
+      # ne peuvent pas bouger. Les boucliers planétaires sont uniques (max 1).
+
+      defenses:
+        lance_missiles:
+          cout: { ferrum: 2000 }
+          duree_utj: 0.05
+          coque: 200
+          bouclier: 20
+          attaque: 80
+          bonus_contre: { chasseur_leger: 1.5 }
+
+        canon_laser_leger:
+          cout: { ferrum: 1500, lumen: 500 }
+          duree_utj: 0.08
+          coque: 200
+          bouclier: 25
+          attaque: 100
+          requiert: { armement: 2 }
+
+        canon_laser_lourd:
+          cout: { ferrum: 6000, lumen: 2000 }
+          duree_utj: 0.5
+          coque: 800
+          bouclier: 100
+          attaque: 250
+          requiert: { armement: 4 }
+
+        canon_gauss:
+          cout: { ferrum: 20000, lumen: 15000, plasmide: 2000 }
+          duree_utj: 1.5
+          coque: 3500
+          bouclier: 200
+          attaque: 1100
+          bonus_contre: { croiseur: 2.0, cuirasse: 1.5 }
+          requiert: { armement: 6 }
+
+        canon_ionique:
+          cout: { ferrum: 5000, lumen: 3000 }
+          duree_utj: 1.0
+          coque: 800
+          bouclier: 500
+          attaque: 150
+          requiert: { bouclier_graviton: 4 }
+
+        canon_plasma:
+          cout: { ferrum: 50000, lumen: 50000, plasmide: 30000 }
+          duree_utj: 4.0
+          coque: 10000
+          bouclier: 300
+          attaque: 3000
+          bonus_contre: { cuirasse: 2.0, destroyer: 1.5 }
+          requiert: { armement: 8, bouclier_graviton: 6 }
+
+        petit_bouclier_planetaire:
+          cout: { ferrum: 10000, lumen: 10000 }
+          duree_utj: 2.0
+          coque: 2000
+          bouclier: 2000
+          attaque: 1
+          max_par_planete: 1
+          requiert: { bouclier_graviton: 2 }
+
+        grand_bouclier_planetaire:
+          cout: { ferrum: 50000, lumen: 50000 }
+          duree_utj: 6.0
+          coque: 10000
+          bouclier: 10000
+          attaque: 1
+          max_par_planete: 1
+          requiert: { bouclier_graviton: 6 }
+
+      # ───────────────────────── CONSTRUCTION ─────────────────────────
+      # La vitesse de construction = 1 + 0.10 × chantier_spatial + 0.10 × usine_robotique
+
+      construction:
+        formule_vitesse: "1 + 0.10 * chantier_spatial + 0.10 * usine_robotique"
+
+      # ───────────────────────── RECHERCHES ─────────────────────────
+
+      recherches:
+        robotique:                { cout_base: { ferrum: 400, lumen: 120 }, mult: 2.0, duree_base: 1.0 }
+        automation_miniere:       { cout_base: { ferrum: 400, lumen: 200 }, mult: 1.8, duree_base: 1.0 }
+        fusion_controlee:         { cout_base: { ferrum: 800, lumen: 400, plasmide: 200 }, mult: 1.8, duree_base: 1.2 }
+        drives_impulsion:         { cout_base: { ferrum: 2000, lumen: 4000 }, mult: 2.0, duree_base: 1.5 }
+        drive_hyperspatial:       { cout_base: { ferrum: 10000, lumen: 20000, plasmide: 6000 }, mult: 2.0, duree_base: 2.0, requiert: { drives_impulsion: 3 } }
+        armement:                 { cout_base: { ferrum: 800, lumen: 200 }, mult: 2.0, duree_base: 1.0 }
+        bouclier_graviton:        { cout_base: { ferrum: 200, lumen: 1000 }, mult: 2.0, duree_base: 1.5 }
+        espionnage_profond:       { cout_base: { ferrum: 200, lumen: 1000, plasmide: 200 }, mult: 2.0, duree_base: 1.0 }
+        cryptographie:            { cout_base: { ferrum: 1000, lumen: 500 }, mult: 2.0, duree_base: 1.0 }
+        diplomatie:               { cout_base: { ferrum: 200, lumen: 200 }, mult: 1.5, duree_base: 0.8 }
+        doctrine_imperiale:       { cout_base: { ferrum: 5000, lumen: 5000 }, mult: 2.0, duree_base: 2.0, requiert: { diplomatie: 4 } }
+        distorsion_subluminique:  { cout_base: { ferrum: 200000, lumen: 400000, plasmide: 100000 }, mult: 2.5, duree_base: 4.0, requiert: { drive_hyperspatial: 6 } }
+
+      # ───────────────────────── COMBAT ─────────────────────────
+
+      combat:
+        rondes_max: 6
+        bouclier_regen_entre_rondes: 1.0    # 100 % entre rondes
+        seuil_destruction_coque: 0.30       # ≤ 30 % de coque → 70 % de chance de destruction
+        proba_destruction: 0.70
+        ratio_debris: 0.30                  # 30 % du métal des épaves devient un champ
+        pillage_max: 0.50                   # 50 % du non-protégé pillé
+
+      # ───────────────────────── MARCHÉ ─────────────────────────
+
+      marche:
+        ratio_base: { ferrum: 3.0, lumen: 2.0, plasmide: 1.0 }   # référence informationnelle
+        fee_base: 0.05                                           # 5% prélevés à chaque match
+        fee_reduction_par_terminal: 0.05                         # réduit à 0% à terminal niv 20
+        expire_ticks_default: 12                                 # ordres non remplis annulés après 12 ticks (~3h)
+        expire_ticks_max: 48
+
+      # ───────────────────────── ESPIONNAGE ─────────────────────────
+      # diff = nombre_sondes - tech_espionnage_defenseur × 4
+      # niveau d'info révélé = palier atteint :
+      #   diff ≥ 1   → niveau 1 (ressources)
+      #   diff ≥ 5   → niveau 2 (+ flotte au sol)
+      #   diff ≥ 25  → niveau 3 (+ défenses)
+      #   diff ≥ 125 → niveau 4 (+ bâtiments)
+      #   diff ≥ 625 → niveau 5 (+ recherches)
+      #
+      # Contre-espionnage : chaque niveau du défenseur détruit 1 sonde avec proba 0.20
+      # Si toutes les sondes meurent → niveau 0 et alerte au défenseur.
+
+      espionnage:
+        paliers: [1, 5, 25, 125, 625]
+        proba_destruction_par_niveau: 0.20
+
+      # ───────────────────────── SINGULARITÉ ─────────────────────────
+      # Une anomalie colonisée produit lentement une singularité quantique.
+      # 300 UTJ ≈ 50 ticks ≈ 12h35 par singularité. Cap à 5 par empire pour
+      # éviter le farming sans plafond.
+      singularite:
+        utj_par_unite: 300
+        cap_par_empire: 5
+
+      # ───────────────────────── INFLUENCE / DIPLOMATIE ─────────────────────────
+      # L'influence est produite par centre_diplomatique (déjà 0.5 × niv / UTJ
+      # dans rules.batiments.centre_diplomatique). Elle finance les ordres
+      # diplomatiques : trêve, rupture, alliance.
+      influence:
+        cap_par_empire: 10000
+      diplomatie:
+        treve:
+          cout_influence: 100
+          duree_ticks: 6
+          requiert_recherche: { diplomatie: 1 }
+        rupture:
+          cout_influence: 0
+          malus_moral_pct: 15        # production ×(1 − 0.15) tant qu'actif
+          malus_duree_ticks: 6
+        # Réduction du coût influence par niveau de recherche diplomatie
+        diplomatie_reduction_par_niveau: 0.05  # max −50% à niv 10
+
+      # ───────────────────────── PLANÈTES ─────────────────────────
+
+      types_planete:
+        tellurique:    { bonus: { mine_ferrum: 1.30 }, champs_min: 200, champs_max: 280 }
+        cristalline:   { bonus: { extracteur_lumen: 1.30 }, champs_min: 130, champs_max: 220 }
+        volcanique:    { bonus: { synthetiseur_plasmide: 1.30 }, champs_min: 100, champs_max: 200 }
+        glacee:        { bonus: { depot: 1.50 }, champs_min: 90, champs_max: 180 }
+        gazeuse:       { bonus: { centrale_solaire: 1.40 }, champs_min: 60, champs_max: 140 }
+        anomalie:      { bonus: { laboratoire: 1.30 }, produit_singularite: true, champs_min: 50, champs_max: 100, rare: true }
+
+  # ───────────────────────── EPOCH 0.3 ─────────────────────────
+  # Calibration "OGame-like" validée par simulation (engine/balance-sim.mjs
+  # skilled-econ 1 an → mine niv 23 sur epoch 0.2, mine niv 33 si on force
+  # cet epoch dès tick 0). Sur 2 ans IRL, atteint mine niv 35.
+  #
+  # activation_tick: 594 = tick_courant (498 au 2026-05-14) + 96 (= 24h de
+  # préavis IRL à 15 min/tick). Les files de chantier en cours au moment de
+  # l'activation NE sont PAS affectées : leur production_par_utj a été
+  # snapshottée à la complétion (cf ADR-0011). Seules les nouvelles upgrades
+  # commandées à partir du tick 594 utiliseront les nouveaux coûts/durées.
+  - activation_tick: 594
+    name: "epoch 0.3 — balance OGame"
+    patches:
+      "batiments.mine_ferrum.multiplicateur_duree": 1.4
+      "batiments.mine_ferrum.multiplicateur_cout": 1.45
+      "batiments.extracteur_lumen.multiplicateur_duree": 1.4
+      "batiments.extracteur_lumen.multiplicateur_cout": 1.5
+      "batiments.synthetiseur_plasmide.multiplicateur_duree": 1.4
+      "batiments.synthetiseur_plasmide.multiplicateur_cout": 1.45
+      "batiments.centrale_solaire.multiplicateur_duree": 1.4
+      "batiments.depot.multiplicateur_cout": 1.7
+      "batiments.depot.multiplicateur_duree": 1.5
+      "batiments.usine_robotique.multiplicateur_cout": 1.8
+      "batiments.usine_robotique.multiplicateur_duree": 1.6
+      "batiments.chantier_spatial.multiplicateur_cout": 1.8
+      "batiments.chantier_spatial.multiplicateur_duree": 1.6
+      "batiments.laboratoire.multiplicateur_cout": 1.8
+      "batiments.laboratoire.multiplicateur_duree": 1.55

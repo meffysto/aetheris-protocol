@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 
 import { runTick } from '../engine/tick-core.mjs';
 import * as combat from '../engine/combat.mjs';
-import { readYaml } from './helpers.mjs';
+import { readYaml, readRules } from './helpers.mjs';
 
-const rules = readYaml('engine/rules.yaml');
+const rules = readRules();
 const galaxie = readYaml('world/galaxie.yaml');
 
 function baseManifest(tick = 0) {

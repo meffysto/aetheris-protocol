@@ -5,12 +5,21 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { yparse, canonicalJSON } from '../engine/tick-core.mjs';
+import { effectiveRulesAtTick } from '../engine/rules-loader.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, '..');
 
 export function readYaml(rel) {
   return yparse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+}
+
+// Lit engine/rules.yaml et retourne le ruleset effectif au tick spécifié
+// (par défaut tick 0 = epoch racine). Tous les tests qui faisaient un
+// `readYaml('engine/rules.yaml')` doivent passer par cette fonction
+// depuis que rules.yaml est passé en format v2 avec epochs[].
+export function readRules(tick = 0) {
+  return effectiveRulesAtTick(fs.readFileSync(path.join(ROOT, 'engine/rules.yaml'), 'utf8'), tick);
 }
 
 export function readText(rel) {
@@ -33,7 +42,11 @@ export function hashState(empires) {
 // Charge les fixtures réelles (manifest, rules, galaxie, empires).
 export function loadFixtures() {
   const manifest = readYaml('world/manifest.yaml');
-  const rules = readYaml('engine/rules.yaml');
+  // rules.yaml est versionné par epochs (cf engine/rules-loader.mjs).
+  // Pour les tests, on prend toujours le ruleset effectif au tick 0 — c.-à-d.
+  // l'epoch racine. Les tests qui veulent simuler des transitions d'epoch
+  // construisent leur propre doc directement via parseRulesDoc.
+  const rules = effectiveRulesAtTick(readText('engine/rules.yaml'), 0);
   const galaxie = readYaml('world/galaxie.yaml');
 
   const empires = {};

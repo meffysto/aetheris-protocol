@@ -35,6 +35,7 @@ import { inscribe, API_URLS, OP_TYPES } from '../engine/inscribe-core.mjs';
 import { scanRange, fetchTipHeight } from '../engine/scan-bitcoin.mjs';
 import { computeSealHash } from '../engine/sealed-protocol.mjs';
 import { tickFromBlockHeight, blockHeightForTick, yparse } from '../engine/tick-core.mjs';
+import { effectiveRulesAtTick } from '../engine/rules-loader.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const STATE_FILE = path.join(ROOT, '.sealed-live-state.json');
@@ -110,9 +111,13 @@ async function loadGenesis() {
   return yparse(text);
 }
 
-async function loadRules() {
+// rules.yaml est v2 (epochs) — rules-loader gère le fallback v1 et calcule
+// le ruleset effectif au tick `at` (cf engine/rules-loader.mjs, ADR-0011).
+// Pour sealed-live, on appelle avec le tick de départ du sceau (= celui où
+// la flotte décolle → c'est ce ruleset qui détermine sa vitesse).
+async function loadRules(at = 0) {
   const text = await fs.readFile(path.join(ROOT, 'engine/rules.yaml'), 'utf8');
-  return yparse(text);
+  return effectiveRulesAtTick(text, at);
 }
 
 // Calcule le tick_impact attendu à partir de distance + vitesse min de la flotte.
@@ -209,7 +214,6 @@ async function cmdSeal({ opts, flags }) {
   }
 
   const genesis = await loadGenesis();
-  const rules = await loadRules();
   const blocGenesis = genesis.ancrage?.bloc_genesis;
   const bpt = genesis.parametres?.blocs_par_tick ?? 1;
   const api = API_URLS[NETWORK];
@@ -217,6 +221,9 @@ async function cmdSeal({ opts, flags }) {
   const tip = await fetchTipHeight(api);
   const tickCourant = tickFromBlockHeight(tip, blocGenesis, bpt, 0);
   const tick_depart = tickCourant + 1;
+  // Ruleset effectif au tick du départ — c'est lui qui détermine la vitesse
+  // de la flotte donc le tick_impact prévu.
+  const rules = await loadRules(tick_depart);
 
   const fleet = parseFleet(opts.fleet);
   const distance = Number.isFinite(parseInt(opts.distance, 10)) ? parseInt(opts.distance, 10) : 100;

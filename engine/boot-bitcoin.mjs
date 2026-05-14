@@ -15,6 +15,7 @@ import { scanRange, fetchTipHeight } from './scan-bitcoin.mjs';
 import { runTick, yparse, tickFromBlockHeight } from './tick-core.mjs';
 import { spawnEmpireFromJoin } from './world-init-core.mjs';
 import { resolveCombat, computeDebris, computePillage } from './combat.mjs';
+import { parseRulesDoc, effectiveRulesAtTick } from './rules-loader.mjs';
 import * as cache from './cache.mjs';
 
 // Clé du cache scan (versionnée — bump si format change)
@@ -54,7 +55,12 @@ export async function bootBitcoin({
   fromBlock,        // override pour reprise incrémentale (default = blocGenesis + 1)
 }) {
   const genesis = yparse(genesisYaml);
-  const rules = yparse(rulesYaml);
+  // Rules : doc d'epochs (cf engine/rules-loader.mjs et docs/adr/0011).
+  // On parse une fois et on calcule le ruleset effectif à chaque tick — le
+  // coût est marginal (deep-clone + quelques patches dottés) et garantit
+  // que les epochs futurs s'activent automatiquement quand T atteint leur
+  // activation_tick, sans rebooter ni invalider les snapshots.
+  const rulesDoc = parseRulesDoc(rulesYaml);
   const galaxie = yparse(galaxieYaml);
 
   const blocGenesis = genesis.ancrage?.bloc_genesis;
@@ -359,6 +365,12 @@ export async function bootBitcoin({
       revealOrders.push({ parsed: entry.parsed, txid: entry.txid, joueur: entry.joueur });
     }
 
+    // Ruleset effectif au tick T — peut changer aux frontières d'epoch.
+    // Les builds antérieurs gardent leur production_par_utj snapshottée à
+    // la complétion (tick-core.mjs phase production), donc seules les
+    // futures upgrades voient les nouveaux coûts/durées.
+    const rules = effectiveRulesAtTick(rulesDoc, T);
+
     // Run le tick
     const result = await runTick({
       manifest, rules, galaxie,
@@ -430,6 +442,10 @@ export async function bootBitcoin({
     globalThis.window.aetheris.roster = roster;
   }
 
+  // Le ruleset retourné est celui actif au tick courant — il alimente l'UI
+  // (prix d'upgrade affichés, ETA des chantiers). À la frontière du prochain
+  // epoch, un re-boot recalculera automatiquement.
+  const rules = effectiveRulesAtTick(rulesDoc, tickCourant);
   return {
     manifest, rules, galaxie, empires, identites,
     tickCourant, blocGenesis, blocsParTick, tip,

@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runTick, yparse, rngFromSeed } from './tick-core.mjs';
+import { parseRulesDoc, effectiveRulesAtTick } from './rules-loader.mjs';
 import * as combat from './combat.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -28,13 +29,18 @@ const ROOT = path.resolve(HERE, '..');
 // ── Args parsing ────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { ticks: 50, seed: '0xbalance-sim', strategie: null, list: false };
+  const args = { ticks: 50, seed: '0xbalance-sim', strategie: null, list: false, rules: null, quiet: false, activationTick: null };
   for (const a of argv.slice(2)) {
     if (a === '--list') args.list = true;
+    else if (a === '--quiet') args.quiet = true;
     else if (a.startsWith('--ticks=')) args.ticks = parseInt(a.slice(8), 10);
     else if (a.startsWith('--seed=')) args.seed = a.slice(7);
+    else if (a.startsWith('--rules=')) args.rules = a.slice(8);
+    else if (a.startsWith('--activation-tick=')) args.activationTick = parseInt(a.slice(18), 10);
     else if (!a.startsWith('--')) args.strategie = a;
   }
+  // Env override (utile pour batch sans modifier les CLI).
+  if (!args.rules && process.env.RULES_FILE) args.rules = process.env.RULES_FILE;
   return args;
 }
 
@@ -57,8 +63,20 @@ function readTickDurationMin() {
   }
 }
 
-function buildInitialState({ seed }) {
-  const rules = yparse(fs.readFileSync(path.join(ROOT, 'engine/rules.yaml'), 'utf8'));
+function buildInitialState({ seed, rulesPath, activationTick }) {
+  const rulesFile = rulesPath
+    ? (path.isAbsolute(rulesPath) ? rulesPath : path.join(ROOT, rulesPath))
+    : path.join(ROOT, 'engine/rules.yaml');
+  const rulesDoc = parseRulesDoc(fs.readFileSync(rulesFile, 'utf8'));
+  // Si --activation-tick=N est fourni, on bascule TOUS les epochs (au-delà de 0)
+  // sur le tick N — utile pour simuler "que se passe-t-il si epoch 0.3 entre
+  // en vigueur dès le début ?" sans toucher rules.yaml.
+  if (activationTick !== null && Number.isFinite(activationTick)) {
+    for (let i = 1; i < rulesDoc.epochs.length; i++) {
+      rulesDoc.epochs[i].activation_tick = activationTick + (i - 1);
+    }
+  }
+  const rules = effectiveRulesAtTick(rulesDoc, 0);
   const dureeTickMin = readTickDurationMin();
   const manifest = {
     version: 1, serveur: 'balance-sim', tick: 0, seed,
@@ -120,7 +138,7 @@ function buildInitialState({ seed }) {
     progres_singularite_utj: 0, relations: {}, malus_moral_jusqu_tick: 0,
   };
 
-  return { manifest, rules, galaxie, empires: { sim: empire } };
+  return { manifest, rules, galaxie, empires: { sim: empire }, rulesDoc };
 }
 
 // ── Stratégies ──────────────────────────────────────────────────────────
@@ -352,20 +370,151 @@ function colonRush(emp, manifest, rules, tick) {
   return orders;
 }
 
+// 5) Skilled-econ — joueur expert focalisé endgame 1 planète.
+//
+//    Priorités, dans cet ordre (réévaluées chaque tick que la file est libre) :
+//      1. Énergie : centrale_solaire dès que facteur_production < 1.0
+//      2. Stockage proactif : dépôt si stock > 70% capa sur Fe ou Lu
+//      3. Tech tree : laboratoire jusqu'à 3 puis tient le rythme (lab ≈ mf/4)
+//      4. Industrie : usine_robotique cible mf/3, chantier_spatial 1
+//      5. Mines : mine_ferrum & extracteur_lumen en lockstep, synthetiseur ≈ mf*0.6
+//      6. Recherche : automation_miniere et robotique en priorité, puis fusion.
+//
+//    Le bot maintient les invariants (objectifs proportionnels) plutôt qu'un
+//    plan figé — il s'adapte si la duree d'un palier explose.
+function skilledEcon(emp, manifest, rules, tick) {
+  const p = emp.planetes[0];
+  const orders = [];
+  const b = p.batiments;
+  const mf = b.mine_ferrum || 0;
+  const el = b.extracteur_lumen || 0;
+  const sp = b.synthetiseur_plasmide || 0;
+  const dep = b.depot || 0;
+  const cs = b.centrale_solaire || 0;
+  const ur = b.usine_robotique || 0;
+  const lab = b.laboratoire || 0;
+
+  // ─ Recherche (toujours, indépendamment de la file chantier) ─
+  const rech = emp.recherche || {};
+  if ((emp.file_recherche || []).length === 0 && lab >= 1) {
+    // Boucle prioritaire : automation_miniere (≥ 0.5 × mf), robotique (≥ 0.4 × mf),
+    // puis fusion (utile pour reacteur_fusion later) et armement (bouclier économique).
+    const targets = [
+      ['automation_miniere', Math.max(8, Math.floor(mf / 2) + 2)],
+      ['robotique',          Math.max(6, Math.floor(mf / 3) + 2)],
+      ['fusion_controlee',   Math.max(5, Math.floor(cs / 3) + 1)],
+      ['armement',           3],
+      ['drives_impulsion',   2],
+    ];
+    for (const [tech, cap] of targets) {
+      const cur = rech[tech] || 0;
+      if (cur >= cap) continue;
+      const def = rules.recherches?.[tech];
+      if (!def) continue;
+      if (def.requiert) {
+        let ok = true;
+        for (const [k, v] of Object.entries(def.requiert)) {
+          const isB = rules.batiments?.[k];
+          const cur2 = isB ? (b[k] || 0) : (rech[k] || 0);
+          if (cur2 < v) { ok = false; break; }
+        }
+        if (!ok) continue;
+      }
+      const mult = Math.pow(def.mult || 2.0, cur);
+      const cout = def.cout_base || {};
+      let canPay = true;
+      for (const [r, n] of Object.entries(cout)) {
+        if ((p.ressources[r]?.stock || 0) < n * mult) { canPay = false; break; }
+      }
+      if (canPay) {
+        orders.push({ type: 'recherche', technologie: tech, niveau_cible: cur + 1 });
+        break;
+      }
+    }
+  }
+
+  // ─ Chantier : un seul à la fois, candidats par ordre de priorité ─
+  if (isQueueFree(p)) {
+    const candidates = [];
+    const factEnergie = p.energie?.facteur_production ?? 1.0;
+
+    // URGENCE 1 — Énergie : déficit avéré → centrale immédiatement.
+    if (factEnergie < 1.0) candidates.push('centrale_solaire');
+
+    // URGENCE 2 — Stockage : un stock productif sature ET on a un minimum de mines.
+    //  (sans ce garde-fou le bot dépense ses ferrum en depot dès t=0 et reste bloqué)
+    let depotUrgent = false;
+    if (mf >= 3 && el >= 3) {
+      for (const r of ['ferrum', 'lumen', 'plasmide']) {
+        const info = p.ressources[r];
+        if (info && info.production_par_utj > 0 && info.stock > info.capacite * 0.85) {
+          depotUrgent = true;
+          break;
+        }
+      }
+    }
+    if (depotUrgent) candidates.push('depot');
+
+    // STAGE A — Bootstrap mines (atteindre mf=5, el=5) AVANT toute autre infra.
+    //   À ce stade le bot ignore lab/synth/usine et concentre tout sur les
+    //   producteurs primaires, qui sont les seuls à faire rouler la trésorerie.
+    if (mf < 5 || el < 5) {
+      // Lockstep : monter celui qui est derrière.
+      if (el < mf) candidates.push('extracteur_lumen');
+      else candidates.push('mine_ferrum');
+      candidates.push('mine_ferrum', 'extracteur_lumen');
+    } else {
+      // STAGE B — Infrastructure (lab → synth → usine) une fois mines viables.
+      if (lab < 1) candidates.push('laboratoire');
+      if (sp < 1) candidates.push('synthetiseur_plasmide');
+      if (lab < 3) candidates.push('laboratoire');
+      if (sp < 2) candidates.push('synthetiseur_plasmide');
+      if (ur < 2) candidates.push('usine_robotique');
+
+      // STAGE C — Endgame ratios.
+      // Énergie pré-emptive : cs proportionnel à (mf + el) / 3.
+      if (cs < Math.floor((mf + el) / 3)) candidates.push('centrale_solaire');
+      // Labo suit mf/4.
+      if (lab < Math.floor(mf / 4) + 1) candidates.push('laboratoire');
+      // Usine suit mf/4.
+      if (ur < Math.floor(mf / 4) + 1) candidates.push('usine_robotique');
+      // Dépôt : prévention douce, on monte dès qu'on est < mf - 6.
+      if (dep < Math.max(0, mf - 6)) candidates.push('depot');
+      // Plasmide suit mf*0.6.
+      if (sp < Math.floor(mf * 0.6)) candidates.push('synthetiseur_plasmide');
+      // Mines/extracteurs en boucle, lockstep.
+      candidates.push(mf <= el ? 'mine_ferrum' : 'extracteur_lumen');
+    }
+
+    // Fallback ultime.
+    candidates.push('mine_ferrum', 'extracteur_lumen');
+
+    for (const b2 of candidates) {
+      if (canAffordChantier(p, rules, b2)) {
+        orders.push(buildOrder(p, b2));
+        break;
+      }
+    }
+  }
+
+  return orders;
+}
+
 const STRATEGIES = {
   'econ-rush':     { fn: econRush,     desc: 'Économie pure : mines + extracteurs + plasmide + dépôt' },
   'military-rush': { fn: militaryRush, desc: 'Militaire précoce : chantier_spatial + chasseur_leger en flux' },
   'tech-rush':     { fn: techRush,     desc: 'Laboratoire + enchaînement recherches' },
   'colon-rush':    { fn: colonRush,    desc: 'Économie + colon + colonisation 1:1:2' },
+  'skilled-econ':  { fn: skilledEcon,  desc: 'Joueur expert 1-planète : énergie/dépôt/labo proactifs, ratios calibrés, recherche automation_miniere+robotique' },
 };
 
 // ── Runner ──────────────────────────────────────────────────────────────
 
-async function runSim({ strategie, ticks, seed }) {
+async function runSim({ strategie, ticks, seed, rules: rulesPath, activationTick }) {
   const fn = STRATEGIES[strategie]?.fn;
   if (!fn) throw new Error(`Stratégie inconnue: ${strategie}. Voir --list.`);
 
-  let state = buildInitialState({ seed });
+  let state = buildInitialState({ seed, rulesPath, activationTick });
   const dureeTickMin = state.manifest.duree_tick_min;
   const csv = [];
   csv.push('tick,minutes,ferrum,lumen,plasmide,score,planetes,flotte_au_sol,recherches,en_vol');
@@ -376,6 +525,14 @@ async function runSim({ strategie, ticks, seed }) {
     const ordresPkg = orders.length
       ? { sim: { joueur: 'sim', tick_cible: state.manifest.tick + 1, ordres: orders } }
       : {};
+
+    // Ruleset effectif au tick CIBLE — celui qu'on est sur le point de
+    // calculer (state.manifest.tick passera de t à t+1 après runTick). Cette
+    // convention "target-tick" est la même que dans boot-bitcoin.mjs (var T
+    // dans la boucle de replay), pour que la sim observe les transitions
+    // d'epoch exactement comme le replay client.
+    const targetTick = state.manifest.tick + 1;
+    state.rules = effectiveRulesAtTick(state.rulesDoc, targetTick);
 
     const result = await runTick({
       manifest: state.manifest,

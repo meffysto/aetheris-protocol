@@ -13,6 +13,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 import { runTick, yparse, ystringify } from './tick-core.mjs';
+import { effectiveRulesAtTick } from './rules-loader.mjs';
 import { resolveCombat, computeDebris, computePillage } from './combat.mjs';
 
 const ROOT = path.resolve(process.argv[2] === '--root' ? process.argv[3] : '.');
@@ -43,7 +44,10 @@ console.log(`root = ${ROOT}`);
 console.log(`mode = ${DRY ? 'DRY-RUN' : 'APPLY'}`);
 
 const manifest = yparse(rd('world/manifest.yaml'));
-const rules = yparse(rd('engine/rules.yaml'));
+// rules.yaml est v2 (epochs) — on prend le ruleset effectif au tick CIBLE
+// (manifest.tick + 1, i.e. le tick qu'on va calculer), même convention que
+// boot-bitcoin.mjs. Cf engine/rules-loader.mjs et ADR-0011.
+const rules = effectiveRulesAtTick(rd('engine/rules.yaml'), manifest.tick + 1);
 const galaxie = yparse(rd('world/galaxie.yaml'));
 
 console.log(`tick courant = ${manifest.tick}`);

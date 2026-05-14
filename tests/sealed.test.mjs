@@ -11,9 +11,9 @@ import assert from 'node:assert/strict';
 import { runTick } from '../engine/tick-core.mjs';
 import { computeSealHash } from '../engine/sealed-protocol.mjs';
 import * as combat from '../engine/combat.mjs';
-import { readYaml, clone } from './helpers.mjs';
+import { readYaml, readRules, clone } from './helpers.mjs';
 
-const rules = readYaml('engine/rules.yaml');
+const rules = readRules();
 const galaxie = readYaml('world/galaxie.yaml');
 
 function baseManifest(tick = 0) {

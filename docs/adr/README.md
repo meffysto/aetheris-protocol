@@ -25,6 +25,7 @@ cp docs/adr/0000-template.md docs/adr/NNNN-titre-en-kebab.md
 | [0008](0008-modularisation-tick-core.md) | Modularisation progressive de `tick-core.mjs` | Accepted (étape 1) | architecture, tooling |
 | [0009](0009-console-decoupage-html-css-js.md) | Découpage de la console : HTML / CSS / JS | Accepted (étape 1) | architecture, tooling, dx |
 | [0010](0010-notifications-et-responsive-mobile.md) | Notifications push & responsive mobile | Accepted (Nostr self-DM en backlog) | ux, mobile |
+| [0011](0011-rules-epochs-soft-fork.md) | Epochs de rules (soft-fork du gameplay) | Accepted | architecture, balance, gameplay |
 
 ## En cours d'écriture / backlog
 

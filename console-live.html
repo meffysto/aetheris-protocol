@@ -1800,7 +1800,15 @@ async function load() {
   try {
     state.manifest = yparse(await fetchText('world/manifest.yaml'));
     if (!state.rules) {
-      try { state.rules = yparse(await fetchText('engine/rules.yaml')); } catch {}
+      try {
+        // rules.yaml v2 — l'engine versionne par epochs (cf ADR-0011).
+        // Cette console legacy n'a pas accès à rules-loader.mjs ; on dépaquette
+        // inline en prenant epoch[0].rules (= ruleset racine). Les epochs
+        // futurs ne sont pas appliqués — acceptable pour ce client legacy
+        // (l'affichage est best-effort, la prod est sur console-live-bitcoin.html).
+        const parsed = yparse(await fetchText('engine/rules.yaml'));
+        state.rules = Array.isArray(parsed?.epochs) ? (parsed.epochs[0]?.rules || parsed) : parsed;
+      } catch {}
     }
     const galaxieText = await fetchText('world/galaxie.yaml');
     state.galaxie = yparse(galaxieText);

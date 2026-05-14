@@ -20,6 +20,16 @@ import * as cache from './cache.mjs';
 // Clé du cache scan (versionnée — bump si format change)
 const SCAN_CACHE_KEY = 'scan-v3';  // v3: inclut sealedByTick + revealsByTick
 
+// Clé du snapshot replay (versionnée — bump si format change ou si
+// la sémantique de runTick évolue de façon non-rétrocompatible).
+// Au boot, un snapshot dont la version diffère est ignoré (full replay).
+const REPLAY_SNAPSHOT_KEY = 'replay-snapshot-v1';
+const REPLAY_SNAPSHOT_VERSION = 1;
+
+// Fréquence d'écriture du snapshot pendant le replay (resilience aux crashes
+// d'onglet). À la fin du replay, un snapshot final est toujours écrit.
+const SNAPSHOT_EVERY_TICKS = 200;
+
 /**
  * @param {object} params
  * @param {string} params.api                 base Esplora URL
@@ -200,19 +210,78 @@ export async function bootBitcoin({
   log(`  → ${joins.length} join(s), ${Object.values(ordersByTick).reduce((a, m) => a + Object.keys(m).length, 0)} ordre(s) répartis sur ${Object.keys(ordersByTick).length} tick(s)`);
 
   // ─── Replay : tick par tick, intègre les joins en première fenêtre ─────
-  log(`▸ Replay des ${tickCourant} tick(s)…`);
-  let processedJoinIdx = 0;
-
   // Accumulateurs de rapports — l'engine les produit à chaque tick mais ils
   // étaient jetés. On les garde pour les surfacer dans l'UI (onglet Rapports).
-  // intelByPlayer[name] = [{ tick, filename, content }]   (espionnages reçus/émis par 'name')
-  // alertsByPlayer[name] = [{ tick, filename, content }]  (alertes : on a été espionné)
-  // battles = [{ tick, filename, content, attaquant, defenseur, lieu, issue }]
-  const intelByPlayer = {};
-  const alertsByPlayer = {};
-  const battles = [];
+  let intelByPlayer = {};
+  let alertsByPlayer = {};
+  let battles = [];
 
-  for (let T = 1; T <= tickCourant; T++) {
+  // Tentative de reprise sur snapshot. Si valide (même genesis, même version)
+  // et tick ≤ tickCourant, on saute le replay des ticks déjà calculés.
+  // Sinon : fallback transparent vers full replay depuis le tick 1.
+  let startTick = 1;
+  let cachedSnapshot = null;
+  try { cachedSnapshot = await cache.get(REPLAY_SNAPSHOT_KEY); } catch {}
+  if (cachedSnapshot
+      && cachedSnapshot.version === REPLAY_SNAPSHOT_VERSION
+      && cachedSnapshot.blocGenesis === blocGenesis
+      && Number.isInteger(cachedSnapshot.tick)
+      && cachedSnapshot.tick >= 1
+      && cachedSnapshot.tick <= tickCourant) {
+    try {
+      manifest = cachedSnapshot.manifest;
+      empires = cachedSnapshot.empires;
+      Object.assign(identites, cachedSnapshot.identites || {});
+      // La galaxie évolue par mutation (colonisations) — la restaurer depuis le snapshot
+      // sinon les coordonnées des planètes colonisées disparaîtraient.
+      if (cachedSnapshot.galaxie) {
+        Object.keys(galaxie).forEach(k => delete galaxie[k]);
+        Object.assign(galaxie, cachedSnapshot.galaxie);
+      }
+      intelByPlayer = cachedSnapshot.intelByPlayer || {};
+      alertsByPlayer = cachedSnapshot.alertsByPlayer || {};
+      battles = cachedSnapshot.battles || [];
+      startTick = cachedSnapshot.tick + 1;
+      log(`✓ Snapshot reprise tick ${cachedSnapshot.tick} (saute ${cachedSnapshot.tick} tick(s) du replay)`);
+    } catch (e) {
+      log(`  ! snapshot corrompu (${e.message}) — full replay`);
+      startTick = 1;
+      intelByPlayer = {};
+      alertsByPlayer = {};
+      battles = [];
+    }
+  }
+
+  log(`▸ Replay tick ${startTick}..${tickCourant} (${tickCourant - startTick + 1} tick(s))…`);
+
+  // processedJoinIdx avance jusqu'au premier join non encore intégré dans
+  // l'état actuel. Si on reprend sur snapshot, on saute les joins déjà
+  // intégrés (blockHeight ≤ blocGenesis + (startTick-1)*bpt).
+  let processedJoinIdx = 0;
+  if (startTick > 1) {
+    const cutBlock = blocGenesis + (startTick - 1) * blocsParTick;
+    while (processedJoinIdx < joins.length && joins[processedJoinIdx].blockHeight <= cutBlock) {
+      processedJoinIdx++;
+    }
+  }
+
+  // Helper : sérialise l'état courant en snapshot. Async, fail-soft.
+  const writeSnapshot = async (atTick) => {
+    try {
+      await cache.set(REPLAY_SNAPSHOT_KEY, {
+        version: REPLAY_SNAPSHOT_VERSION,
+        blocGenesis,
+        tick: atTick,
+        manifest, empires, galaxie, identites,
+        intelByPlayer, alertsByPlayer, battles,
+        writtenAt: Date.now(),
+      });
+    } catch (e) {
+      log(`  ! snapshot write skipped @ tick ${atTick}: ${e.message}`);
+    }
+  };
+
+  for (let T = startTick; T <= tickCourant; T++) {
     onProgress({ phase: 'replay', current: T, total: tickCourant });
 
     // Intègre les joins dont blockHeight ≤ blocGenesis + T*bpt
@@ -329,7 +398,17 @@ export async function bootBitcoin({
         }
       }
     }
+
+    // Snapshot intermédiaire — resilience aux crashes d'onglet pendant le
+    // replay. À éviter d'await dans la boucle (perf), donc fire-and-forget.
+    if (T % SNAPSHOT_EVERY_TICKS === 0 && T < tickCourant) {
+      writeSnapshot(T);
+    }
   }
+
+  // Snapshot final — toujours awaité pour que le prochain boot bénéficie
+  // du replay qu'on vient de terminer.
+  if (tickCourant >= 1) await writeSnapshot(tickCourant);
 
   log(`✓ Boot terminé — tick ${manifest.tick}, ${Object.keys(empires).length} empire(s)`);
 

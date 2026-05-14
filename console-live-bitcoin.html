@@ -983,6 +983,25 @@ h2.sect .rule {
   pointer-events: none;
   animation: orbital-pulse 1.6s ease-in-out infinite;
 }
+.system .orbital .route { fill: none; stroke-width: 1.2; stroke-dasharray: 3 3; opacity: .85; animation: route-dash 1.4s linear infinite; pointer-events: none; }
+.system .orbital .route.hostile  { stroke: var(--phosphor); }
+.system .orbital .route.friendly { stroke: #5a7a3a; animation-direction: reverse; animation-duration: 1.6s; }
+.system .orbital .ship { stroke: #f7f0df; stroke-width: .5; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
+.system .orbital .ship.hostile  { fill: var(--phosphor); }
+.system .orbital .ship.friendly { fill: #5a7a3a; }
+.system .orbital .ship-trail { pointer-events: none; }
+@keyframes route-dash { to { stroke-dashoffset: -12; } }
+
+/* Badge "vous êtes ici" sur le système courant + soft glow autour de la carte. */
+.system.my-system { box-shadow: 0 1px 2px rgba(28,20,8,.04), 0 8px 22px rgba(28,20,8,.06), 0 0 0 1px rgba(168,90,40,.25); }
+.system .here-badge {
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--phosphor); background: rgba(168,58,37,.10);
+  border: 1px solid rgba(168,58,37,.32);
+  padding: 2px 8px; border-radius: var(--r-pill);
+  margin-left: 4px;
+}
 .system .orbital .star-label {
   font-family: var(--display); font-weight: 600; font-size: 13px;
   fill: var(--bone-2); text-anchor: middle; dominant-baseline: central;
@@ -3919,6 +3938,40 @@ function renderGalaxie() {
     }
   }
 
+  // Index nom de planète → { coord, i } pour positionner les trajectoires.
+  const planetIndex = new Map();
+  for (const [coord, sys] of Object.entries(g.systemes)) {
+    for (const [k, pos] of Object.entries(sys.positions || {})) {
+      if (pos?.type === 'planete' && pos.nom) {
+        planetIndex.set(pos.nom, { coord, i: parseInt(k, 10) });
+      }
+    }
+  }
+
+  // Trajectoires intra-système, indexées par coord du système.
+  // Cross-system non rendu (les SVG sont séparés par carte).
+  const routesBySystem = new Map();
+  const pushRoute = (sysKey, route) => {
+    if (!routesBySystem.has(sysKey)) routesBySystem.set(sysKey, []);
+    routesBySystem.get(sysKey).push(route);
+  };
+  for (const [pname, e] of Object.entries(state.players || {})) {
+    for (const f of (e.flottes_en_vol || [])) {
+      const fromName = f.depuis?.planete;
+      const toName = f.vers?.planete;
+      if (!fromName || !toName) continue;
+      const a = planetIndex.get(fromName);
+      const b = planetIndex.get(toName);
+      if (!a || !b || a.coord !== b.coord) continue;
+      const isMine = pname === me;
+      const isHostileOnMe = !isMine && f.vers?.joueur === me &&
+        hostileTypes.has((f.type_mission || '').toLowerCase());
+      const kind = isHostileOnMe ? 'hostile' : (isMine ? 'friendly' : 'neutral');
+      if (kind === 'neutral') continue; // on ne montre que mes flottes et les menaces sur moi
+      pushRoute(a.coord, { from: a.i, to: b.i, kind, type: f.type_mission });
+    }
+  }
+
   // ─── orbital layout constants ─────────────────────────────────
   const ORB_N = 15, ORB_RMIN = 42, ORB_RMAX = 240;
   const orbR = i => ORB_RMIN + (i - 1) * (ORB_RMAX - ORB_RMIN) / (ORB_N - 1);
@@ -3949,12 +4002,13 @@ function renderGalaxie() {
   for (const [coord, sys] of systemEntries) {
     const star = sys.etoile || {};
     const sc = starColor(star.type);
-    const haloId = `starHalo-${defsId}`;
-    const gasRingId = `gasRing-${defsId}`;
-    defsId++;
+    const sysIdx = defsId++;
+    const haloId = `starHalo-${sysIdx}`;
+    const gasRingId = `gasRing-${sysIdx}`;
 
     let bodiesSvg = '';
     let ringsSvg = '';
+    let routesSvg = '';
 
     for (let i = 1; i <= ORB_N; i++) {
       const pos = sys.positions?.[i] || { type: 'empty' };
@@ -4052,12 +4106,47 @@ function renderGalaxie() {
       </g>`;
     }
 
-    html += `<div class="system"><header>
+    // Trajectoires de flotte intra-système (mes flottes + flottes hostiles sur moi).
+    const sysRoutes = routesBySystem.get(coord) || [];
+    sysRoutes.forEach((r, k) => {
+      const [x1, y1] = orbXY(r.from);
+      const [x2, y2] = orbXY(r.to);
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      // Arc latéral pour donner du mouvement
+      const nx = -dy / len, ny = dx / len;
+      const curveAmt = Math.min(40, len * 0.18);
+      const cx = (x1 + x2) / 2 + nx * curveAmt;
+      const cy = (y1 + y2) / 2 + ny * curveAmt;
+      const d = `M${x1.toFixed(1)} ${y1.toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+      const pid = `route-${sysIdx}-${k}`;
+      const dur = r.kind === 'hostile' ? '5.5s' : '4.2s';
+      routesSvg += `<path id="${pid}" class="route ${r.kind}" d="${d}"/>`;
+      // Vaisseau-cône qui glisse + 3 points de traînée décalés.
+      routesSvg += `<polygon class="ship ${r.kind}" points="5,0 -3,-2.6 -3,2.6">
+        <animateMotion dur="${dur}" repeatCount="indefinite" rotate="auto">
+          <mpath xlink:href="#${pid}" href="#${pid}"/>
+        </animateMotion>
+      </polygon>`;
+      for (let n = 1; n <= 3; n++) {
+        routesSvg += `<circle class="ship-trail ${r.kind}" r="${(1.6 - n * 0.35).toFixed(2)}"
+          fill="${r.kind === 'hostile' ? '#a83a25' : '#5a7a3a'}"
+          opacity="${(0.55 - n * 0.15).toFixed(2)}">
+          <animateMotion dur="${dur}" repeatCount="indefinite" begin="-${(n * 0.18).toFixed(2)}s">
+            <mpath xlink:href="#${pid}" href="#${pid}"/>
+          </animateMotion>
+        </circle>`;
+      }
+    });
+
+    const isMySystem = coord === mySystemKey;
+    html += `<div class="system${isMySystem ? ' my-system' : ''}"><header>
       <span class="star-name">${esc(star.nom || '—')}</span>
       <span class="star-meta">type ${esc(star.type || '?')} · ${esc(star.temperature_k || '?')}K</span>
+      ${isMySystem ? '<span class="here-badge" title="vous êtes ici">★ ici</span>' : ''}
       <span class="coord">${esc(coord)}</span>
     </header><div class="orbital">
-      <svg viewBox="-260 -260 520 520" aria-label="système ${esc(star.nom || coord)}">
+      <svg viewBox="-260 -260 520 520" xmlns:xlink="http://www.w3.org/1999/xlink" aria-label="système ${esc(star.nom || coord)}">
         <defs>
           <radialGradient id="${haloId}" cx="50%" cy="50%" r="50%">
             <stop offset="0%"  stop-color="#fff2c2" stop-opacity="1"/>
@@ -4079,6 +4168,7 @@ function renderGalaxie() {
         </circle>
         <circle cx="0" cy="0" r="22" fill="url(#${haloId})" opacity=".95"/>
         <circle cx="0" cy="0" r="13" fill="${sc}" stroke="#d49a3a" stroke-width=".6"/>
+        <g class="routes">${routesSvg}</g>
         <text class="star-label" y="42">${esc(star.nom || '—')}</text>
         <text class="star-meta-text" y="56">${esc(star.type || '?')} · ${esc(star.temperature_k || '?')}K</text>
         <g class="bodies">${bodiesSvg}</g>

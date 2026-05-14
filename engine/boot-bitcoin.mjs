@@ -447,7 +447,7 @@ export async function bootBitcoin({
   // epoch, un re-boot recalculera automatiquement.
   const rules = effectiveRulesAtTick(rulesDoc, tickCourant);
   return {
-    manifest, rules, galaxie, empires, identites,
+    manifest, rules, rulesDoc, galaxie, empires, identites,
     tickCourant, blocGenesis, blocsParTick, tip,
     joins, ordersByTick,
     roster,

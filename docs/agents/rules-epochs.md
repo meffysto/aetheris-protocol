@@ -89,7 +89,21 @@ import("./engine/rules-loader.mjs").then(async ({parseRulesDoc, effectiveRulesAt
 '
 ```
 
-### 5. Commit + push 3 cibles
+### 5. Vérifier le bandeau UI
+
+Le bandeau d'annonce d'epoch (`client/app.js::renderEpochBanner` +
+`client/styles.css::.epoch-banner`) est **automatique** — il lit
+`state.rulesDoc.epochs` au boot et détecte tout seul le prochain epoch
+dont l'`activation_tick` est dans le futur. Tu n'as rien à coder, mais :
+
+- **Ouvre la console** après push et vérifie que le bandeau apparaît
+  avec le bon nom d'epoch + un countdown raisonnable.
+- Clique le bandeau → l'overlay détail doit afficher tous les patches.
+- Si le bandeau n'apparaît pas alors qu'`activation_tick > tick_courant` :
+  vérifie que `bootBitcoin` retourne bien `rulesDoc` (sinon le client
+  reçoit un doc obsolète depuis le cache navigateur — hard refresh).
+
+### 6. Commit + push 3 cibles
 
 ```bash
 git add engine/rules.yaml

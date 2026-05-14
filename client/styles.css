@@ -1344,6 +1344,55 @@ body.tick-pulsed::after {
   word-break: break-word;
 }
 .err.on { display: block; }
+
+/* Bandeau d'annonce d'epoch (soft-fork de balance) — cf ADR-0011.
+   Affiche un compte à rebours jusqu'à l'activation d'un nouvel epoch
+   de rules.yaml + un résumé des patches. */
+.epoch-banner {
+  position: sticky; top: 0; z-index: 50;
+  background: linear-gradient(90deg, rgba(168,58,37,0.92), rgba(198,74,48,0.92));
+  color: var(--bone-2);
+  padding: 10px 18px;
+  font-family: var(--sans);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid rgba(0,0,0,0.2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer;
+}
+.epoch-banner .eb-label {
+  text-transform: uppercase; opacity: 0.85; font-size: 10px;
+  letter-spacing: 0.08em;
+}
+.epoch-banner .eb-name { flex: 1; font-weight: 700; }
+.epoch-banner .eb-countdown {
+  font-variant-numeric: tabular-nums;
+  background: rgba(0,0,0,0.18);
+  padding: 4px 10px; border-radius: 4px;
+}
+.epoch-banner .eb-details {
+  display: none;
+  width: 100%;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.18);
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.epoch-banner.open { flex-wrap: wrap; }
+.epoch-banner.open .eb-details { display: block; }
+.epoch-banner .eb-patches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 16px;
+  margin-top: 6px;
+}
+.epoch-banner .eb-patches code {
+  background: rgba(0,0,0,0.18); padding: 1px 5px; border-radius: 3px;
+  font-family: var(--mono); font-size: 10.5px;
+}
 .err .close, .toast .close {
   position: absolute; top: 6px; right: 8px;
   width: 22px; height: 22px;

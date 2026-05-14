@@ -384,6 +384,7 @@ async function load() {
 
     state.manifest = result.manifest;
     state.rules = result.rules;
+    state.rulesDoc = result.rulesDoc;  // pour le bandeau d'annonce d'epoch
     state.galaxie = result.galaxie;
     state.players = result.empires;
     state.identites = result.identites;
@@ -620,6 +621,7 @@ function render() {
   const emp = state.players[state.current];
   const p = emp && (emp.planetes || [])[0];
 
+  renderEpochBanner();
   renderResourceStrip(p);
   renderPlanetHead(p, emp);
   renderOverview(p, emp);
@@ -2033,6 +2035,69 @@ function summarizeQueuedOrder(o) {
   return { nm: o.type, sub: '' };
 }
 
+/* Bandeau d'annonce d'epoch (cf docs/agents/rules-epochs.md + ADR-0011).
+ *
+ * Affiche un compte à rebours quand un epoch futur est défini dans
+ * rules.yaml (activation_tick > tick courant). Cliquer ouvre le détail
+ * des patches qui seront appliqués.
+ *
+ * MAINTENANCE : cette fonction est AUTOMATIQUE — pas besoin de la toucher
+ * quand on ajoute un nouvel epoch. Elle lit state.rulesDoc.epochs et
+ * détecte tout seul le prochain à activer. Si tu modifies l'epoch
+ * structure (rules-loader.mjs), vérifie que ce renderer reste cohérent.
+ * Si tu pousses un nouvel epoch, ouvre la console et regarde que le
+ * bandeau apparaît avec le bon name + countdown.
+ */
+function renderEpochBanner() {
+  const el = document.getElementById('epochBanner');
+  if (!el) return;
+  const doc = state.rulesDoc;
+  const tickCourant = state.manifest?.tick;
+  if (!doc || !Array.isArray(doc.epochs) || tickCourant === undefined) {
+    el.hidden = true;
+    return;
+  }
+  // Trouve le prochain epoch dont l'activation est strictement future.
+  const next = doc.epochs.find(e => (e.activation_tick || 0) > tickCourant);
+  if (!next) {
+    el.hidden = true;
+    return;
+  }
+  const ticksLeft = next.activation_tick - tickCourant;
+  const minutesParTick = state.manifest?.duree_tick_min || 15;
+  const minutesLeft = ticksLeft * minutesParTick;
+  // Format compte à rebours : "23h12" ou "47min" ou "3j 2h"
+  let countdown;
+  if (minutesLeft >= 24 * 60) {
+    const days = Math.floor(minutesLeft / (24 * 60));
+    const h = Math.floor((minutesLeft % (24 * 60)) / 60);
+    countdown = h > 0 ? `${days}j ${h}h` : `${days}j`;
+  } else if (minutesLeft >= 60) {
+    const h = Math.floor(minutesLeft / 60);
+    const m = Math.round(minutesLeft % 60);
+    countdown = m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+  } else {
+    countdown = `${Math.max(1, Math.round(minutesLeft))} min`;
+  }
+  const patches = next.patches ? Object.entries(next.patches) : [];
+  const patchesHtml = patches.length === 0
+    ? '<div style="opacity:0.7">Aucun patch listé (epoch redéfinit le ruleset complet).</div>'
+    : `<div>Patches appliqués au tick ${next.activation_tick} :</div>
+       <div class="eb-patches">${patches.map(([k, v]) => `<div><code>${escapeHtml(k)}</code> → <b>${escapeHtml(String(v))}</b></div>`).join('')}</div>
+       <div style="opacity:0.75;margin-top:8px;font-size:10.5px;">
+         Les bâtiments déjà construits gardent leur production. Seules
+         les upgrades commandées après l'activation utiliseront ces valeurs.
+       </div>`;
+  el.innerHTML = `
+    <span class="eb-label">Soft-fork</span>
+    <span class="eb-name">${escapeHtml(next.name || `epoch tick ${next.activation_tick}`)}</span>
+    <span class="eb-countdown">dans ${countdown}</span>
+    <div class="eb-details">${patchesHtml}</div>
+  `;
+  el.hidden = false;
+  el.onclick = () => el.classList.toggle('open');
+}
+
 function renderCart() {
   const playerName = state.current;
   const q = playerName ? getQueue(playerName) : [];
@@ -2531,7 +2596,10 @@ function queueOrderLocally(newOrder, message) {
   if (!localQueue[playerName]) localQueue[playerName] = [];
   localQueue[playerName].push({ order: newOrder, message, tickCible });
   __lastQueueTick = tickCible;
-  render();
+  // PARTIAL render : seul le panier UI dépend de localQueue (les renderers
+  // de bâtiments/recherche/flotte lisent l'état moteur, pas le panier).
+  // Évite le flash visuel pénible à chaque clic "améliorer".
+  renderCart();
   return localQueue[playerName].length;
 }
 
@@ -2540,7 +2608,7 @@ function removeQueuedOrder(playerName, idx) {
   if (!q) return;
   q.splice(idx, 1);
   if (q.length === 0) delete localQueue[playerName];
-  render();
+  renderCart();
 }
 
 // Inscrit en UNE SEULE inscription Bitcoin tous les ordres du panier du

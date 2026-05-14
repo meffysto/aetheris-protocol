@@ -30,6 +30,10 @@
 
 <div class="err" id="err"></div>
 <div class="toast" id="toast"></div>
+<!-- Bandeau d'annonce d'epoch (cf docs/agents/rules-epochs.md). Rendu par
+     renderEpochBanner() — visible quand un epoch futur est dans rules.yaml
+     avec activation_tick > tick courant. -->
+<div class="epoch-banner" id="epochBanner" hidden></div>
 
 <div class="ob-bg" id="obBgLegacy" hidden>
   <div class="ob-card" id="obCard">

@@ -14,6 +14,10 @@ Default canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, `read
 
 Single-context layout (`CONTEXT.md` + `docs/adr/` at repo root). See `docs/agents/domain.md`.
 
+### Rules epochs (soft-fork de balance)
+
+Pour changer la balance (coûts, durées, multiplicateurs) sans hard reset : runbook dans `docs/agents/rules-epochs.md`. Architecture dans `docs/adr/0011`.
+
 ## Push workflow
 
 Quand l'utilisateur demande de commit/push (sur la branche `bitcoin/mvp`), pousser systématiquement sur **trois cibles** :

@@ -391,6 +391,104 @@ test('runTick : recherche ACCEPTÉE si labo sur une AUTRE planète de l\'empire'
     'recherche acceptée car labo existe ailleurs dans l\'empire');
 });
 
+test('runTick : attaque REJETÉE sans chantier_spatial', async () => {
+  const empires = {
+    attk: emptyEmpire('attk', [planet('attk-base', [1, 1, 7])]),
+    def: emptyEmpire('def', [planet('def-base', [1, 1, 8])]),
+  };
+  // Flotte pré-positionnée mais pas de chantier → attaque rejetée.
+  empires.attk.planetes[0].flotte_au_sol = { chasseur_leger: 50 };
+  empires.attk.planetes[0].batiments.chantier_spatial = 0;
+
+  const orders = {
+    attk: { joueur: 'attk', tick_cible: 1, ordres: [
+      { type: 'attaque', depuis: 'attk-base', cible: { joueur: 'def', planete: 'def-base' }, flotte: { chasseur_leger: 50 } },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  // Flotte reste au sol (l'ordre a été rejeté avant débit).
+  assert.equal(result.newEmpires.attk.planetes[0].flotte_au_sol.chasseur_leger, 50);
+  assert.equal((result.newEmpires.attk.flottes_en_vol || []).length, 0);
+});
+
+test('runTick : trêve BILATÉRALE — A déclare → B ne peut PAS attaquer A', async () => {
+  // Avant le fix, seul l'empire émetteur était lié. Désormais lecture
+  // symétrique : B voit la trêve de A et est bloqué aussi.
+  const empires = {
+    a: emptyEmpire('a', [planet('a-base', [1, 1, 7])]),
+    b: emptyEmpire('b', [planet('b-base', [1, 1, 8])]),
+  };
+  empires.a.relations = { b: { status: 'treve', expire_tick: 100 } };
+  empires.b.planetes[0].flotte_au_sol = { chasseur_leger: 50 };
+  empires.b.planetes[0].batiments.chantier_spatial = 1;
+
+  const orders = {
+    b: { joueur: 'b', tick_cible: 1, ordres: [
+      { type: 'attaque', depuis: 'b-base', cible: { joueur: 'a', planete: 'a-base' }, flotte: { chasseur_leger: 50 } },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  assert.equal((result.newEmpires.b.flottes_en_vol || []).length, 0,
+    "attaque de b vers a rejetée car a a déclaré une trêve (lecture symétrique)");
+});
+
+test('runTick : rupture efface la trêve des DEUX côtés', async () => {
+  // a a posé la trêve, b pose une rupture → relations[a] côté b passe
+  // neutre ET relations[b] côté a passe neutre aussi (sinon b reste bloqué).
+  const empires = {
+    a: emptyEmpire('a', [planet('a-base', [1, 1, 7])]),
+    b: emptyEmpire('b', [planet('b-base', [1, 1, 8])]),
+  };
+  empires.a.relations = { b: { status: 'treve', expire_tick: 100 } };
+  empires.b.planetes[0].batiments.centre_diplomatique = 1;
+  empires.b.recherche = { diplomatie: 1 };
+
+  const orders = {
+    b: { joueur: 'b', tick_cible: 1, ordres: [
+      { type: 'diplomatie', action: 'rupture', vers: 'a' },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  assert.equal(result.newEmpires.a.relations.b.status, 'neutre',
+    "côté a, la trêve est effacée par la rupture posée par b");
+  // Et b écope du malus moral (initiator de la rupture).
+  assert.ok(result.newEmpires.b.malus_moral_jusqu_tick > 0);
+});
+
+test('runTick : trêve REJETÉE sans centre_diplomatique', async () => {
+  const empires = {
+    a: emptyEmpire('a', [planet('a-base', [1, 1, 7])]),
+    b: emptyEmpire('b', [planet('b-base', [1, 1, 8])]),
+  };
+  // a a la recherche diplomatie et de l'influence, mais pas de centre.
+  empires.a.recherche = { diplomatie: 2 };
+  empires.a.ressources_globales = { singularite: 0, influence: 500 };
+  empires.a.planetes[0].batiments.centre_diplomatique = 0;
+
+  const orders = {
+    a: { joueur: 'a', tick_cible: 1, ordres: [
+      { type: 'diplomatie', action: 'treve', vers: 'b' },
+    ]},
+  };
+  const result = await runTick({
+    manifest: baseManifest(0), rules, galaxie,
+    empires, orders, identites: {}, combat,
+  });
+  assert.equal(result.newEmpires.a.relations?.b, undefined,
+    "trêve non créée sans centre_diplomatique");
+  // Influence pas débitée.
+  assert.equal(result.newEmpires.a.ressources_globales.influence, 500);
+});
+
 test('runTick : pas de stock négatif après prod', async () => {
   const empires = { meff: emptyEmpire('meff', [planet('meff-prima')]) };
   empires.meff.planetes[0].ressources.ferrum.stock = 0;

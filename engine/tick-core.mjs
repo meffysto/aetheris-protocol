@@ -421,9 +421,11 @@ export async function runTick({
     const afterLen = (emp.flottes_en_vol || []).length;
     if (afterLen > beforeLen) {
       // Force arrivée ce tick : décrément Phase 4 ramènera arrivee_utj à 0.
+      // duree_aller_utj N'EST PAS overwritten — il garde la vraie durée
+      // calculée par queueAttaque (distance/vMin). Sans ça le retour
+      // de flotte se ferait en 1 tick peu importe la distance (bug C1).
       const flt = emp.flottes_en_vol[afterLen - 1];
       flt.arrivee_utj = UTJ_PAR_TICK;
-      flt.duree_aller_utj = UTJ_PAR_TICK;
       flt.scelle = true;
       events.push({
         type: 'reveal-resolu',
@@ -626,6 +628,15 @@ export async function runTick({
         log(`  · ${playerName}: trêve requiert recherche diplomatie ≥ ${reqNiv} (actuel ${niv})`);
         return;
       }
+      // Gating centre_diplomatique : on ne signe pas de trêve sans
+      // au moins un centre_diplomatique niv 1 quelque part dans l'empire.
+      // C'est lui qui produit l'influence — si l'empire l'a perdu,
+      // il ne peut plus s'engager diplomatiquement.
+      const aCD = (emp.planetes || []).some(p => (p.batiments?.centre_diplomatique || 0) >= 1);
+      if (!aCD) {
+        log(`  · ${playerName}: trêve requiert centre_diplomatique niv 1`);
+        return;
+      }
       const coutBase = conf.treve?.cout_influence || 100;
       const reduc = Math.min(0.5, niv * (conf.diplomatie_reduction_par_niveau || 0));
       const cout = Math.ceil(coutBase * (1 - reduc));
@@ -634,7 +645,9 @@ export async function runTick({
         return;
       }
       const duree = parseInt(action.duree_ticks, 10) || conf.treve?.duree_ticks || 6;
-      emp.ressources_globales.influence -= cout;
+      // Clamp défensif : ne pas descendre sous 0 (impossible vu le check
+      // ligne précédente, mais safety net contre les états corrompus).
+      emp.ressources_globales.influence = Math.max(0, (emp.ressources_globales.influence || 0) - cout);
       emp.relations[cible] = { status: 'treve', expire_tick: tickSuivant + duree };
       events.push({ type: 'treve-declaree', joueur: playerName, vers: cible, expire_tick: tickSuivant + duree, cout });
       log(`  🕊 ${playerName}: trêve avec ${cible} jusqu'au tick ${tickSuivant + duree} (−${cout} influence)`);
@@ -642,13 +655,23 @@ export async function runTick({
     }
 
     if (action.action === 'rupture') {
+      // La rupture doit pouvoir effacer la trêve même si c'est l'AUTRE empire
+      // qui l'a déclarée (trêve bilatérale par lecture : sinon on se retrouve
+      // bloqué d'attaquer par une trêve qu'on n'a pas signée).
       const rel = emp.relations[cible];
-      if (!rel || rel.status === 'neutre') {
+      const relInv = empires[cible]?.relations?.[playerName];
+      const hasTreve = (rel && rel.status === 'treve') || (relInv && relInv.status === 'treve');
+      if (!hasTreve) {
         log(`  · ${playerName}: rupture sans trêve active avec ${cible}`);
         return;
       }
       const malusDuree = conf.rupture?.malus_duree_ticks || 6;
+      // Efface la trêve des DEUX côtés — peu importe qui l'a posée.
       emp.relations[cible] = { status: 'neutre', expire_tick: null };
+      if (empires[cible]?.relations?.[playerName]) {
+        empires[cible].relations[playerName] = { status: 'neutre', expire_tick: null };
+      }
+      // Malus moral sur l'initiateur de la rupture (lui seul paye l'image).
       emp.malus_moral_jusqu_tick = tickSuivant + malusDuree;
       events.push({ type: 'treve-rompue', joueur: playerName, vers: cible, malus_jusqu: tickSuivant + malusDuree });
       log(`  ⚡ ${playerName}: rupture trêve avec ${cible} — malus moral ${malusDuree} ticks`);
@@ -715,15 +738,31 @@ export async function runTick({
     log(`  💱 ${playerName}: marché ${vendQty} ${vendRes} → ${demQty} ${demRes} (paire ${paire}, expire t+${expDans})`);
   }
 
+  // Helper : tout ordre qui lance une flotte (attaque, transport, recyclage,
+  // espionnage) exige que la planète d'origine ait un chantier_spatial ≥ 1.
+  // Convention OGame. Sans ça un joueur peut décoller depuis une planète
+  // vierge ayant juste reçu des vaisseaux par transport.
+  function requireChantierSpatial(src, playerName, mission) {
+    if ((src.batiments?.chantier_spatial || 0) < 1) {
+      log(`  · ${playerName}: ${mission} requiert chantier_spatial niv 1 sur ${src.nom}`);
+      return false;
+    }
+    return true;
+  }
+
   function queueEspionnage(emp, action, playerName) {
     const src = (emp.planetes || []).find(p => p.nom === action.depuis);
     if (!src) return;
     const cible = action.cible || {};
     if (!cible.joueur || !cible.planete) { log(`  · ${playerName}: espionnage sans cible {joueur, planete}`); return; }
+    if (!requireChantierSpatial(src, playerName, 'espionnage')) return;
+    // Init défensif : une planète fraîchement colonisée peut avoir
+    // flotte_au_sol indéfini → crash sur les accès suivants.
+    src.flotte_au_sol = src.flotte_au_sol || {};
     const n = parseInt(action.nombre_sondes, 10);
     if (!n || n <= 0) return;
-    if ((src.flotte_au_sol?.sonde || 0) < n) {
-      log(`  · ${playerName}: pas assez de sondes (${src.flotte_au_sol?.sonde || 0} dispo, ${n} demandées)`);
+    if ((src.flotte_au_sol.sonde || 0) < n) {
+      log(`  · ${playerName}: pas assez de sondes (${src.flotte_au_sol.sonde || 0} dispo, ${n} demandées)`);
       return;
     }
     src.flotte_au_sol.sonde -= n;
@@ -751,14 +790,22 @@ export async function runTick({
     if (!src) return;
     const cible = action.cible || {};
     if (!cible.joueur || !cible.planete) { log(`  · ${playerName}: attaque sans cible {joueur, planete}`); return; }
-    // Trêve unilatérale : si l'attaquant a déclaré une trêve avec la cible,
-    // l'ordre est rejeté tant qu'elle est active. Pour attaquer, il faut
-    // d'abord poser un ordre `rupture` (qui déclenche le malus moral).
-    const rel = emp.relations?.[cible.joueur];
-    if (rel && rel.status === 'treve' && (rel.expire_tick || 0) > tickSuivant) {
-      log(`  · ${playerName}: attaque rejetée — trêve active avec ${cible.joueur} jusqu'au tick ${rel.expire_tick}`);
+    if (!requireChantierSpatial(src, playerName, 'attaque')) return;
+    // Trêve BILATÉRALE par lecture symétrique : l'attaque est bloquée si
+    // l'un OU l'autre des deux empires a déclaré une trêve avec le pair.
+    // Auparavant seul `emp.relations[cible]` était lu → trêve unilatérale
+    // auto-imposée. Désormais on lit aussi `empires[cible].relations[emp]`
+    // pour que la trêve protège vraiment les deux côtés.
+    const relA = emp.relations?.[cible.joueur];
+    const relB = empires[cible.joueur]?.relations?.[playerName];
+    const trêveA = relA && relA.status === 'treve' && (relA.expire_tick || 0) > tickSuivant;
+    const trêveB = relB && relB.status === 'treve' && (relB.expire_tick || 0) > tickSuivant;
+    if (trêveA || trêveB) {
+      const exp = Math.max(trêveA ? relA.expire_tick : 0, trêveB ? relB.expire_tick : 0);
+      log(`  · ${playerName}: attaque rejetée — trêve active avec ${cible.joueur} jusqu'au tick ${exp}`);
       return;
     }
+    src.flotte_au_sol = src.flotte_au_sol || {};
     for (const [ship, n] of Object.entries(action.flotte || {})) {
       if ((src.flotte_au_sol[ship] || 0) < n) { log(`  · ${playerName}: flotte insuffisante (${ship}) pour attaque depuis ${action.depuis}`); return; }
     }
@@ -880,7 +927,9 @@ export async function runTick({
     if (!cible || !cible.planete) { log(`  · ${playerName}: transport sans cible valide`); return; }
     const cibleJoueur = cible.joueur || playerName;
     const ciblePlanete = cible.planete;
+    if (!requireChantierSpatial(src, playerName, 'transport')) return;
 
+    src.flotte_au_sol = src.flotte_au_sol || {};
     for (const [ship, n] of Object.entries(action.flotte || {})) {
       if ((src.flotte_au_sol[ship] || 0) < n) { log(`  · ${playerName}: flotte insuffisante (${ship}) pour transport`); return; }
     }
@@ -915,12 +964,14 @@ export async function runTick({
     const ciblePlanete = cible.planete;
     if (!ciblePlanete) { log(`  · ${playerName}: recyclage sans cible valide`); return; }
     if (cibleJoueur !== playerName) { log(`  · ${playerName}: recyclage sur planète d'autrui non autorisé (v1)`); return; }
+    if (!requireChantierSpatial(src, playerName, 'recyclage')) return;
     const dst = (emp.planetes || []).find(p => p.nom === ciblePlanete);
     const debris = dst?.champ_debris;
     const totalDebris = (debris?.ferrum || 0) + (debris?.lumen || 0);
     if (!totalDebris) { log(`  · ${playerName}: aucun débris à récupérer sur ${ciblePlanete}`); return; }
     const recycleurs = (action.flotte || {}).recycleur || 0;
     if (recycleurs <= 0) { log(`  · ${playerName}: recyclage requiert au moins 1 recycleur`); return; }
+    src.flotte_au_sol = src.flotte_au_sol || {};
     if ((src.flotte_au_sol.recycleur || 0) < recycleurs) { log(`  · ${playerName}: pas assez de recycleurs disponibles sur ${action.depuis}`); return; }
     src.flotte_au_sol.recycleur -= recycleurs;
 

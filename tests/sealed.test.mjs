@@ -63,7 +63,11 @@ function planet(nom, coordonnees = [1, 1, 7], opts = {}) {
     batiments: {
       mine_ferrum: 3, extracteur_lumen: 2, synthetiseur_plasmide: 0,
       centrale_solaire: 0, depot: 0, usine_robotique: 0,
-      chantier_spatial: 0, laboratoire: 0,
+      // chantier_spatial niv 1 par défaut : depuis le fix gating
+      // (tick-core.mjs:requireChantierSpatial), toute mission de flotte
+      // exige ce bâtiment. Les tests qui jouent avec une flotte_au_sol
+      // pré-positionnée doivent donc avoir le chantier qui va avec.
+      chantier_spatial: 1, laboratoire: 0,
     },
     file_chantier: [],
     file_construction: [],

@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>CITADEL · Galaxie orbitale (mockup)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..600,0..100&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#f4ecdc; --ink-2:#fff; --ink-3:#f7f0df; --ink-4:#e8dcc0;
+  --hairline:#e6d9bd;
+  --brass:#0e1d33; --brass-2:#1f3556; --brass-dim:#c4b48a;
+  --phosphor:#a83a25; --phosphor-2:#c64a30;
+  --bone:#2c2014; --bone-2:#0d0a06; --bone-dim:#8a7c64;
+  --violet:#5a3a6a; --green:#5a7a3a;
+  --serif:"Fraunces",Georgia,serif;
+  --sans:"Plus Jakarta Sans",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --shadow-card:0 1px 2px rgba(28,20,8,.04),0 8px 22px rgba(28,20,8,.06);
+  --r-card:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{
+  font-family:var(--sans);color:var(--bone);font-size:14px;line-height:1.5;
+  background:
+    radial-gradient(ellipse 90% 60% at 15% -5%, rgba(255,250,235,.7), transparent 55%),
+    linear-gradient(180deg,#0e1d33 0%,#1f3556 45%,#3a2a1e 100%);
+  background-attachment:fixed;
+  min-height:100vh;
+  padding:32px 28px 80px;
+  position:relative;overflow-x:hidden;
+}
+/* parallax céleste (repris du live) */
+.astro{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.astro span{position:absolute;inset:-10%;display:block;background-repeat:repeat;opacity:.7}
+.far{
+  background-image:radial-gradient(circle at 12% 22%,rgba(247,240,223,.5) 0 1px,transparent 2px),
+                   radial-gradient(circle at 78% 64%,rgba(247,240,223,.4) 0 1px,transparent 2px),
+                   radial-gradient(circle at 42% 88%,rgba(247,240,223,.45) 0 1px,transparent 2px),
+                   radial-gradient(circle at 90% 12%,rgba(247,240,223,.35) 0 1px,transparent 2px);
+  background-size:340px 340px;animation:drift-far 150s linear infinite;
+}
+.dust{
+  background-image:radial-gradient(ellipse 320px 80px at 30% 40%,rgba(196,180,138,.08),transparent 70%),
+                   radial-gradient(ellipse 260px 60px at 70% 70%,rgba(168,90,40,.07),transparent 70%);
+  background-size:600px 400px;animation:drift-dust 92s ease-in-out infinite alternate;
+}
+.near{
+  background-image:radial-gradient(circle at 22% 60%,rgba(216,176,156,.8) 0 1.5px,transparent 3px),
+                   radial-gradient(circle at 80% 30%,rgba(216,176,156,.7) 0 1.5px,transparent 3px);
+  background-size:520px 520px;animation:drift-near 38s ease-in-out infinite alternate;
+}
+@keyframes drift-far{from{transform:translate3d(0,0,0)}to{transform:translate3d(-340px,-80px,0)}}
+@keyframes drift-dust{from{transform:translate3d(0,0,0)}to{transform:translate3d(-30px,20px,0)}}
+@keyframes drift-near{from{transform:translate3d(0,0,0)}to{transform:translate3d(40px,-20px,0)}}
+
+.wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto}
+header.page{
+  display:flex;align-items:baseline;gap:18px;margin-bottom:28px;
+  color:#f7f0df;
+}
+header.page h1{
+  font-family:var(--serif);font-weight:600;font-size:28px;margin:0;
+  letter-spacing:-.01em;color:#f7f0df;
+}
+header.page .sub{font-size:13px;color:rgba(247,240,223,.6);letter-spacing:.02em}
+header.page .toggle{
+  margin-left:auto;display:flex;background:rgba(247,240,223,.08);
+  border:1px solid rgba(247,240,223,.18);border-radius:999px;padding:3px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+}
+header.page .toggle button{
+  appearance:none;background:none;border:none;color:rgba(247,240,223,.65);
+  padding:7px 16px;border-radius:999px;cursor:pointer;font:inherit;
+  text-transform:uppercase;
+}
+header.page .toggle button.on{background:#f7f0df;color:#0e1d33;font-weight:600}
+
+/* layout */
+.layout{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:1100px){.layout{grid-template-columns:1fr}}
+.card{
+  background:rgba(247,240,223,.96);
+  border-radius:var(--r-card);box-shadow:var(--shadow-card);
+  padding:20px 22px 22px;
+}
+.card > h2{
+  font-family:var(--serif);font-weight:600;font-size:18px;margin:0 0 4px;
+  color:var(--bone-2);
+}
+.card > .meta{
+  font-family:var(--sans);font-size:11px;color:var(--bone-dim);
+  letter-spacing:.04em;margin-bottom:18px;
+}
+.card .meta b{color:var(--bone-2);font-weight:600}
+.card .meta .coord{
+  float:right;font-family:var(--mono);color:var(--bone-dim);
+  background:var(--ink-3);padding:3px 10px;border-radius:999px;
+}
+
+/* ─── ORBITAL VIEW ─── */
+.orbital{position:relative;width:100%;aspect-ratio:1;max-width:520px;margin:0 auto}
+.orbital svg{width:100%;height:100%;display:block;overflow:visible}
+.orbital .ring{fill:none;stroke:rgba(196,180,138,.22);stroke-width:1;stroke-dasharray:2 4}
+.orbital .ring.active{stroke:rgba(168,90,40,.35);stroke-dasharray:0}
+.orbital .star-glow{filter:blur(8px)}
+.orbital .planet{cursor:pointer;transition:transform .15s}
+.orbital .planet:hover{transform:scale(1.15)}
+.orbital .planet circle.body{stroke:rgba(13,10,6,.25);stroke-width:.8}
+.orbital .planet .label{
+  font-family:var(--mono);font-size:9px;fill:var(--bone-dim);
+  text-anchor:middle;dominant-baseline:hanging;
+  letter-spacing:.04em;
+}
+.orbital .planet .owner{
+  font-family:var(--sans);font-size:9px;font-weight:700;
+  fill:var(--phosphor);text-anchor:middle;dominant-baseline:hanging;
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.orbital .asteroid{fill:rgba(196,180,138,.55)}
+.orbital .pos-marker{fill:rgba(196,180,138,.18)}
+.orbital .mine-halo{
+  fill:none;stroke:var(--phosphor);stroke-width:1.5;opacity:.55;
+  animation:pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:.25;stroke-width:1}
+  50%{opacity:.7;stroke-width:2.2}
+}
+.orbital .incoming{
+  fill:none;stroke:var(--phosphor);stroke-width:1.2;
+  stroke-dasharray:3 3;opacity:.85;
+  animation:dash 1.4s linear infinite;
+}
+@keyframes dash{to{stroke-dashoffset:-12}}
+.orbital .incoming-warn{
+  fill:var(--phosphor);font-family:var(--sans);font-size:11px;
+  font-weight:700;text-anchor:middle;dominant-baseline:central;
+}
+.orbital .friendly-route{
+  fill:none;stroke:rgba(90,122,58,.75);stroke-width:1.4;
+  stroke-dasharray:4 3;
+  animation:dash 1.6s linear infinite reverse;
+}
+.orbital .ship{fill:var(--green)}
+.orbital .star-label{
+  font-family:var(--serif);font-weight:600;font-size:13px;
+  fill:var(--bone-2);text-anchor:middle;dominant-baseline:central;
+}
+.orbital .star-meta{
+  font-family:var(--mono);font-size:8.5px;fill:var(--bone-dim);
+  text-anchor:middle;dominant-baseline:hanging;letter-spacing:.06em;
+}
+
+/* tooltip */
+.tip{
+  position:absolute;background:var(--brass);color:#fff;
+  font-size:11.5px;padding:8px 12px;border-radius:8px;
+  pointer-events:none;opacity:0;transition:opacity .12s;
+  box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:5;
+  white-space:nowrap;transform:translate(-50%,-100%) translateY(-8px);
+  font-family:var(--sans);font-weight:500;letter-spacing:0;
+}
+.tip.on{opacity:1}
+.tip small{display:block;color:rgba(255,255,255,.65);font-size:10px;margin-top:2px}
+
+/* ─── GRID VIEW (current) ─── */
+.positions{display:grid;grid-template-columns:repeat(15,1fr);gap:5px;margin-top:12px}
+.pos{
+  aspect-ratio:1;background:var(--ink-3);
+  border:1px solid transparent;border-radius:8px;
+  display:grid;place-items:center;position:relative;
+  font-family:var(--mono);font-size:9px;color:var(--bone-dim);
+}
+.pos.asteroide{background:rgba(196,180,138,.18)}
+.pos.planete{background:#fff;border-color:var(--hairline)}
+.pos .dot{width:8px;height:8px;border-radius:50%}
+.pos[data-c=tellurique] .dot{background:#7fa570;box-shadow:0 0 6px rgba(127,165,112,.6)}
+.pos[data-c=cristalline] .dot{background:#3a8a8a;box-shadow:0 0 6px rgba(58,138,138,.7)}
+.pos[data-c=glacee] .dot{background:#88c8e0;box-shadow:0 0 6px rgba(136,200,224,.7)}
+.pos[data-c=volcanique] .dot{background:#a83a25;box-shadow:0 0 6px rgba(232,99,58,.7)}
+.pos[data-c=gazeuse] .dot{background:#5a3a6a;box-shadow:0 0 6px rgba(154,134,212,.7)}
+.pos.mine{border-color:var(--phosphor);background:rgba(168,58,37,.08);box-shadow:0 0 0 2px rgba(168,58,37,.18)}
+.pos .num{position:absolute;top:3px;left:5px;font-size:8.5px}
+.pos .own{
+  position:absolute;bottom:2px;left:4px;right:4px;font-size:8.5px;
+  color:var(--phosphor);font-weight:700;text-align:center;
+  text-transform:uppercase;letter-spacing:.04em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* legend */
+.legend{
+  margin-top:18px;display:flex;flex-wrap:wrap;gap:14px;
+  font-family:var(--mono);font-size:10px;color:var(--bone-dim);
+  letter-spacing:.04em;
+}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%}
+.legend .ring-icon{width:14px;height:14px;border:1.5px solid var(--phosphor);border-radius:50%;background:none;animation:pulse 2.4s ease-in-out infinite}
+.legend .warn-icon{color:var(--phosphor);font-weight:700;font-size:12px}
+
+.notes{
+  margin-top:30px;padding:18px 22px;
+  background:rgba(247,240,223,.08);border:1px solid rgba(247,240,223,.18);
+  border-radius:var(--r-card);color:rgba(247,240,223,.85);
+}
+.notes h3{font-family:var(--serif);font-weight:600;margin:0 0 8px;font-size:15px;color:#f7f0df}
+.notes ul{margin:0;padding-left:18px;font-size:13px;line-height:1.7}
+.notes code{font-family:var(--mono);font-size:12px;color:#d8b09c}
+</style>
+</head>
+<body>
+<div class="astro" aria-hidden="true">
+  <span class="far"></span><span class="dust"></span><span class="near"></span>
+</div>
+
+<div class="wrap">
+  <header class="page">
+    <h1>Galaxie orbitale</h1>
+    <span class="sub">mockup · proposition vue alternative</span>
+    <div class="toggle">
+      <button class="on" data-mode="side">Côte à côte</button>
+      <button data-mode="orbital">Orbital seul</button>
+      <button data-mode="grid">Grille seule</button>
+    </div>
+  </header>
+
+  <div class="layout" id="layout">
+    <!-- ORBITAL CARD -->
+    <section class="card orbital-card" id="card-orbital">
+      <span class="coord">[12, -4]</span>
+      <h2>Heliox-Prime</h2>
+      <div class="meta">type <b>G</b> · <b>5780K</b> · 4 corps · 1 mine active</div>
+
+      <div class="orbital">
+        <svg viewBox="-260 -260 520 520" id="svg-helio">
+          <defs>
+            <radialGradient id="starHalo" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"  stop-color="#fff2c2" stop-opacity="1"/>
+              <stop offset="18%" stop-color="#f4c060" stop-opacity=".85"/>
+              <stop offset="42%" stop-color="#d49a3a" stop-opacity=".35"/>
+              <stop offset="72%" stop-color="#a83a25" stop-opacity=".12"/>
+              <stop offset="100%" stop-color="#a83a25" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="starCore" cx="38%" cy="38%" r="62%">
+              <stop offset="0%"  stop-color="#fff7d8"/>
+              <stop offset="55%" stop-color="#f7e09a"/>
+              <stop offset="100%" stop-color="#e6b04a"/>
+            </radialGradient>
+            <radialGradient id="gasRingGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#c4b48a" stop-opacity="0"/>
+              <stop offset="50%" stop-color="#c4b48a" stop-opacity=".55"/>
+              <stop offset="100%" stop-color="#c4b48a" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- orbit rings -->
+          <g id="rings-helio"></g>
+          <!-- star with radial halo (multi-layered, animated breathing) -->
+          <circle cx="0" cy="0" r="64" fill="url(#starHalo)" opacity=".9">
+            <animate attributeName="r" values="60;68;60" dur="6s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values=".75;.95;.75" dur="6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="0" cy="0" r="22" fill="url(#starHalo)" opacity=".95"/>
+          <circle cx="0" cy="0" r="13" fill="url(#starCore)" stroke="#d49a3a" stroke-width=".6"/>
+          <text class="star-label" y="42">Heliox</text>
+          <text class="star-meta" y="56">G · 5780K</text>
+
+          <!-- planets, asteroids, etc. injected by JS -->
+          <g id="bodies-helio"></g>
+
+          <!-- fleet routes -->
+          <g id="routes-helio"></g>
+        </svg>
+        <div class="tip" id="tip-helio"></div>
+      </div>
+
+      <div class="legend">
+        <span><i style="background:#7fa570"></i> tellurique</span>
+        <span><i style="background:#3a8a8a"></i> cristalline</span>
+        <span><i style="background:#88c8e0"></i> glacée</span>
+        <span><i style="background:#a83a25"></i> volcanique</span>
+        <span><i style="background:#5a3a6a"></i> gazeuse</span>
+        <span><i class="ring-icon"></i> mine active</span>
+        <span><span class="warn-icon">⚠</span> flotte hostile</span>
+        <span><i style="background:#5a7a3a;clip-path:polygon(0 50%,100% 0,100% 100%);width:12px;height:8px;border-radius:0"></i> mission alliée</span>
+      </div>
+    </section>
+
+    <!-- GRID CARD (current) -->
+    <section class="card grid-card" id="card-grid">
+      <span class="coord">[12, -4]</span>
+      <h2>Heliox-Prime <small style="color:var(--bone-dim);font-family:var(--mono);font-size:10px;font-weight:500"> · vue actuelle</small></h2>
+      <div class="meta">grille 15 cases — implémentation existante</div>
+      <div class="positions" id="grid-helio"></div>
+    </section>
+  </div>
+
+  <div class="notes">
+    <h3>Ce que l'orbital apporte</h3>
+    <ul>
+      <li><b>Lisibilité spatiale</b> — un coup d'œil suffit pour saisir l'étoile et ses corps. Le vide n'est plus 11 blocs gris : c'est du ciel.</li>
+      <li><b>Étoile lumineuse</b> — dégradé radial multicouche avec respiration animée (6s), comme une vraie photosphère. La couleur reste fidèle au type spectral (G doré ici).</li>
+      <li><b>Halos de production pulsés</b> sur les mines actives — l'économie se lit sans ouvrir un onglet.</li>
+      <li><b>Vaisseaux qui glissent</b> sur les trajectoires (SMIL <code>animateMotion</code>) avec traînée de 3 points décalés — la flotte vit, on voit où elle va et combien de temps il lui reste avant impact.</li>
+      <li><b>Anneaux de Saturne</b> stylisés autour des géantes gazeuses — distinction visuelle immédiate, et personnalité.</li>
+      <li><b>Interactions préservées</b> — clic sur planète garde la même sémantique (mission, transport, coloniser).</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+// ─── Données d'exemple (un système réaliste) ──────────────────────
+const heliox = {
+  name:'Heliox-Prime', star:{type:'G',temp:5780,color:'#f7e09a'},
+  positions:[
+    /* 1 */ {type:'asteroide'},
+    /* 2 */ {type:'planete',classe:'volcanique',nom:'Heliox-II',owner:'meffysto',mine:true,isMe:true},
+    /* 3 */ {type:'empty'},
+    /* 4 */ {type:'planete',classe:'tellurique',nom:'Verdane',owner:'meffysto'},
+    /* 5 */ {type:'empty'},
+    /* 6 */ {type:'asteroide'},
+    /* 7 */ {type:'planete',classe:'cristalline',nom:'Sephira',owner:'kohra',hostile:true,incoming:true},
+    /* 8 */ {type:'empty'},
+    /* 9 */ {type:'planete',classe:'gazeuse',nom:'Vohran-XI',owner:null,free:true},
+    /*10 */ {type:'empty'},
+    /*11 */ {type:'asteroide'},
+    /*12 */ {type:'planete',classe:'glacee',nom:'Korr',owner:'meffysto'},
+    /*13 */ {type:'empty'},
+    /*14 */ {type:'empty'},
+    /*15 */ {type:'empty'},
+  ],
+  routes:[
+    {kind:'hostile',from:5,to:2},     // hostile incoming aiming at Heliox-II (case 2) from case 5
+    {kind:'friendly',from:2,to:7},    // mission player vs Sephira
+  ]
+};
+const classColor={tellurique:'#7fa570',cristalline:'#3a8a8a',glacee:'#88c8e0',volcanique:'#a83a25',gazeuse:'#5a3a6a'};
+
+// ─── ORBITAL render ───────────────────────────────────────────────
+const N=15, RMIN=42, RMAX=240;
+function radiusFor(i){ return RMIN + (i-1)*(RMAX-RMIN)/(N-1); }
+// angle déterministe par slot (or doré pour répartition douce)
+function angleFor(i){ return (i*137.508) * Math.PI/180; }
+function posXY(i){ const r=radiusFor(i), a=angleFor(i); return [Math.cos(a)*r, Math.sin(a)*r]; }
+
+function renderOrbital(){
+  const ringsG=document.getElementById('rings-helio');
+  const bodiesG=document.getElementById('bodies-helio');
+  const routesG=document.getElementById('routes-helio');
+  ringsG.innerHTML=''; bodiesG.innerHTML=''; routesG.innerHTML='';
+
+  // rings — affiche seulement orbites avec quelque chose
+  heliox.positions.forEach((p,idx)=>{
+    const i=idx+1;
+    if(p.type==='empty') return;
+    const r=radiusFor(i);
+    const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ring.setAttribute('cx',0); ring.setAttribute('cy',0); ring.setAttribute('r',r);
+    ring.setAttribute('class','ring' + (p.type==='planete'&&p.owner ? ' active':''));
+    ringsG.appendChild(ring);
+  });
+
+  // bodies
+  heliox.positions.forEach((p,idx)=>{
+    const i=idx+1;
+    const [x,y]=posXY(i);
+    if(p.type==='empty'){
+      // marker discret
+      const m=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      m.setAttribute('cx',x); m.setAttribute('cy',y); m.setAttribute('r',1.6);
+      m.setAttribute('class','pos-marker');
+      bodiesG.appendChild(m);
+      return;
+    }
+    if(p.type==='asteroide'){
+      // 3 petits points en cluster
+      for(let k=0;k<3;k++){
+        const a=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        a.setAttribute('cx',x+(k-1)*2.2); a.setAttribute('cy',y+(k%2?1.4:-1));
+        a.setAttribute('r',1.4); a.setAttribute('class','asteroid');
+        bodiesG.appendChild(a);
+      }
+      return;
+    }
+    // planète
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','planet');
+    g.setAttribute('transform',`translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    g.dataset.slot=i;
+
+    if(p.mine){
+      const halo=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      halo.setAttribute('r',14); halo.setAttribute('class','mine-halo');
+      g.appendChild(halo);
+    }
+    const radius = p.classe==='gazeuse'?8.5 : p.classe==='tellurique'?6.5 : 7;
+
+    // Anneaux de Saturne pour gazeuses (sous le corps pour effet de passage)
+    if(p.classe==='gazeuse'){
+      const ringOuter=document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+      ringOuter.setAttribute('rx',radius*2.1); ringOuter.setAttribute('ry',radius*0.55);
+      ringOuter.setAttribute('fill','none');
+      ringOuter.setAttribute('stroke','url(#gasRingGrad)');
+      ringOuter.setAttribute('stroke-width',2.2);
+      ringOuter.setAttribute('transform','rotate(-18)');
+      g.appendChild(ringOuter);
+      const ringInner=document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+      ringInner.setAttribute('rx',radius*1.55); ringInner.setAttribute('ry',radius*0.4);
+      ringInner.setAttribute('fill','none');
+      ringInner.setAttribute('stroke','rgba(196,180,138,.7)');
+      ringInner.setAttribute('stroke-width',.8);
+      ringInner.setAttribute('transform','rotate(-18)');
+      g.appendChild(ringInner);
+    }
+
+    const body=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    body.setAttribute('r',radius);
+    body.setAttribute('class','body');
+    body.setAttribute('fill',classColor[p.classe]||'#888');
+    if(p.isMe){ body.setAttribute('stroke','#0e1d33'); body.setAttribute('stroke-width',1.5); }
+    g.appendChild(body);
+
+    // num indicator (small)
+    const num=document.createElementNS('http://www.w3.org/2000/svg','text');
+    num.setAttribute('class','label');
+    num.setAttribute('y',radius+4);
+    num.textContent='§'+i+' · '+(p.nom||'');
+    g.appendChild(num);
+
+    if(p.owner){
+      const own=document.createElementNS('http://www.w3.org/2000/svg','text');
+      own.setAttribute('class','owner');
+      own.setAttribute('y',-radius-12);
+      own.setAttribute('fill', p.hostile?'#a83a25':(p.isMe?'#0e1d33':'#5a7a3a'));
+      own.textContent=p.owner.slice(0,7);
+      g.appendChild(own);
+    } else if(p.free){
+      const free=document.createElementNS('http://www.w3.org/2000/svg','text');
+      free.setAttribute('class','owner');
+      free.setAttribute('y',-radius-12);
+      free.setAttribute('fill','#8a7c64');
+      free.textContent='libre';
+      g.appendChild(free);
+    }
+
+    g.addEventListener('mouseenter',(e)=>showTip(e,p,i));
+    g.addEventListener('mousemove',(e)=>moveTip(e));
+    g.addEventListener('mouseleave',hideTip);
+    bodiesG.appendChild(g);
+  });
+
+  // routes (fleet trajectories) + vaisseau qui glisse le long de la courbe
+  heliox.routes.forEach((r,idx)=>{
+    const [x1,y1]=posXY(r.from), [x2,y2]=posXY(r.to);
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const dx=x2-x1, dy=y2-y1;
+    const len=Math.sqrt(dx*dx+dy*dy);
+    const nx=-dy/len, ny=dx/len;
+    const curveAmt = Math.min(40, len*0.18);
+    const cx=mx+nx*curveAmt, cy=my+ny*curveAmt;
+    const d=`M${x1.toFixed(1)} ${y1.toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+    const pathId=`route-${idx}`;
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('id',pathId);
+    path.setAttribute('d',d);
+    path.setAttribute('class', r.kind==='hostile' ? 'incoming' : 'friendly-route');
+    routesG.appendChild(path);
+
+    // ⚠ statique sur trajectoire hostile (libellé contextuel)
+    if(r.kind==='hostile'){
+      const warn=document.createElementNS('http://www.w3.org/2000/svg','text');
+      warn.setAttribute('class','incoming-warn');
+      warn.setAttribute('x',cx); warn.setAttribute('y',cy-10);
+      warn.textContent='⚠';
+      routesG.appendChild(warn);
+    }
+
+    // vaisseau-cône qui glisse le long de la courbe (SMIL animateMotion)
+    const ship=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    ship.setAttribute('points','5,0 -3,-2.6 -3,2.6');
+    ship.setAttribute('fill', r.kind==='hostile' ? '#a83a25' : '#5a7a3a');
+    ship.setAttribute('stroke','#f7f0df');
+    ship.setAttribute('stroke-width','.5');
+    ship.style.filter='drop-shadow(0 1px 2px rgba(0,0,0,.25))';
+    const anim=document.createElementNS('http://www.w3.org/2000/svg','animateMotion');
+    anim.setAttribute('dur', r.kind==='hostile' ? '5.5s' : '4.2s');
+    anim.setAttribute('repeatCount','indefinite');
+    anim.setAttribute('rotate','auto');
+    const mpath=document.createElementNS('http://www.w3.org/2000/svg','mpath');
+    mpath.setAttributeNS('http://www.w3.org/1999/xlink','href','#'+pathId);
+    mpath.setAttribute('href','#'+pathId);
+    anim.appendChild(mpath);
+    ship.appendChild(anim);
+    routesG.appendChild(ship);
+
+    // traînée — petits points qui suivent à intervalle, pour densifier le mouvement
+    for(let k=1;k<=3;k++){
+      const trail=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      trail.setAttribute('r', 1.6 - k*0.35);
+      trail.setAttribute('fill', r.kind==='hostile' ? '#a83a25' : '#5a7a3a');
+      trail.setAttribute('opacity', (0.55 - k*0.15).toFixed(2));
+      const ta=document.createElementNS('http://www.w3.org/2000/svg','animateMotion');
+      ta.setAttribute('dur', r.kind==='hostile' ? '5.5s' : '4.2s');
+      ta.setAttribute('repeatCount','indefinite');
+      ta.setAttribute('begin', `-${(k*0.18).toFixed(2)}s`);
+      const tm=document.createElementNS('http://www.w3.org/2000/svg','mpath');
+      tm.setAttributeNS('http://www.w3.org/1999/xlink','href','#'+pathId);
+      tm.setAttribute('href','#'+pathId);
+      ta.appendChild(tm);
+      trail.appendChild(ta);
+      routesG.appendChild(trail);
+    }
+  });
+}
+
+// ─── Tooltip ──────────────────────────────────────────────────────
+const tip=document.getElementById('tip-helio');
+function showTip(e,p,i){
+  let body=`${p.nom||'corps'} · ${p.classe||'?'}`;
+  let small=`§${i}`;
+  if(p.isMe) small+=' · ta planète';
+  else if(p.hostile) small+=' · clic → mission';
+  else if(p.owner) small+=' · clic → transport';
+  else if(p.free) small+=' · clic → coloniser';
+  if(p.mine) small+=' · mine active';
+  if(p.incoming) small+=' · ⚠ flotte hostile en approche';
+  tip.innerHTML=`${body}<small>${small}</small>`;
+  tip.classList.add('on');
+  moveTip(e);
+}
+function moveTip(e){
+  const r=document.getElementById('card-orbital').getBoundingClientRect();
+  tip.style.left=(e.clientX-r.left)+'px';
+  tip.style.top=(e.clientY-r.top)+'px';
+}
+function hideTip(){ tip.classList.remove('on'); }
+
+// ─── GRID render (réplique du live) ───────────────────────────────
+function renderGrid(){
+  const g=document.getElementById('grid-helio');
+  let html='';
+  heliox.positions.forEach((p,idx)=>{
+    const i=idx+1;
+    const t=p.type;
+    const cls=p.classe||'';
+    const isMine=p.mine;
+    let dot = t==='planete' ? '<span class="dot"></span>' : '';
+    let own = p.owner ? `<span class="own">${p.owner.slice(0,5)}</span>` : '';
+    html+=`<div class="pos ${t} ${isMine?'mine':''}" data-c="${cls}">
+      <span class="num">${i}</span>${dot}${own}
+    </div>`;
+  });
+  g.innerHTML=html;
+}
+
+renderOrbital(); renderGrid();
+
+// ─── toggle modes ─────────────────────────────────────────────────
+document.querySelectorAll('header.page .toggle button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('header.page .toggle button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    const m=b.dataset.mode;
+    const co=document.getElementById('card-orbital');
+    const cg=document.getElementById('card-grid');
+    const lay=document.getElementById('layout');
+    if(m==='side'){ co.style.display=''; cg.style.display=''; lay.style.gridTemplateColumns='1fr 1fr'; }
+    if(m==='orbital'){ co.style.display=''; cg.style.display='none'; lay.style.gridTemplateColumns='1fr'; }
+    if(m==='grid'){ co.style.display='none'; cg.style.display=''; lay.style.gridTemplateColumns='1fr'; }
+  });
+});
+</script>
+</body>
+</html>

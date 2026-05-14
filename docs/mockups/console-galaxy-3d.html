@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>CITADEL · Galaxie 3D (mockup)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#f4ecdc;--ink-2:#fff;--ink-3:#f7f0df;--hairline:#e6d9bd;
+  --brass:#0e1d33;--brass-dim:#c4b48a;--phosphor:#a83a25;
+  --bone:#2c2014;--bone-2:#0d0a06;--bone-dim:#8a7c64;
+  --serif:"Fraunces",Georgia,serif;
+  --sans:"Plus Jakarta Sans",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:var(--sans);color:#f7f0df;font-size:14px;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,#1a2a4a 0%,#0a1424 55%,#04070d 100%);
+  min-height:100vh;padding:24px 28px 40px;overflow-x:hidden;
+}
+.wrap{max-width:1280px;margin:0 auto;position:relative;z-index:1}
+header.page{display:flex;align-items:baseline;gap:18px;margin-bottom:22px}
+header.page h1{font-family:var(--serif);font-weight:600;font-size:28px;margin:0;letter-spacing:-.01em}
+header.page .sub{font-size:13px;color:rgba(247,240,223,.6)}
+header.page .ctrl{
+  margin-left:auto;display:flex;gap:8px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+}
+header.page .ctrl button{
+  appearance:none;background:rgba(247,240,223,.08);border:1px solid rgba(247,240,223,.18);
+  color:rgba(247,240,223,.75);padding:7px 14px;border-radius:999px;
+  cursor:pointer;font:inherit;
+}
+header.page .ctrl button.on{background:#f7f0df;color:#0e1d33;font-weight:600;border-color:#f7f0df}
+
+.stage{
+  position:relative;
+  border-radius:18px;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 50%,rgba(20,30,60,.3),rgba(4,8,16,.9));
+  border:1px solid rgba(247,240,223,.1);
+  aspect-ratio:16/10;max-height:74vh;
+}
+#stage canvas{display:block;width:100%;height:100%}
+
+.hud{
+  position:absolute;inset:0;pointer-events:none;
+}
+.hud .topbar{
+  position:absolute;top:18px;left:22px;right:22px;
+  display:flex;justify-content:space-between;align-items:flex-start;
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;
+  color:rgba(247,240,223,.7);text-transform:uppercase;
+}
+.hud .topbar .star{
+  font-family:var(--serif);font-size:22px;font-weight:600;
+  color:#f7f0df;letter-spacing:-.01em;text-transform:none;line-height:1;
+}
+.hud .topbar .star small{
+  display:block;font-family:var(--mono);font-size:10px;
+  color:rgba(247,240,223,.5);margin-top:4px;letter-spacing:.1em;text-transform:uppercase;
+}
+.hud .coord{
+  background:rgba(247,240,223,.1);border:1px solid rgba(247,240,223,.2);
+  padding:5px 12px;border-radius:999px;color:#f7f0df;
+}
+
+.hud .hint{
+  position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:10.5px;color:rgba(247,240,223,.45);
+  letter-spacing:.1em;text-transform:uppercase;
+  background:rgba(0,0,0,.3);padding:6px 14px;border-radius:999px;
+  border:1px solid rgba(247,240,223,.1);
+}
+
+.tip{
+  position:absolute;background:#0e1d33;color:#fff;
+  font-size:12px;padding:10px 14px;border-radius:10px;
+  pointer-events:none;opacity:0;transition:opacity .12s;
+  box-shadow:0 12px 32px rgba(0,0,0,.5);z-index:5;
+  white-space:nowrap;transform:translate(-50%,-100%) translateY(-10px);
+  font-family:var(--sans);font-weight:500;
+  border:1px solid rgba(247,240,223,.15);
+}
+.tip.on{opacity:1}
+.tip b{font-family:var(--serif);font-weight:600;font-size:13px}
+.tip small{display:block;color:rgba(247,240,223,.6);font-size:10.5px;margin-top:3px;letter-spacing:.04em}
+
+/* side panel */
+.panel{
+  position:absolute;right:22px;top:60px;width:240px;
+  background:rgba(14,20,36,.7);backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  border:1px solid rgba(247,240,223,.12);border-radius:12px;
+  padding:14px 16px;font-size:12px;color:rgba(247,240,223,.85);
+  pointer-events:auto;
+}
+.panel h4{
+  margin:0 0 10px;font-family:var(--serif);font-weight:600;font-size:14px;
+  color:#f7f0df;letter-spacing:-.005em;
+}
+.panel .row{display:flex;justify-content:space-between;padding:4px 0;font-family:var(--mono);font-size:11px}
+.panel .row b{color:#f7f0df;font-weight:600}
+.panel .row.warn b{color:var(--phosphor)}
+.panel .row + .row{border-top:1px solid rgba(247,240,223,.08)}
+
+.legend{
+  margin-top:18px;display:flex;flex-wrap:wrap;gap:14px;
+  font-family:var(--mono);font-size:11px;color:rgba(247,240,223,.6);
+  letter-spacing:.04em;
+}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%}
+
+.notes{
+  margin-top:22px;padding:18px 22px;
+  background:rgba(247,240,223,.05);border:1px solid rgba(247,240,223,.12);
+  border-radius:14px;color:rgba(247,240,223,.85);
+}
+.notes h3{font-family:var(--serif);font-weight:600;margin:0 0 8px;font-size:15px;color:#f7f0df}
+.notes ul{margin:0;padding-left:18px;font-size:13px;line-height:1.7}
+.notes code{font-family:var(--mono);font-size:12px;color:#d8b09c}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.160.0",
+    "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <h1>Galaxie 3D</h1>
+    <span class="sub">mockup · système Heliox-Prime</span>
+    <div class="ctrl">
+      <button data-cam="top">Vue de dessus</button>
+      <button class="on" data-cam="iso">Isométrique</button>
+      <button data-cam="ecliptic">Plan écliptique</button>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="hud">
+      <div class="topbar">
+        <div class="star">Heliox-Prime <small>type G · 5780K · 4 corps</small></div>
+        <div class="coord">[12, -4]</div>
+      </div>
+      <div class="panel" id="panel">
+        <h4>Système</h4>
+        <div class="row"><span>Planètes</span><b>4</b></div>
+        <div class="row"><span>Astéroïdes</span><b>3</b></div>
+        <div class="row"><span>Mines actives</span><b>1</b></div>
+        <div class="row warn"><span>⚠ Flottes hostiles</span><b>1</b></div>
+      </div>
+      <div class="hint">glisse pour orbiter · molette pour zoomer · clic sur planète</div>
+    </div>
+    <div class="tip" id="tip"></div>
+  </div>
+
+  <div class="legend">
+    <span><i style="background:#7fa570"></i> tellurique</span>
+    <span><i style="background:#3a8a8a"></i> cristalline</span>
+    <span><i style="background:#88c8e0"></i> glacée</span>
+    <span><i style="background:#a83a25"></i> volcanique</span>
+    <span><i style="background:#5a3a6a"></i> gazeuse</span>
+    <span><i style="background:#f7e09a;box-shadow:0 0 8px #f4c060"></i> étoile</span>
+    <span><i style="background:transparent;border:1.5px solid #a83a25;border-radius:50%"></i> halo de production</span>
+  </div>
+
+  <div class="notes">
+    <h3>Ce que la 3D apporte</h3>
+    <ul>
+      <li><b>Profondeur réelle</b> — orbites inclinées, étoile lumineuse, ombres portées. On lit la position spatiale, pas une grille.</li>
+      <li><b>Caméra libre</b> — drag pour orbiter, molette zoom, presets (dessus / iso / écliptique).</li>
+      <li><b>Trajectoire de flotte 3D</b> — la mission hostile suit une courbe inter-planétaire animée (point qui glisse + traînée).</li>
+      <li><b>Halo de mine en anneau orbital</b> autour de la planète productive — pulsation lente.</li>
+      <li><b>Coût</b> : Three.js (~150KB esm), 60fps confortable, mais beaucoup plus de JS qu'une vue SVG. À pondérer selon l'audience cible.</li>
+    </ul>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─── Data ─────────────────────────────────────────────────────────
+const SYSTEM = {
+  star:{name:'Heliox',type:'G',temp:5780,color:0xf7e09a,coreColor:0xfff2c2,size:5},
+  positions:[
+    {i:1,  type:'asteroide'},
+    {i:2,  type:'planete',classe:'volcanique',color:0xa83a25,nom:'Heliox-II',owner:'meffysto',mine:true,isMe:true,size:1.6},
+    {i:3,  type:'empty'},
+    {i:4,  type:'planete',classe:'tellurique',color:0x7fa570,nom:'Verdane',owner:'meffysto',size:1.4},
+    {i:5,  type:'empty'},
+    {i:6,  type:'asteroide'},
+    {i:7,  type:'planete',classe:'cristalline',color:0x3a8a8a,nom:'Sephira',owner:'kohra',hostile:true,size:1.5},
+    {i:8,  type:'empty'},
+    {i:9,  type:'planete',classe:'gazeuse',color:0x9a86d4,nom:'Vohran-XI',owner:null,free:true,size:2.4},
+    {i:10, type:'empty'},
+    {i:11, type:'asteroide'},
+    {i:12, type:'planete',classe:'glacee',color:0x88c8e0,nom:'Korr',owner:'meffysto',size:1.3},
+    {i:13, type:'empty'},{i:14,type:'empty'},{i:15,type:'empty'},
+  ],
+  routes:[{kind:'hostile',from:7,to:2}]
+};
+
+const N=15, RMIN=10, RMAX=58;
+const radiusFor = i => RMIN + (i-1)*(RMAX-RMIN)/(N-1);
+const angleFor  = i => i*137.508 * Math.PI/180;   // golden angle
+// inclinaisons légères par slot (en radians) — donne du relief sans devenir chaotique
+const tiltFor   = i => Math.sin(i*0.9)*0.18;
+function orbitPoint(i, phase=0){
+  const r=radiusFor(i), a=angleFor(i)+phase, t=tiltFor(i);
+  const x=Math.cos(a)*r, z=Math.sin(a)*r;
+  const y=Math.sin(a)*Math.sin(t)*r*0.4;
+  return new THREE.Vector3(x,y,z);
+}
+
+// ─── Renderer / scene / cam ───────────────────────────────────────
+const stage=document.getElementById('stage');
+const w=stage.clientWidth, h=stage.clientHeight;
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(w,h);
+renderer.setClearColor(0x000000,0);
+stage.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0x04070d, 80, 200);
+
+const camera=new THREE.PerspectiveCamera(50, w/h, 0.1, 500);
+camera.position.set(40,38,55);
+camera.lookAt(0,0,0);
+
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;
+controls.dampingFactor=.08;
+controls.minDistance=20;
+controls.maxDistance=140;
+controls.enablePan=false;
+
+// ─── Background stars ─────────────────────────────────────────────
+{
+  const g=new THREE.BufferGeometry();
+  const N=900, arr=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const r=200+Math.random()*120;
+    const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    arr[i*3]  =r*Math.sin(ph)*Math.cos(th);
+    arr[i*3+1]=r*Math.sin(ph)*Math.sin(th);
+    arr[i*3+2]=r*Math.cos(ph);
+  }
+  g.setAttribute('position',new THREE.BufferAttribute(arr,3));
+  const m=new THREE.PointsMaterial({color:0xf7f0df,size:.6,sizeAttenuation:true,transparent:true,opacity:.75});
+  scene.add(new THREE.Points(g,m));
+}
+
+// ─── Star ─────────────────────────────────────────────────────────
+const starGroup=new THREE.Group(); scene.add(starGroup);
+{
+  const core=new THREE.Mesh(
+    new THREE.SphereGeometry(SYSTEM.star.size,32,32),
+    new THREE.MeshBasicMaterial({color:SYSTEM.star.coreColor})
+  );
+  starGroup.add(core);
+  // glow halo via sprite
+  const c=document.createElement('canvas');c.width=c.height=128;
+  const ctx=c.getContext('2d');
+  const grd=ctx.createRadialGradient(64,64,4,64,64,64);
+  grd.addColorStop(0,'rgba(255,232,160,1)');
+  grd.addColorStop(.25,'rgba(244,192,96,.6)');
+  grd.addColorStop(.6,'rgba(168,90,40,.18)');
+  grd.addColorStop(1,'rgba(168,90,40,0)');
+  ctx.fillStyle=grd;ctx.fillRect(0,0,128,128);
+  const tex=new THREE.CanvasTexture(c);
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+  sprite.scale.set(24,24,1);
+  starGroup.add(sprite);
+}
+const starLight=new THREE.PointLight(0xfff2c2,2.4,250,1.2);
+scene.add(starLight);
+scene.add(new THREE.AmbientLight(0x556688,.35));
+
+// ─── Orbit rings ──────────────────────────────────────────────────
+SYSTEM.positions.forEach(p=>{
+  if(p.type==='empty') return;
+  const r=radiusFor(p.i), t=tiltFor(p.i);
+  const seg=128, pts=[];
+  for(let k=0;k<=seg;k++){
+    const a=(k/seg)*Math.PI*2;
+    const x=Math.cos(a)*r, z=Math.sin(a)*r;
+    const y=Math.sin(a)*Math.sin(t)*r*0.4;
+    pts.push(new THREE.Vector3(x,y,z));
+  }
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  const active = p.type==='planete' && p.owner;
+  const m=new THREE.LineBasicMaterial({
+    color: active?0xa83a25:0xc4b48a,
+    transparent:true, opacity: active?.35:.18
+  });
+  scene.add(new THREE.Line(g,m));
+});
+
+// ─── Bodies ───────────────────────────────────────────────────────
+const pickable=[]; // for raycaster
+const haloRefs=[];
+SYSTEM.positions.forEach(p=>{
+  if(p.type==='empty') return;
+  const pos=orbitPoint(p.i);
+  if(p.type==='asteroide'){
+    // cluster de 3 rochers
+    for(let k=0;k<3;k++){
+      const m=new THREE.Mesh(
+        new THREE.IcosahedronGeometry(.35+Math.random()*.25,0),
+        new THREE.MeshStandardMaterial({color:0xc4b48a,roughness:.9,metalness:.1,flatShading:true})
+      );
+      m.position.copy(pos).add(new THREE.Vector3((k-1)*.9,Math.random()*.4-.2,(k%2?.4:-.3)));
+      scene.add(m);
+    }
+    return;
+  }
+  // planète
+  const g=new THREE.Group();
+  g.position.copy(pos);
+  const mesh=new THREE.Mesh(
+    new THREE.SphereGeometry(p.size,28,28),
+    new THREE.MeshStandardMaterial({color:p.color,roughness:.55,metalness:.05,emissive:new THREE.Color(p.color).multiplyScalar(0.08)})
+  );
+  mesh.userData=p;
+  g.add(mesh);
+  pickable.push(mesh);
+
+  if(p.mine){
+    const ring=new THREE.Mesh(
+      new THREE.TorusGeometry(p.size+1.4,.12,8,48),
+      new THREE.MeshBasicMaterial({color:0xa83a25,transparent:true,opacity:.7})
+    );
+    ring.rotation.x=Math.PI/2*0.85;
+    g.add(ring);
+    haloRefs.push(ring);
+  }
+  if(p.isMe){
+    const halo=new THREE.Mesh(
+      new THREE.TorusGeometry(p.size+0.8,.06,6,48),
+      new THREE.MeshBasicMaterial({color:0xf7e09a,transparent:true,opacity:.55})
+    );
+    halo.rotation.x=Math.PI/2;
+    g.add(halo);
+  }
+  if(p.classe==='gazeuse'){
+    // anneau de Saturne stylisé
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(p.size*1.4,p.size*2.1,48),
+      new THREE.MeshBasicMaterial({color:0xc4b48a,side:THREE.DoubleSide,transparent:true,opacity:.45})
+    );
+    ring.rotation.x=Math.PI/2.4;
+    g.add(ring);
+  }
+  scene.add(g);
+});
+
+// ─── Fleet routes (hostile incoming) ─────────────────────────────
+const routeMeshes=[];
+SYSTEM.routes.forEach(r=>{
+  const a=orbitPoint(r.from), b=orbitPoint(r.to);
+  // courbe en arc
+  const mid=a.clone().add(b).multiplyScalar(.5);
+  mid.y+=Math.max(6, a.distanceTo(b)*0.18);
+  const curve=new THREE.QuadraticBezierCurve3(a,mid,b);
+  const tubeGeom=new THREE.TubeGeometry(curve,64,.08,6,false);
+  const tube=new THREE.Mesh(
+    tubeGeom,
+    new THREE.MeshBasicMaterial({color:r.kind==='hostile'?0xa83a25:0x5a7a3a,transparent:true,opacity:.55})
+  );
+  scene.add(tube);
+  // ship marker (moves along curve)
+  const ship=new THREE.Mesh(
+    new THREE.ConeGeometry(.4,1,8),
+    new THREE.MeshBasicMaterial({color:r.kind==='hostile'?0xc64a30:0x7fa570})
+  );
+  scene.add(ship);
+  routeMeshes.push({curve,ship,kind:r.kind});
+});
+
+// ─── Resize ───────────────────────────────────────────────────────
+function onResize(){
+  const w=stage.clientWidth, h=stage.clientHeight;
+  renderer.setSize(w,h);
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',onResize);
+
+// ─── Tooltip & picking ───────────────────────────────────────────
+const tip=document.getElementById('tip');
+const raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2();
+function onMove(e){
+  const r=stage.getBoundingClientRect();
+  mouse.x=((e.clientX-r.left)/r.width)*2-1;
+  mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(pickable,false);
+  if(hits.length){
+    const p=hits[0].object.userData;
+    let label=`${p.nom} · ${p.classe}`;
+    let small=`§${p.i}`;
+    if(p.isMe) small+=' · ta planète';
+    else if(p.hostile) small+=' · clic → mission';
+    else if(p.owner) small+=' · clic → transport';
+    else if(p.free) small+=' · clic → coloniser';
+    if(p.mine) small+=' · mine active';
+    tip.innerHTML=`<b>${label}</b><small>${small}</small>`;
+    tip.style.left=(e.clientX-r.left)+'px';
+    tip.style.top=(e.clientY-r.top)+'px';
+    tip.classList.add('on');
+    stage.style.cursor='pointer';
+  } else {
+    tip.classList.remove('on');
+    stage.style.cursor='';
+  }
+}
+stage.addEventListener('pointermove',onMove);
+stage.addEventListener('pointerleave',()=>tip.classList.remove('on'));
+
+// ─── Camera presets ──────────────────────────────────────────────
+const presets={
+  top:[0,90,0.01],
+  iso:[40,38,55],
+  ecliptic:[0,4,80],
+};
+document.querySelectorAll('header.page .ctrl button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('header.page .ctrl button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    const p=presets[btn.dataset.cam];
+    animateCam(new THREE.Vector3(p[0],p[1],p[2]));
+  });
+});
+function animateCam(target){
+  const start=camera.position.clone();
+  const t0=performance.now();
+  (function step(){
+    const k=Math.min(1,(performance.now()-t0)/700);
+    const e=1-Math.pow(1-k,3);
+    camera.position.lerpVectors(start,target,e);
+    camera.lookAt(0,0,0);
+    if(k<1) requestAnimationFrame(step);
+  })();
+}
+
+// ─── Animate ──────────────────────────────────────────────────────
+const clock=new THREE.Clock();
+function tick(){
+  const dt=clock.getDelta(), t=clock.elapsedTime;
+  // halo pulse
+  haloRefs.forEach(h=>{
+    const s=1+Math.sin(t*2)*.08;
+    h.scale.set(s,s,1);
+    h.material.opacity=.4+Math.sin(t*2)*.25;
+  });
+  // ship along curves
+  routeMeshes.forEach((r,idx)=>{
+    const u=((t*0.13)+idx*0.3)%1;
+    const p=r.curve.getPointAt(u);
+    const next=r.curve.getPointAt(Math.min(.999,u+0.01));
+    r.ship.position.copy(p);
+    r.ship.lookAt(next);
+    r.ship.rotateX(Math.PI/2);
+  });
+  controls.update();
+  renderer.render(scene,camera);
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

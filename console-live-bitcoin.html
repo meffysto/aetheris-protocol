@@ -933,6 +933,67 @@ h2.sect .rule {
 }
 .pos:hover .tip { display: block; }
 
+/* ─── orbital system view ─────────────────────────────────── */
+.system .orbital {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 360px;
+  margin: 4px auto 0;
+}
+.system .orbital svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.system .orbital .ring { fill: none; stroke: rgba(196,180,138,.28); stroke-width: 1; stroke-dasharray: 2 4; }
+.system .orbital .ring.active { stroke: rgba(168,90,40,.42); stroke-dasharray: 0; }
+.system .orbital .planet { cursor: pointer; }
+.system .orbital .planet .scaler {
+  transition: transform .15s;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.system .orbital .planet:hover .scaler { transform: scale(1.18); }
+.system .orbital .planet.no-action { cursor: default; }
+.system .orbital .planet .body { stroke: rgba(13,10,6,.28); stroke-width: .8; }
+.system .orbital .planet.mine .body { stroke: #0e1d33; stroke-width: 1.6; }
+.system .orbital .planet.enemy .body { stroke: var(--phosphor); stroke-width: 1.2; }
+.system .orbital .label-num {
+  font-family: var(--mono); font-size: 9px; fill: var(--bone-dim);
+  text-anchor: middle; dominant-baseline: hanging; letter-spacing: .04em;
+  pointer-events: none;
+}
+.system .orbital .owner-tag {
+  font-family: var(--sans); font-size: 9px; font-weight: 700;
+  text-anchor: middle; dominant-baseline: hanging;
+  letter-spacing: .04em; text-transform: uppercase;
+  pointer-events: none;
+}
+.system .orbital .asteroid { fill: rgba(196,180,138,.55); }
+.system .orbital .pos-marker { fill: rgba(196,180,138,.22); }
+.system .orbital .mine-halo {
+  fill: none; stroke: var(--phosphor); stroke-width: 1.5; opacity: .55;
+  animation: orbital-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes orbital-pulse {
+  0%,100% { opacity: .25; stroke-width: 1; }
+  50%     { opacity: .7;  stroke-width: 2.2; }
+}
+.system .orbital .incoming-warn {
+  fill: var(--phosphor); font-family: var(--sans); font-size: 14px;
+  font-weight: 700; text-anchor: middle; dominant-baseline: central;
+  pointer-events: none;
+  animation: orbital-pulse 1.6s ease-in-out infinite;
+}
+.system .orbital .star-label {
+  font-family: var(--display); font-weight: 600; font-size: 13px;
+  fill: var(--bone-2); text-anchor: middle; dominant-baseline: central;
+  pointer-events: none;
+}
+.system .orbital .star-meta-text {
+  font-family: var(--mono); font-size: 9px; fill: var(--bone-dim);
+  text-anchor: middle; dominant-baseline: hanging; letter-spacing: .06em;
+  pointer-events: none;
+}
+
 /* ─── right rail / journal ────────────────────────────────── */
 .rail {
   grid-area: rail;
@@ -1876,8 +1937,13 @@ body.tick-pulsed::after {
 .bulletin,
 .tbl,
 .empty-stamp,
-.system,
 .rail .group {
+  animation: panel-enter 440ms var(--motion-out) both;
+}
+/* La vue Galaxie se rafraîchit à chaque tick — on ne joue l'entrée qu'une fois.
+   #vGal n'est pas remplacé par renderGalaxie (seul son innerHTML l'est),
+   donc on s'en sert comme sentinelle « première fois ». */
+#vGal:not([data-rendered]) .system {
   animation: panel-enter 440ms var(--motion-out) both;
 }
 
@@ -3830,6 +3896,10 @@ function renderGalaxie() {
   if (!g || !g.systemes) { v.innerHTML = `<h2 class="sect">Galaxie</h2><div class="empty-stamp">cartographie indisponible</div>`; return; }
   const myPlanet = state.players[state.current]?.planetes?.[0];
   const myCoord = myPlanet?.coordonnees ? myPlanet.coordonnees.join(':') : null;
+  // Clé de mon système (coord sans position). On accepte les deux formats possibles.
+  const mySystemKey = myPlanet?.coordonnees
+    ? myPlanet.coordonnees.slice(0, 2).join(':')
+    : null;
 
   // Index des flottes hostiles incoming, par nom de planète cible.
   // Une flotte est "hostile sur moi" si vers.joueur === current et type ≠ retour.
@@ -3849,64 +3919,177 @@ function renderGalaxie() {
     }
   }
 
+  // ─── orbital layout constants ─────────────────────────────────
+  const ORB_N = 15, ORB_RMIN = 42, ORB_RMAX = 240;
+  const orbR = i => ORB_RMIN + (i - 1) * (ORB_RMAX - ORB_RMIN) / (ORB_N - 1);
+  // Golden-angle pour répartition douce et déterministe
+  const orbA = i => i * 137.508 * Math.PI / 180;
+  const orbXY = i => [Math.cos(orbA(i)) * orbR(i), Math.sin(orbA(i)) * orbR(i)];
+  const classColor = {
+    tellurique: '#7fa570', cristalline: '#3a8a8a', glacee: '#88c8e0',
+    volcanique: '#a83a25', gazeuse: '#5a3a6a'
+  };
+  const planetRadius = cls => cls === 'gazeuse' ? 8.5 : cls === 'tellurique' ? 6.5 : 7;
+  // Couleur d'étoile par type spectral
+  const starColor = (type) => {
+    const t = (type || 'G').toUpperCase();
+    return ({ O:'#9bb0ff', B:'#aabfff', A:'#cad7ff', F:'#f8f7ff',
+              G:'#f7e09a', K:'#ffd2a1', M:'#ffaa6f' })[t] || '#f7e09a';
+  };
+  const esc = s => String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
   let html = `<h2 class="sect">Cartographie galactique <span class="num">§ G</span> <span class="rule"></span></h2><div class="galaxy">`;
-  for (const [coord, sys] of Object.entries(g.systemes)) {
+  let defsId = 0;
+  // Mon système en premier, puis les autres dans l'ordre d'origine.
+  const systemEntries = Object.entries(g.systemes).sort(([a], [b]) => {
+    if (a === mySystemKey) return -1;
+    if (b === mySystemKey) return 1;
+    return 0;
+  });
+  for (const [coord, sys] of systemEntries) {
     const star = sys.etoile || {};
-    html += `<div class="system"><header>
-      <span class="star-name">${star.nom || '—'}</span>
-      <span class="star-meta">type ${star.type || '?'} · ${star.temperature_k || '?'}K</span>
-      <span class="coord">${coord}</span>
-    </header><div class="positions">`;
-    for (let i = 1; i <= 15; i++) {
+    const sc = starColor(star.type);
+    const haloId = `starHalo-${defsId}`;
+    const gasRingId = `gasRing-${defsId}`;
+    defsId++;
+
+    let bodiesSvg = '';
+    let ringsSvg = '';
+
+    for (let i = 1; i <= ORB_N; i++) {
       const pos = sys.positions?.[i] || { type: 'empty' };
       const t = pos.type;
       const cls = pos.classe;
       const owner = pos.proprietaire;
       const fullCoord = `${coord}:${i}`;
       const isMine = fullCoord === myCoord;
-      let dot = '';
-      let kind = t;
-      if (t === 'planete') {
-        dot = `<span class="dot"></span>`;
-      }
       const isEnemy = t === 'planete' && owner && owner !== state.current && !isMine;
-      // Une planète à moi (pas la courante) = cible valide pour transport interne.
       const isAllyOwn = t === 'planete' && owner === state.current && !isMine;
-      // Planète libre = cible valide pour colonisation.
       const isFree = t === 'planete' && (!owner || owner === '~' || owner === 'null');
       const isMissionTarget = isEnemy || isAllyOwn;
       const incoming = (t === 'planete' && pos.nom) ? incomingByPlanet.get(pos.nom) : null;
       const hasIncoming = incoming && incoming.length > 0;
-      let tip = '';
-      if (t === 'planete') {
-        tip = `${pos.nom || 'planète'} · ${cls || '?'}${owner ? ' · ' + owner : ' · libre'}`;
-        if (isEnemy) tip += ' · clic → mission';
-        else if (isAllyOwn) tip += ' · clic → transport';
-        else if (isFree) tip += ' · clic → coloniser';
-        if (hasIncoming) {
-          const cur = state.manifest?.tick ?? 0;
-          for (const inc of incoming) {
-            const left = inc.arr ? Math.max(0, inc.arr - cur) : null;
-            tip += ` · ⚠ ${inc.type} ← ${inc.from}${left != null ? ` (T-${left})` : ''}`;
-          }
+
+      const [x, y] = orbXY(i);
+
+      // ring de l'orbite — seulement si quelque chose est posé
+      if (t !== 'empty') {
+        const r = orbR(i);
+        ringsSvg += `<circle class="ring${(t === 'planete' && owner) ? ' active' : ''}" cx="0" cy="0" r="${r.toFixed(1)}"/>`;
+      }
+
+      if (t === 'empty') {
+        bodiesSvg += `<circle class="pos-marker" cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.6"/>`;
+        continue;
+      }
+
+      if (t === 'asteroide') {
+        // cluster de 3 rochers
+        bodiesSvg += `<g class="asteroid-cluster" transform="translate(${x.toFixed(2)} ${y.toFixed(2)})">
+          <title>astéroïde · §${i}</title>
+          <circle class="asteroid" cx="-2.2" cy="-1" r="1.4"/>
+          <circle class="asteroid" cx="0" cy="1.4" r="1.5"/>
+          <circle class="asteroid" cx="2.2" cy="-0.6" r="1.2"/>
+        </g>`;
+        continue;
+      }
+
+      // planète
+      const radius = planetRadius(cls);
+      const color = classColor[cls] || '#888';
+      // tooltip text (natif via <title>)
+      let tip = `${pos.nom || 'planète'} · ${cls || '?'}${owner ? ' · ' + owner : ' · libre'}`;
+      if (isEnemy) tip += ' · clic → mission';
+      else if (isAllyOwn) tip += ' · clic → transport';
+      else if (isFree) tip += ' · clic → coloniser';
+      if (hasIncoming) {
+        const cur = state.manifest?.tick ?? 0;
+        for (const inc of incoming) {
+          const left = inc.arr ? Math.max(0, inc.arr - cur) : null;
+          tip += ` · ⚠ ${inc.type} ← ${inc.from}${left != null ? ` (T-${left})` : ''}`;
         }
-      } else if (t === 'asteroide') {
-        tip = `astéroïde`;
-      } else { tip = `vide`; }
+      }
+
       let dataAttrs = '';
-      if (isMissionTarget) dataAttrs = ` data-mission-target="${owner}|${pos.nom || ''}"`;
-      else if (isFree) dataAttrs = ` data-coloniser-target="${coord}|${i}|${cls || ''}"`;
-      html += `<div class="pos ${kind} ${isMine?'mine':''} ${isEnemy?'enemy':''} ${isAllyOwn?'allyown':''} ${isFree?'free':''} ${hasIncoming?'incoming':''}" data-c="${cls||''}"${dataAttrs}>
-        <span class="num">${i}</span>${dot}
-        ${hasIncoming ? `<span class="incoming-flag" title="${incoming.length} flotte(s) hostile(s)">⚠</span>` : ''}
-        ${owner ? `<span class="own">${owner.slice(0,5)}</span>` : ''}
-        <span class="tip">${tip}</span>
-      </div>`;
+      if (isMissionTarget) dataAttrs = ` data-mission-target="${esc(owner)}|${esc(pos.nom || '')}"`;
+      else if (isFree)     dataAttrs = ` data-coloniser-target="${esc(coord)}|${i}|${esc(cls || '')}"`;
+
+      const actionable = isMissionTarget || isFree;
+      const groupClasses = ['planet', `c-${cls || 'unknown'}`,
+        isMine ? 'mine' : '', isEnemy ? 'enemy' : '',
+        isAllyOwn ? 'allyown' : '', isFree ? 'free' : '',
+        hasIncoming ? 'incoming' : '', !actionable ? 'no-action' : ''
+      ].filter(Boolean).join(' ');
+
+      // Bloc « scalable » (le corps qui grossit au hover) — uniquement les formes centrées sur (0,0)
+      let scalerInner = '';
+      if (cls === 'gazeuse') {
+        scalerInner += `<ellipse rx="${(radius * 2.1).toFixed(1)}" ry="${(radius * 0.55).toFixed(1)}" fill="none" stroke="url(#${gasRingId})" stroke-width="2.2" transform="rotate(-18)"/>`;
+        scalerInner += `<ellipse rx="${(radius * 1.55).toFixed(1)}" ry="${(radius * 0.4).toFixed(1)}" fill="none" stroke="rgba(196,180,138,.7)" stroke-width=".8" transform="rotate(-18)"/>`;
+      }
+      if (isMine) scalerInner += `<circle class="mine-halo" r="${radius + 6}"/>`;
+      scalerInner += `<circle class="body" r="${radius}" fill="${color}"/>`;
+
+      // Bloc « overlay » (labels, ⚠) — fixe, ne suit pas le scale du hover
+      let overlayInner = '';
+      overlayInner += `<text class="label-num" y="${(radius + 4).toFixed(1)}">§${i}${pos.nom ? ' · ' + esc(pos.nom) : ''}</text>`;
+      if (owner) {
+        const ownFill = isEnemy ? '#a83a25' : (isMine ? '#0e1d33' : (isAllyOwn ? '#5a7a3a' : '#8a7c64'));
+        overlayInner += `<text class="owner-tag" y="${(-radius - 12).toFixed(1)}" fill="${ownFill}">${esc(owner.slice(0, 7))}</text>`;
+      } else if (isFree) {
+        overlayInner += `<text class="owner-tag" y="${(-radius - 12).toFixed(1)}" fill="#8a7c64">libre</text>`;
+      }
+      if (hasIncoming) {
+        overlayInner += `<text class="incoming-warn" x="${radius + 6}" y="${-radius - 2}">⚠</text>`;
+      }
+
+      bodiesSvg += `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)})">
+        <g class="${groupClasses}" data-c="${esc(cls || '')}"${dataAttrs}>
+          <title>${esc(tip)}</title>
+          <g class="scaler">${scalerInner}</g>
+          ${overlayInner}
+        </g>
+      </g>`;
     }
-    html += `</div></div>`;
+
+    html += `<div class="system"><header>
+      <span class="star-name">${esc(star.nom || '—')}</span>
+      <span class="star-meta">type ${esc(star.type || '?')} · ${esc(star.temperature_k || '?')}K</span>
+      <span class="coord">${esc(coord)}</span>
+    </header><div class="orbital">
+      <svg viewBox="-260 -260 520 520" aria-label="système ${esc(star.nom || coord)}">
+        <defs>
+          <radialGradient id="${haloId}" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"  stop-color="#fff2c2" stop-opacity="1"/>
+            <stop offset="18%" stop-color="${sc}" stop-opacity=".85"/>
+            <stop offset="42%" stop-color="#d49a3a" stop-opacity=".32"/>
+            <stop offset="72%" stop-color="#a83a25" stop-opacity=".10"/>
+            <stop offset="100%" stop-color="#a83a25" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="${gasRingId}" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stop-color="#c4b48a" stop-opacity="0"/>
+            <stop offset="50%"  stop-color="#c4b48a" stop-opacity=".55"/>
+            <stop offset="100%" stop-color="#c4b48a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <g class="rings">${ringsSvg}</g>
+        <circle cx="0" cy="0" r="64" fill="url(#${haloId})" opacity=".85">
+          <animate attributeName="r" values="60;68;60" dur="6s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values=".7;.92;.7" dur="6s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="0" cy="0" r="22" fill="url(#${haloId})" opacity=".95"/>
+        <circle cx="0" cy="0" r="13" fill="${sc}" stroke="#d49a3a" stroke-width=".6"/>
+        <text class="star-label" y="42">${esc(star.nom || '—')}</text>
+        <text class="star-meta-text" y="56">${esc(star.type || '?')} · ${esc(star.temperature_k || '?')}K</text>
+        <g class="bodies">${bodiesSvg}</g>
+      </svg>
+    </div></div>`;
   }
   html += `</div>`;
   v.innerHTML = html;
+  // Marque la sentinelle après le premier rendu — coupe l'animation d'entrée
+  // sur les refresh suivants (sinon les .system flashent à chaque tick).
+  if (!v.dataset.rendered) v.dataset.rendered = '1';
 }
 
 function renderJournal(p, emp) {

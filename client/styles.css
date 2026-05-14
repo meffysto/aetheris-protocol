@@ -40,6 +40,8 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background-image:
     radial-gradient(ellipse 90% 60% at 15% -5%, rgba(255,250,235,0.7), transparent 55%),
     radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168,90,40,0.06), transparent 60%),
@@ -192,7 +194,8 @@ body[data-view="galaxie"] .strip { background: rgba(247, 240, 223, 0.18); }
     "strip strip strip"
     "nav main rail"
     "foot foot foot";
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   gap: 0;
 }
 

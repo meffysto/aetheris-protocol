@@ -534,6 +534,22 @@ function fmtCountdown(s) {
 // uniquement quand le moteur avance, pas à chaque re-render.
 let __lastSeenTick = -1;
 let __lastResourceSnapshot = null;  // { [planete|res]: stock } pour diff cellules
+let __lastRenderFingerprint = null; // skip re-render si rien n'a changé (cf scintillement poll)
+function __computeRenderFingerprint() {
+  const m = state.manifest;
+  const localQ = Object.entries(localQueue || {}).map(([k, q]) => `${k}:${q.length}`).join(',');
+  const pending = state.pending ? [...state.pending].sort().join(',') : '';
+  return [
+    m?.hash_etat || '',
+    m?.tick ?? -1,
+    state.current || '',
+    state.view || '',
+    state.wallet?.pubKeyHex || '',
+    state.bitcoin?.tip ?? -1,
+    pending,
+    localQ,
+  ].join('|');
+}
 function __snapshotResources(emp) {
   const snap = {};
   for (const p of (emp?.planetes || [])) {
@@ -573,6 +589,19 @@ function __fireTickPulse() {
 function render() {
   const m = state.manifest;
   const currentTick = m?.tick ?? -1;
+
+  // Toujours rafraîchir l'horodatage "dernier uplink" même si on bail.
+  const lr = document.getElementById('lastRefresh');
+  if (lr) {
+    lr.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  // Anti-scintillement : si l'état n'a pas bougé (poll Bitcoin sans nouveau
+  // tick ni nouvel ordre), on évite le full innerHTML rebuild qui repeint
+  // tous les panneaux.
+  const fingerprint = __computeRenderFingerprint();
+  if (fingerprint === __lastRenderFingerprint) return;
+  __lastRenderFingerprint = fingerprint;
 
   // Détection avancement tick : on déclenche AVANT le render (pour saisir
   // l'ancien snapshot ressources) et on flash APRÈS (pour voir les
@@ -637,9 +666,6 @@ function render() {
   renderRail(p, emp);
   renderNavCounts(p, emp);
   applyView();
-
-  document.getElementById('lastRefresh').textContent =
-    new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   if (p) maybeAdvanceOnboarding(p, emp);
 

@@ -23,8 +23,8 @@ cp docs/adr/0000-template.md docs/adr/NNNN-titre-en-kebab.md
 | [0005](0005-pas-de-backend-pure-replay.md) | Pas de backend. État dérivé par replay client. | Accepted | architecture |
 | [0007](0007-snapshots-replay-indexeddb.md) | Snapshots de replay en IndexedDB | Accepted | architecture, performance |
 | [0008](0008-modularisation-tick-core.md) | Modularisation progressive de `tick-core.mjs` | Accepted (étape 1) | architecture, tooling |
+| [0009](0009-console-decoupage-html-css-js.md) | Découpage de la console : HTML / CSS / JS | Accepted (étape 1) | architecture, tooling, dx |
 
 ## En cours d'écriture / backlog
 
 - ADR-0006 — Multi-device via `device_link` (inscription d'une seconde pubkey).
-- ADR-0009 — Console client : éclatement du monofichier (cf v0.2 #1).

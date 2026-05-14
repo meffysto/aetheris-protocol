@@ -24,7 +24,9 @@ cp docs/adr/0000-template.md docs/adr/NNNN-titre-en-kebab.md
 | [0007](0007-snapshots-replay-indexeddb.md) | Snapshots de replay en IndexedDB | Accepted | architecture, performance |
 | [0008](0008-modularisation-tick-core.md) | Modularisation progressive de `tick-core.mjs` | Accepted (étape 1) | architecture, tooling |
 | [0009](0009-console-decoupage-html-css-js.md) | Découpage de la console : HTML / CSS / JS | Accepted (étape 1) | architecture, tooling, dx |
+| [0010](0010-notifications-et-responsive-mobile.md) | Notifications push & responsive mobile | Accepted (Nostr self-DM en backlog) | ux, mobile |
 
 ## En cours d'écriture / backlog
 
 - ADR-0006 — Multi-device via `device_link` (inscription d'une seconde pubkey).
+- ADR-future — Nostr self-DM push pour notifications cross-device (cf ADR-0010 backlog).

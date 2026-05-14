@@ -105,18 +105,22 @@ Toute discordance → ordre rejeté.
 ## Statut MVP
 
 ```
-[████████████████████░░] MVP Bitcoin — 90%
+[██████████████████████] MVP Bitcoin — 100%
  ✓ Genesis on-chain (bloc 3 084 991)
  ✓ Inscriptions join + ordres (commit + reveal Taproot)
- ✓ Scanner Mutinynet (cache IndexedDB v2)
+ ✓ Scanner Mutinynet (cache IndexedDB v3)
  ✓ Boot browser : scan → replay → state
+ ✓ Snapshots IndexedDB (boot tiède, ADR-0007)
  ✓ Wallet AES-GCM/PBKDF2 200k (chiffré localStorage)
  ✓ Console live + auto-refresh 15s
  ✓ Anti-triche pubkey-binding
  ✓ Tests E2E + déterminisme + fuzz
- ◯ Onboarding tutoriel in-app
- ◯ Cloche notifications
+ ✓ Onboarding tutoriel in-app (4 étapes au 1er login)
+ ✓ Cloche notifications in-app (alertes flotte, chantier, stock)
 ```
+
+Voir [`docs/adr/`](docs/adr/) pour les décisions structurantes et
+[`CONTEXT.md`](CONTEXT.md) pour le vocabulaire du domaine.
 
 ## Pour les développeurs
 

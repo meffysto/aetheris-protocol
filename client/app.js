@@ -4355,6 +4355,11 @@ const OB_STEPS = [
     body: `<p>Choisis un bâtiment à construire, une recherche à lancer ou une flotte à envoyer. Clique <b>Inscrire</b> : la console signe une transaction Taproot avec ton wallet et la broadcaste sur Mutinynet.</p>
 <p>Coût : quelques sats du faucet. Confirmation : 1-2 blocs. Une fois confirmé, ton ordre est appliqué au prochain tour.</p>`,
   },
+  {
+    title: 'Reste prévenu — notifications push',
+    body: `<p>Quand une <b>flotte hostile arrive</b>, un <b>chantier termine</b> ou un <b>stock sature</b>, la cloche 🔔 clignote. Si tu actives les notifications du navigateur, tu reçois aussi un <b>push système</b> même quand l'onglet est en arrière-plan.</p>
+<p>Clique sur la cloche, puis <b>Activer les notifications</b> en bas du panneau. Tu peux changer d'avis à tout moment depuis ton navigateur.</p>`,
+  },
 ];
 
 const onboarding = {
@@ -4407,7 +4412,36 @@ const onboarding = {
   });
 })();
 
-/* boot — le tour onboarding moderne (5 étapes) prend le relais via maybeAdvanceOnboarding(). */
+/* ─── Rail drawer mobile ─────────────────────────────────────────────
+ * Sur viewport ≤ 900px, le rail droit est masqué hors-canvas. Le bouton
+ * #railToggle dans le header (rendu visible par CSS @media) ouvre/ferme.
+ * Backdrop cliquable pour fermer. Escape ferme aussi.
+ */
+(function setupRailDrawer() {
+  const toggle = document.getElementById('railToggle');
+  const rail = document.getElementById('rail');
+  const backdrop = document.getElementById('railBackdrop');
+  if (!toggle || !rail || !backdrop) return;
+  const open = () => {
+    rail.classList.add('open');
+    backdrop.classList.add('on');
+    toggle.setAttribute('aria-expanded', 'true');
+  };
+  const close = () => {
+    rail.classList.remove('open');
+    backdrop.classList.remove('on');
+    toggle.setAttribute('aria-expanded', 'false');
+  };
+  toggle.addEventListener('click', () => {
+    rail.classList.contains('open') ? close() : open();
+  });
+  backdrop.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && rail.classList.contains('open')) close();
+  });
+})();
+
+/* boot — le tour onboarding (5 étapes) prend le relais via maybeAdvanceOnboarding(). */
 load();
 tickCountdown();
 

@@ -2,222 +2,40 @@
 // Importable Node ou navigateur.
 //
 // Exports :
-//   - yparse, ystringify, canonicalJSON, rngFromSeed   (helpers iso)
 //   - runTick({...}) → { newManifest, newEmpires, events, reports, eventsLog }
+//   - yparse, ystringify, canonicalJSON, rngFromSeed, tickFromBlockHeight,
+//     blockHeightForTick (re-exports depuis les modules dédiés, pour
+//     préserver la compatibilité avec les imports existants).
 //
 // Le caller (CLI Node ou console browser) charge l'état, appelle runTick,
 // puis persiste le résultat (fs ou IndexedDB).
+//
+// Découpage (v0.2 #2) :
+//   - yaml-mini.mjs : yparse / ystringify
+//   - rng.mjs       : rngFromSeed / canonicalJSON / sha256Hex
+//   - time.mjs      : tickFromBlockHeight / blockHeightForTick
+//   - reports.mjs   : helpers de rendu Markdown
+// Les phases internes de runTick sont encore dans ce fichier sous forme de
+// commentaires "// ─── Phase N ───" (cf ADR-0008 backlog) — extraction par
+// phase à faire dans un prochain milestone.
 
-import { sha256 } from '@noble/hashes/sha256';
 import { queueColonisation, resolveColonisationArrivee } from './colonisation.mjs';
 import { computeSealHash, validateSealedShape, validateRevealShape, SEALED_MAX_PATIENCE_TICKS } from './sealed-protocol.mjs';
 
-// ════════════════════════════════════════════════════════════════════════
-// 1.  YAML mini (sous-ensemble suffisant pour notre schéma)
-// ════════════════════════════════════════════════════════════════════════
+import { yparse, ystringify } from './yaml-mini.mjs';
+import { rngFromSeed, canonicalJSON, sha256Hex } from './rng.mjs';
+import { tickFromBlockHeight, blockHeightForTick } from './time.mjs';
+import {
+  renderIntelReport, renderAlerteEspionnage, renderBattleReport, renderEmpireMd,
+} from './reports.mjs';
 
-export function yparse(text) {
-  const lines = text.split('\n')
-    .filter(l => !/^\s*#/.test(l))
-    .map(l => l.replace(/\s+#.*$/, ''));
-  let i = 0;
-  function readBlock(indent) {
-    const out = {};
-    let firstKey = true;
-    while (i < lines.length) {
-      const line = lines[i];
-      if (!line.trim()) { i++; continue; }
-      const ind = line.match(/^ */)[0].length;
-      if (ind < indent) return out;
-      if (ind > indent && firstKey) return readBlock(ind);
-      const m = line.slice(ind).match(/^(?:"([^"]+)"|'([^']+)'|([\w-]+))\s*:\s*(.*)$/);
-      if (!m) { i++; continue; }
-      const k = m[1] ?? m[2] ?? m[3];
-      const rest = m[4];
-      i++;
-      if (rest === '') {
-        if (i < lines.length && /^\s*-\s/.test(lines[i])) out[k] = readList(ind + 2);
-        else out[k] = readBlock(ind + 2);
-      } else if (rest.startsWith('[') || rest.startsWith('{')) {
-        out[k] = readInline(rest);
-      } else {
-        out[k] = parseScalar(rest);
-      }
-      firstKey = false;
-    }
-    return out;
-  }
-  function readList(indent) {
-    const out = [];
-    while (i < lines.length) {
-      const line = lines[i];
-      if (!line.trim()) { i++; continue; }
-      const ind = line.match(/^ */)[0].length;
-      if (ind < indent) return out;
-      if (!line.slice(ind).startsWith('- ')) return out;
-      const rest = line.slice(ind + 2);
-      i++;
-      if (rest.includes(':')) {
-        const m = rest.match(/^([\w-]+)\s*:\s*(.*)$/);
-        const item = {};
-        if (m[2] === '') item[m[1]] = readBlock(ind + 4);
-        else item[m[1]] = parseScalar(m[2]);
-        Object.assign(item, readBlock(ind + 2));
-        out.push(item);
-      } else {
-        out.push(parseScalar(rest));
-      }
-    }
-    return out;
-  }
-  function splitTopLevel(s, sep) {
-    const out = [];
-    let depth = 0, start = 0;
-    for (let i = 0; i < s.length; i++) {
-      const c = s[i];
-      if (c === '{' || c === '[') depth++;
-      else if (c === '}' || c === ']') depth--;
-      else if (c === sep && depth === 0) {
-        out.push(s.slice(start, i).trim());
-        start = i + 1;
-      }
-    }
-    const last = s.slice(start).trim();
-    if (last) out.push(last);
-    return out;
-  }
-  function readInline(s) {
-    s = s.trim();
-    if (s.startsWith('[') && s.endsWith(']')) {
-      const inner = s.slice(1, -1).trim();
-      if (!inner) return [];
-      return splitTopLevel(inner, ',').map(t => parseScalar(t));
-    }
-    if (s.startsWith('{') && s.endsWith('}')) {
-      const inner = s.slice(1, -1).trim();
-      if (!inner) return {};
-      const out = {};
-      for (const part of splitTopLevel(inner, ',')) {
-        const colon = part.indexOf(':');
-        if (colon < 0) continue;
-        const k = part.slice(0, colon).trim().replace(/^["']|["']$/g, '');
-        const v = part.slice(colon + 1).trim();
-        out[k] = parseScalar(v);
-      }
-      return out;
-    }
-    return s;
-  }
-  function parseScalar(s) {
-    s = s.trim();
-    if (s === 'true') return true;
-    if (s === 'false') return false;
-    if (s === 'null' || s === '~' || s === '') return null;
-    if (/^-?\d+$/.test(s)) return parseInt(s, 10);
-    if (/^-?\d*\.\d+$/.test(s)) return parseFloat(s);
-    if (/^["'].*["']$/.test(s)) return s.slice(1, -1);
-    if (s.startsWith('[') || s.startsWith('{')) return readInline(s);
-    return s;
-  }
-  return readBlock(0);
-}
-
-export function ystringify(obj, indent = 0) {
-  const pad = ' '.repeat(indent);
-  if (obj === null || obj === undefined) return 'null';
-  if (typeof obj === 'string') return /[:#\[\]{}]|^\s|\s$/.test(obj) ? JSON.stringify(obj) : obj;
-  if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
-  if (Array.isArray(obj)) {
-    if (obj.length === 0) return '[]';
-    return obj.map(item => {
-      if (typeof item === 'object' && item !== null) {
-        const lines = Object.entries(item).map(([k, v], i) => {
-          const prefix = i === 0 ? `${pad}- ` : `${pad}  `;
-          if (typeof v === 'object' && v !== null) {
-            if (Array.isArray(v) && v.length === 0) return `${prefix}${k}: []`;
-            if (!Array.isArray(v) && Object.keys(v).length === 0) return `${prefix}${k}: {}`;
-            return `${prefix}${k}:\n${ystringify(v, indent + 4)}`;
-          }
-          return `${prefix}${k}: ${ystringify(v)}`;
-        });
-        return lines.join('\n');
-      }
-      return `${pad}- ${ystringify(item)}`;
-    }).join('\n');
-  }
-  return Object.entries(obj).map(([k, v]) => {
-    if (typeof v === 'object' && v !== null) {
-      if (Array.isArray(v) && v.length === 0) return `${pad}${k}: []`;
-      if (!Array.isArray(v) && Object.keys(v).length === 0) return `${pad}${k}: {}`;
-      const inner = ystringify(v, indent + 2);
-      return `${pad}${k}:\n${inner}`;
-    }
-    return `${pad}${k}: ${ystringify(v)}`;
-  }).join('\n');
-}
+// Re-exports : préserve la surface d'API publique de tick-core.
+export { yparse, ystringify } from './yaml-mini.mjs';
+export { rngFromSeed, canonicalJSON } from './rng.mjs';
+export { tickFromBlockHeight, blockHeightForTick } from './time.mjs';
 
 // ════════════════════════════════════════════════════════════════════════
-// 2.  RNG déterministe (xoshiro128**) — seed via SHA256 (iso)
-// ════════════════════════════════════════════════════════════════════════
-
-export function rngFromSeed(seedStr) {
-  const h = sha256(new TextEncoder().encode(seedStr));
-  const dv = new DataView(h.buffer, h.byteOffset, h.byteLength);
-  let s0 = dv.getUint32(0, true), s1 = dv.getUint32(4, true),
-      s2 = dv.getUint32(8, true), s3 = dv.getUint32(12, true);
-  function rotl(x, k) { return ((x << k) | (x >>> (32 - k))) >>> 0; }
-  return function rng() {
-    const result = (rotl(Math.imul(s1, 5), 7) * 9) >>> 0;
-    const t = (s1 << 9) >>> 0;
-    s2 ^= s0; s3 ^= s1; s1 ^= s2; s0 ^= s3;
-    s2 ^= t; s3 = rotl(s3, 11);
-    return result / 0x100000000;
-  };
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// 3.  JSON canonique pour hash (clés triées récursivement)
-// ════════════════════════════════════════════════════════════════════════
-
-export function canonicalJSON(value) {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return '[' + value.map(canonicalJSON).join(',') + ']';
-  const keys = Object.keys(value).sort();
-  return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalJSON(value[k])).join(',') + '}';
-}
-
-function sha256Hex(text) {
-  const bytes = sha256(new TextEncoder().encode(text));
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// Mapping bloc Bitcoin ↔ tick
-// ════════════════════════════════════════════════════════════════════════
-
-/**
- * Calcule le tick courant à partir de la hauteur de bloc Bitcoin.
- *
- * @param {number} currentHeight   Hauteur actuelle (tip)
- * @param {number} genesisBlock    Bloc Bitcoin où le serveur démarre
- * @param {number} [blocsParTick=1]
- * @param {number} [tickGenesis=0] Tick associé à genesisBlock
- * @returns {number} Tick courant (clampé ≥ tickGenesis)
- */
-export function tickFromBlockHeight(currentHeight, genesisBlock, blocsParTick = 1, tickGenesis = 0) {
-  if (currentHeight < genesisBlock) return tickGenesis;
-  return tickGenesis + Math.floor((currentHeight - genesisBlock) / blocsParTick);
-}
-
-/**
- * Hauteur de bloc Bitcoin où le tick `targetTick` se résout.
- */
-export function blockHeightForTick(targetTick, genesisBlock, blocsParTick = 1, tickGenesis = 0) {
-  return genesisBlock + (targetTick - tickGenesis) * blocsParTick;
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// 4.  runTick — pure function
+// runTick — pure function
 // ════════════════════════════════════════════════════════════════════════
 
 /**
@@ -1537,7 +1355,9 @@ export async function runTick({
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Helpers de rendu (purs)
+// Vérification de signature Ed25519 legacy
+// (héritage Aetheris pré-bitcoin ; aujourd'hui la sécurité passe par la
+//  pubkey Schnorr de l'inscripteur, cf ADR-0003)
 // ════════════════════════════════════════════════════════════════════════
 
 async function checkSignature(name, rawContent, identites, verifySignature) {
@@ -1557,146 +1377,3 @@ async function checkSignature(name, rawContent, identites, verifySignature) {
   }
 }
 
-function renderIntelReport({ att, cible, planete, defEmp, niveau, sondesLancees, detruites, tick }) {
-  const lines = [];
-  lines.push('---');
-  lines.push(`type: rapport-espionnage`);
-  lines.push(`tick: ${tick}`);
-  lines.push(`cible: { joueur: ${cible.joueur}, planete: ${cible.planete} }`);
-  lines.push(`niveau_intel: ${niveau}`);
-  lines.push(`sondes_lancees: ${sondesLancees}`);
-  lines.push(`sondes_detruites: ${detruites}`);
-  lines.push('---');
-  lines.push('');
-  lines.push(`# Rapport d'espionnage — ${cible.joueur}/${cible.planete}`);
-  lines.push('');
-  lines.push(`Tick ${tick} · Niveau ${niveau}/5`);
-  lines.push(`${sondesLancees} sondes lancées, ${detruites} interceptées.`);
-  lines.push('');
-  if (niveau === 0) {
-    lines.push(`> ⚠ Toutes les sondes ont été détectées et détruites avant transmission utile.`);
-    lines.push(`> Le défenseur **a été alerté** de la tentative d'intrusion.`);
-  }
-  if (niveau >= 1) {
-    lines.push(`## Ressources`); lines.push('');
-    for (const [r, info] of Object.entries(planete.ressources || {})) {
-      lines.push(`- ${r} : **${(info.stock || 0).toLocaleString('fr-FR')}** (capacité ${(info.capacite || 0).toLocaleString('fr-FR')}, prod +${info.production_par_utj || 0}/UTJ)`);
-    }
-    lines.push('');
-  }
-  if (niveau >= 2) {
-    lines.push(`## Flotte au sol`); lines.push('');
-    const fl = planete.flotte_au_sol || {};
-    if (Object.keys(fl).length === 0) lines.push('*aucune*');
-    else for (const [t, n] of Object.entries(fl)) lines.push(`- ${t} : ${n.toLocaleString('fr-FR')}`);
-    lines.push('');
-  }
-  if (niveau >= 3) {
-    lines.push(`## Défenses`); lines.push('');
-    const d = planete.defenses || {};
-    if (Object.keys(d).length === 0) lines.push('*aucune*');
-    else for (const [t, n] of Object.entries(d)) lines.push(`- ${t} : ${n.toLocaleString('fr-FR')}`);
-    lines.push('');
-  }
-  if (niveau >= 4) {
-    lines.push(`## Bâtiments`); lines.push('');
-    for (const [b, niv] of Object.entries(planete.batiments || {})) lines.push(`- ${b} : niveau ${niv}`);
-    lines.push('');
-  }
-  if (niveau >= 5) {
-    lines.push(`## Recherches`); lines.push('');
-    for (const [t, niv] of Object.entries(defEmp.recherche || {})) lines.push(`- ${t} : niveau ${niv}`);
-    lines.push('');
-  }
-  return lines.join('\n') + '\n';
-}
-
-function renderAlerteEspionnage({ defenderName, planeteCible, att, detruites, tick }) {
-  const lines = [];
-  lines.push('---');
-  lines.push(`type: alerte-espionnage`);
-  lines.push(`tick: ${tick}`);
-  lines.push(`planete: ${planeteCible}`);
-  lines.push(`attaquant: ${att}`);
-  lines.push(`sondes_interceptees: ${detruites}`);
-  lines.push('---');
-  lines.push('');
-  lines.push(`# ⚠ Tentative d'espionnage interceptée`);
-  lines.push('');
-  lines.push(`Tick ${tick} · Planète **${planeteCible}**`);
-  lines.push(`${detruites} sonde(s) appartenant à **${att}** ont été détectées et détruites par le contre-espionnage.`);
-  return lines.join('\n') + '\n';
-}
-
-function renderBattleReport({ att, def, cible, result, debris, pillage, tick }) {
-  const lines = [];
-  lines.push('---');
-  lines.push(`type: bataille`);
-  lines.push(`tick: ${tick}`);
-  lines.push(`attaquant: ${att}`);
-  lines.push(`defenseur: ${def}`);
-  lines.push(`lieu: { joueur: ${def}, planete: ${cible.planete} }`);
-  lines.push(`issue: ${result.issue}`);
-  lines.push(`rondes: ${result.rondes.length}`);
-  lines.push(`debris: { ferrum: ${debris.ferrum}, lumen: ${debris.lumen} }`);
-  lines.push(`pillage: { ferrum: ${pillage.ferrum}, lumen: ${pillage.lumen}, plasmide: ${pillage.plasmide} }`);
-  lines.push('---');
-  lines.push('');
-  lines.push(`# Bataille de ${cible.planete} — tick ${tick}`);
-  lines.push('');
-  lines.push(`**${att.toUpperCase()}** attaque **${def.toUpperCase()}** sur ${cible.planete}.`);
-  lines.push('');
-  lines.push(`## Forces engagées`);
-  lines.push('');
-  lines.push(`### Attaquant (${att})`);
-  for (const [t, n] of Object.entries(result.attaquant_initial)) {
-    lines.push(`- ${t} : ${n}  →  restant : ${result.attaquant_restant[t] || 0}`);
-  }
-  lines.push('');
-  lines.push(`### Défenseur (${def})`);
-  for (const [t, n] of Object.entries(result.defenseur_initial)) {
-    lines.push(`- ${t} : ${n}  →  restant : ${result.defenseur_restant[t] || 0}`);
-  }
-  lines.push('');
-  lines.push(`## Déroulé`);
-  lines.push('');
-  for (const r of result.rondes) {
-    lines.push(`**Ronde ${r.ronde}** — tir A=${r.tir_attaquant} / D=${r.tir_defenseur}`);
-    const pa = Object.entries(r.pertes_attaquant).map(([t, n]) => `${t} -${n}`).join(', ') || '—';
-    const pd = Object.entries(r.pertes_defenseur).map(([t, n]) => `${t} -${n}`).join(', ') || '—';
-    lines.push(`- pertes attaquant : ${pa}`);
-    lines.push(`- pertes défenseur : ${pd}`);
-    lines.push('');
-  }
-  lines.push(`## Résultat`);
-  lines.push('');
-  lines.push(`Issue : **${result.issue}**`);
-  lines.push(`Champ de débris : ${debris.ferrum} ferrum / ${debris.lumen} lumen`);
-  if (result.issue === 'victoire-attaquant') {
-    lines.push(`Butin : ${pillage.ferrum} ferrum / ${pillage.lumen} lumen / ${pillage.plasmide} plasmide`);
-  }
-  return lines.join('\n') + '\n';
-}
-
-function renderEmpireMd(emp) {
-  let md = `# Empire de ${emp.joueur}\n\n`;
-  md += `> Tick ${emp.tick} · Score ${emp.score_total} · Alliance ${emp.alliance || '—'}\n\n`;
-  md += `## Planètes (${(emp.planetes || []).length})\n\n`;
-  for (const p of emp.planetes || []) {
-    md += `### ${p.nom} — ${p.coordonnees.join(':')} · *${p.type}*\n\n`;
-    md += `| Ressource | Stock | Production/UTJ | Capacité |\n|---|---|---|---|\n`;
-    for (const [k, v] of Object.entries(p.ressources)) {
-      md += `| ${k} | ${v.stock?.toLocaleString('fr-FR')} | +${v.production_par_utj} | ${v.capacite?.toLocaleString('fr-FR')} |\n`;
-    }
-    md += `\n**Bâtiments** : `;
-    md += Object.entries(p.batiments).map(([k, v]) => `${k} ${v}`).join(', ') + '\n\n';
-    if ((p.file_chantier || []).length > 0) {
-      md += `**File** : ${p.file_chantier.map(c => `${c.batiment}→${c.niveau_cible} (${c.fin_utj} UTJ)`).join(', ')}\n\n`;
-    }
-  }
-  if ((emp.recherche || {}) && Object.keys(emp.recherche).length > 0) {
-    md += `## Recherche\n\n`;
-    for (const [k, v] of Object.entries(emp.recherche)) md += `- ${k} : niv ${v}\n`;
-  }
-  return md;
-}

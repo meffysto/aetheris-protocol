@@ -22,9 +22,9 @@ cp docs/adr/0000-template.md docs/adr/NNNN-titre-en-kebab.md
 | [0004](0004-commit-reveal-option-b.md) | Commit-reveal "option B" (reveal à l'impact) | Accepted | gameplay, securite |
 | [0005](0005-pas-de-backend-pure-replay.md) | Pas de backend. État dérivé par replay client. | Accepted | architecture |
 | [0007](0007-snapshots-replay-indexeddb.md) | Snapshots de replay en IndexedDB | Accepted | architecture, performance |
+| [0008](0008-modularisation-tick-core.md) | Modularisation progressive de `tick-core.mjs` | Accepted (étape 1) | architecture, tooling |
 
 ## En cours d'écriture / backlog
 
 - ADR-0006 — Multi-device via `device_link` (inscription d'une seconde pubkey).
-- ADR-0008 — Modularisation `tick-core` en phases (cf v0.2 #2).
 - ADR-0009 — Console client : éclatement du monofichier (cf v0.2 #1).

@@ -249,12 +249,43 @@ body[data-view="galaxie"] .strip { background: rgba(247, 240, 223, 0.18); }
   line-height: 1; letter-spacing: -0.01em;
 }
 .tick-block .countdown {
-  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  font-family: var(--mono); font-size: 18px; font-weight: 600;
   color: var(--phosphor-2);
   letter-spacing: 0.04em;
   padding: 0;
   background: none; border: none;
+  font-variant-numeric: tabular-nums;
 }
+.tick-block .countdown.overdue {
+  color: var(--phosphor);
+  animation: countdown-pulse 1.2s ease-in-out infinite;
+}
+@keyframes countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+/* Ring de progression conique autour du numéro de cycle.
+   --progress: 0..100, piloté par tickCountdown(). */
+.cycle-ring {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background:
+    conic-gradient(var(--phosphor) calc(var(--progress, 0) * 1%), rgba(255,255,255,0.06) 0);
+  padding: 3px;
+  transition: background 0.5s linear;
+}
+.cycle-ring::before {
+  content: '';
+  position: absolute; inset: 3px;
+  background: var(--brass);
+  border-radius: 50%;
+  z-index: 0;
+}
+.cycle-ring > div { position: relative; z-index: 1; text-align: center; }
+.cycle-ring .label { margin-bottom: 1px; }
+.cycle-ring .value { font-size: 22px; }
 
 .player-pick {
   display: flex; align-items: center; gap: 12px;
@@ -1115,6 +1146,33 @@ h2.sect .rule {
 }
 .qitem.cart .cancel-btn:hover { color: var(--phosphor); background: rgba(109,194,202,0.08); }
 .qitem.cart .cancel-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+/* Récap coût agrégé du panier (avant le bouton Inscrire).
+   L'engagement Bitcoin est irréversible — on rend visible l'impact. */
+.cart-cost, .cart-cost-bitcoin {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px;
+  margin-top: 10px; padding: 8px 10px;
+  background: var(--ink-3);
+  border-left: 2px solid var(--phosphor-2);
+  border-radius: 4px;
+  font-family: var(--sans);
+}
+.cart-cost-bitcoin { border-left-color: var(--brass); margin-top: 4px; }
+.cart-cost-label {
+  font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--bone-dim); font-weight: 600;
+}
+.cart-cost-values { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.cart-cost-item {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--bone); font-variant-numeric: tabular-nums;
+}
+.cart-cost-item.insufficient {
+  color: var(--phosphor);
+  text-decoration: underline dotted var(--phosphor);
+  text-underline-offset: 3px;
+}
+
 .cart-inscribe {
   display: block; width: 100%;
   margin-top: 10px;
@@ -1133,6 +1191,102 @@ h2.sect .rule {
   font-family: var(--sans); font-size: 11px; color: var(--bone-dim);
   text-align: center;
 }
+
+/* ─── confirm modal (inscription Bitcoin) ─────────────────────
+   Friction explicite avant le broadcast on-chain — irréversible
+   ce tick, donc on demande confirmation. Évite les mistaps mobile. */
+.confirm-modal-bg {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(14, 29, 51, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: fade-in 0.15s ease-out;
+}
+.confirm-modal-bg[hidden] { display: none; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.confirm-modal {
+  width: 100%; max-width: 480px;
+  background: var(--ink-2);
+  border: 1px solid rgba(168, 58, 37, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(14, 29, 51, 0.35);
+  padding: 24px 24px 20px;
+  font-family: var(--sans);
+  color: var(--bone);
+  animation: pop-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes pop-in {
+  from { transform: scale(0.94); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.confirm-modal .confirm-icon {
+  font-size: 28px; color: var(--phosphor);
+  text-align: center; margin-bottom: 8px;
+  animation: spin 2s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.confirm-modal h2 {
+  margin: 0 0 16px;
+  font-family: var(--display);
+  font-size: 17px; font-weight: 700;
+  text-align: center;
+  color: var(--bone-2);
+  letter-spacing: 0.01em;
+}
+.confirm-body {
+  font-size: 12.5px; line-height: 1.55;
+  color: var(--bone);
+  margin-bottom: 18px;
+}
+.confirm-body .confirm-section {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: var(--ink-3);
+  border-left: 2px solid var(--phosphor-2);
+  border-radius: 4px;
+}
+.confirm-body .confirm-section .label {
+  font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--bone-dim); font-weight: 600;
+  margin-bottom: 4px;
+}
+.confirm-body ul {
+  margin: 0; padding-left: 18px;
+}
+.confirm-body li {
+  font-family: var(--mono); font-size: 11.5px;
+  color: var(--bone-2);
+  margin: 2px 0;
+}
+.confirm-body .warn {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--phosphor-2);
+  border-radius: 4px;
+  font-size: 11px; color: var(--phosphor);
+  background: rgba(168, 58, 37, 0.04);
+}
+.confirm-actions {
+  display: flex; gap: 10px; justify-content: stretch;
+}
+.confirm-actions button {
+  flex: 1; appearance: none; cursor: pointer;
+  padding: 10px 14px; border-radius: 6px;
+  font-family: var(--display); font-weight: 700; font-size: 12.5px;
+  letter-spacing: 0.02em;
+  transition: filter 0.12s, opacity 0.12s, background 0.12s;
+}
+.confirm-cancel {
+  background: transparent; color: var(--bone-dim);
+  border: 1px solid var(--ink-4);
+}
+.confirm-cancel:hover { background: var(--ink-3); color: var(--bone); }
+.confirm-ok {
+  background: var(--phosphor); color: #fff;
+  border: 1px solid var(--phosphor);
+}
+.confirm-ok:hover { filter: brightness(1.1); }
 
 /* ─── onboarding modal ────────────────────────────────────── */
 .onboarding-bg {

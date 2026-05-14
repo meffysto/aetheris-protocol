@@ -35,6 +35,21 @@
      avec activation_tick > tick courant. -->
 <div class="epoch-banner" id="epochBanner" hidden></div>
 
+<!-- Modal de confirmation pour les inscriptions Bitcoin. Affichée juste
+     avant le broadcast pour éviter les mistaps mobile. Le contenu est
+     injecté par showInscribeConfirm() dans client/app.js. -->
+<div class="confirm-modal-bg" id="confirmModalBg" hidden>
+  <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-icon" aria-hidden="true">⟳</div>
+    <h2 id="confirmTitle">Confirmer la signature Bitcoin</h2>
+    <div class="confirm-body" id="confirmBody"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-cancel" id="confirmCancelBtn">Modifier le panier</button>
+      <button type="button" class="confirm-ok" id="confirmOkBtn">Confirmer la signature</button>
+    </div>
+  </div>
+</div>
+
 <div class="ob-bg" id="obBgLegacy" hidden>
   <div class="ob-card" id="obCard">
     <button type="button" class="ob-skip" id="obSkip">passer</button>
@@ -194,9 +209,15 @@
     </div>
     <div class="head-meta">
       <div class="tick-block">
-        <div>
-          <div class="label">cycle</div>
-          <div class="value" id="tickValue">—</div>
+        <!-- Ring de progression conique autour du numéro de cycle.
+             --progress: 0..100 piloté par tickCountdown() (client/app.js).
+             Le pulse phosphor ramène l'attention sur le tempo : c'est LA
+             info la plus vitale dans un 4X à cadence 15min/tick. -->
+        <div class="cycle-ring" id="cycleRing" style="--progress:0">
+          <div>
+            <div class="label">cycle</div>
+            <div class="value" id="tickValue">—</div>
+          </div>
         </div>
         <div class="countdown" id="countdown">prochain · —</div>
       </div>

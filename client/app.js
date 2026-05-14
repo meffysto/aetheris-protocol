@@ -2124,6 +2124,31 @@ function renderCart() {
       </div>
     </div>`;
   }
+  // Récap coût agrégé : somme des coûts ressources de tous les ordres du
+  // panier. Affiché AVANT le bouton pour que le joueur voie l'impact
+  // financier de sa signature Bitcoin. Inclut une estimation des frais sat.
+  const totalCost = computeCartTotalCost(q, state.players[playerName]);
+  const feeSat = estimateInscriptionSat(q.length);
+  const emp = state.players[playerName];
+  const planete = emp?.planetes?.[0];
+  const costParts = Object.entries(totalCost).filter(([, v]) => v > 0).map(([res, v]) => {
+    const stock = planete?.ressources?.[res]?.stock ?? 0;
+    const insuffisant = v > stock;
+    const label = { ferrum: 'Fe', lumen: 'Lu', plasmide: 'Pl', singularite: 'Sg', influence: 'Inf' }[res] || res;
+    return `<span class="cart-cost-item ${insuffisant ? 'insufficient' : ''}" title="${insuffisant ? `Manque ${fmt(v - stock)} ${label} (stock: ${fmt(stock)})` : `Stock après: ${fmt(stock - v)} ${label}`}">${fmt(v)} ${label}</span>`;
+  });
+  const costHtml = costParts.length
+    ? `<div class="cart-cost">
+        <span class="cart-cost-label">Coût total</span>
+        <span class="cart-cost-values">${costParts.join('')}</span>
+      </div>
+      <div class="cart-cost-bitcoin">
+        <span class="cart-cost-label">Frais Bitcoin estimés</span>
+        <span class="cart-cost-values"><span class="cart-cost-item">~${feeSat} sat</span></span>
+      </div>`
+    : '';
+  html += costHtml;
+
   let btnLabel;
   if (locked) btnLabel = 'Inscription en cours…';
   else if (inflight) btnLabel = 'TX Bitcoin en attente de confirmation';
@@ -2131,9 +2156,144 @@ function renderCart() {
   html += `<button class="cart-inscribe" id="cartInscribeBtn" ${disabled ? 'disabled' : ''}>${btnLabel}</button>`;
   const hint = inflight
     ? 'Inscription précédente non confirmée (Mutinynet ≈ 30s). Le panier reste prêt.'
-    : 'Une seule inscription Bitcoin pour tout le panier.';
+    : `Réversible jusqu'à signature · 1 seule inscription Bitcoin pour ${q.length} ordre${q.length > 1 ? 's' : ''}.`;
   html += `<div class="cart-hint">${hint}</div>`;
   document.getElementById('qCart').innerHTML = html;
+}
+
+// Agrège le coût ressources de tous les ordres du panier. Pour les
+// chantiers/recherches/constructions, calcule le coût d'après les
+// formules de rules.yaml (multiplicateur^(niveau-1)). Pour les actions
+// sans coût ressource (missions, marché — coût déjà débité au push),
+// renvoie 0. Le résultat est { ferrum, lumen, plasmide, singularite, influence }.
+function computeCartTotalCost(queueItems, emp) {
+  const total = { ferrum: 0, lumen: 0, plasmide: 0, singularite: 0, influence: 0 };
+  if (!emp || !state.rules) return total;
+  const planete = emp.planetes?.[0];
+  for (const item of queueItems) {
+    const o = item.order;
+    if (o.type === 'chantier') {
+      const def = state.rules.batiments?.[o.batiment];
+      if (!def) continue;
+      const niv = (o.niveau_cible || 1) - 1;
+      const mult = Math.pow(def.multiplicateur_cout || 1.5, niv);
+      for (const [k, v] of Object.entries(def.cout_base || {})) {
+        if (total[k] !== undefined) total[k] += Math.floor(v * mult);
+      }
+    } else if (o.type === 'recherche') {
+      const def = state.rules.recherches?.[o.technologie];
+      if (!def) continue;
+      const niv = (o.niveau_cible || 1) - 1;
+      const mult = Math.pow(def.mult || 2.0, niv);
+      for (const [k, v] of Object.entries(def.cout_base || {})) {
+        if (total[k] !== undefined) total[k] += Math.floor(v * mult);
+      }
+    } else if (o.type === 'construction') {
+      const def = state.rules.vaisseaux?.[o.unite] || state.rules.defenses?.[o.unite];
+      if (!def) continue;
+      const qty = parseInt(o.quantite, 10) || 1;
+      for (const [k, v] of Object.entries(def.cout || {})) {
+        if (total[k] !== undefined) total[k] += v * qty;
+      }
+    } else if (o.type === 'diplomatie' && o.action === 'treve') {
+      const conf = state.rules.diplomatie?.treve;
+      const niv = emp.recherche?.diplomatie || 0;
+      const reduc = Math.min(0.5, niv * (state.rules.diplomatie?.diplomatie_reduction_par_niveau || 0));
+      total.influence += Math.ceil((conf?.cout_influence || 100) * (1 - reduc));
+    }
+    // marche, mission, colonisation : coût déjà débité ou complexe (cargaison) — ignoré ici.
+  }
+  return total;
+}
+
+// Estimation grossière des frais Bitcoin pour une inscription. Ordre
+// de grandeur : ~150 sat pour 1 ordre simple, ~50 sat de plus par ordre
+// additionnel (le YAML grossit, le vsize aussi). À feeRate 1 sat/vB.
+function estimateInscriptionSat(nOrders) {
+  return 150 + Math.max(0, nOrders - 1) * 50;
+}
+
+/* Affiche la modal de confirmation avant inscription Bitcoin.
+ * Retourne une Promise<boolean> : true si l'utilisateur confirme,
+ * false s'il annule (clic en dehors, bouton "Modifier", touche Escape).
+ *
+ * Friction délibérée : c'est le dernier checkpoint avant une TX
+ * Bitcoin réelle sur Mutinynet. On résume les ordres, le coût agrégé
+ * et les frais sat pour que l'utilisateur signe en connaissance de cause. */
+function showInscribeConfirm(queueItems, playerName) {
+  return new Promise(resolve => {
+    const bg = document.getElementById('confirmModalBg');
+    const body = document.getElementById('confirmBody');
+    const okBtn = document.getElementById('confirmOkBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+    if (!bg || !body || !okBtn || !cancelBtn) {
+      // Fallback : pas de modal disponible → on confirme silencieusement
+      // (garde le comportement legacy). Ne devrait pas arriver en prod.
+      resolve(true);
+      return;
+    }
+
+    const tickCible = queueItems[0].tickCible;
+    const emp = state.players[playerName];
+    const planete = emp?.planetes?.[0];
+    const totalCost = computeCartTotalCost(queueItems, emp);
+    const feeSat = estimateInscriptionSat(queueItems.length);
+
+    const orderLis = queueItems.map(item => {
+      const s = summarizeQueuedOrder(item.order);
+      return `<li>${escapeHtml(s.nm)}${s.sub ? ` <span style="opacity:0.7">— ${escapeHtml(s.sub)}</span>` : ''}</li>`;
+    }).join('');
+
+    const costParts = Object.entries(totalCost).filter(([, v]) => v > 0).map(([res, v]) => {
+      const label = { ferrum: 'Fe', lumen: 'Lu', plasmide: 'Pl', singularite: 'Sg', influence: 'Inf' }[res] || res;
+      const stock = planete?.ressources?.[res]?.stock ?? 0;
+      const insuffisant = v > stock;
+      return `<li${insuffisant ? ' style="color:var(--phosphor)"' : ''}>${fmt(v)} ${label}${insuffisant ? ` <span style="opacity:0.8">(manque ${fmt(v - stock)})</span>` : ''}</li>`;
+    }).join('');
+
+    const insufficient = Object.entries(totalCost).some(([res, v]) => v > (planete?.ressources?.[res]?.stock ?? 0));
+
+    body.innerHTML = `
+      <div class="confirm-section">
+        <div class="label">Ordres groupés (tick ${tickCible})</div>
+        <ul>${orderLis}</ul>
+      </div>
+      ${costParts ? `<div class="confirm-section">
+        <div class="label">Coût total ressources</div>
+        <ul>${costParts}</ul>
+      </div>` : ''}
+      <div class="confirm-section">
+        <div class="label">Frais Bitcoin estimés</div>
+        <ul><li>~${feeSat} sat sur Mutinynet (feeRate 1 sat/vB)</li></ul>
+      </div>
+      ${insufficient ? `<div class="warn">⚠ Ressources insuffisantes pour au moins un ordre — l'engine rejettera ces ordres au prochain tick. La TX Bitcoin sera quand même inscrite et facturée.</div>` : ''}
+      <div class="warn">Une fois signée, la TX est broadcast sur Mutinynet. Tu peux RBF avant confirmation mais le panier sera réécrit.</div>
+    `;
+
+    bg.hidden = false;
+
+    const cleanup = () => {
+      bg.hidden = true;
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      bg.removeEventListener('click', onBgClick);
+      document.removeEventListener('keydown', onKey);
+    };
+    const onOk = () => { cleanup(); resolve(true); };
+    const onCancel = () => { cleanup(); resolve(false); };
+    const onBgClick = (ev) => { if (ev.target === bg) onCancel(); };
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') onCancel();
+      if (ev.key === 'Enter' && !insufficient) onOk();
+    };
+
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    bg.addEventListener('click', onBgClick);
+    document.addEventListener('keydown', onKey);
+    // Focus accessible : par défaut sur "Modifier" (cancel) = bouton non-destructif.
+    cancelBtn.focus();
+  });
 }
 
 function renderSealedActive() {
@@ -2367,7 +2527,13 @@ document.getElementById('main').addEventListener('click', e => {
 /* ───────────────────────────── Tick countdown ───────────────────────────── */
 function tickCountdown() {
   const info = nextTickInfo();
-  document.getElementById('countdown').textContent = `prochain · ${fmtCountdown(info.secs)}`;
+  const cd = document.getElementById('countdown');
+  cd.textContent = `prochain · ${fmtCountdown(info.secs)}`;
+  cd.classList.toggle('overdue', !!info.overdue);
+  // Met à jour le ring de progression autour du numéro de cycle.
+  // info.pct ∈ [0, 100]. À 0 = tick vient de tomber, à 100 = il est imminent.
+  const ring = document.getElementById('cycleRing');
+  if (ring) ring.style.setProperty('--progress', String(Math.round(info.pct)));
   refreshOnboardingTick();
 }
 setInterval(tickCountdown, 1000);
@@ -2507,7 +2673,17 @@ document.getElementById('rail').addEventListener('click', e => {
   const cartRm = e.target.closest('button[data-cart-remove]');
   if (cartRm) { removeQueuedOrder(state.current, parseInt(cartRm.dataset.cartRemove, 10)); return; }
   const inscribeBtn = e.target.closest('#cartInscribeBtn');
-  if (inscribeBtn) { inscribeQueuedOrders(); return; }
+  if (inscribeBtn) {
+    // Friction explicite avant broadcast Bitcoin : modal de confirmation.
+    // Évite les mistaps mobile qui enverraient une TX Mutinynet inutile.
+    const playerName = state.current;
+    const q = playerName ? getQueue(playerName) : [];
+    if (q.length === 0) return;
+    showInscribeConfirm(q, playerName).then(confirmed => {
+      if (confirmed) inscribeQueuedOrders();
+    });
+    return;
+  }
 });
 
 async function cancelOrder(idx) {

@@ -19,6 +19,22 @@ const FLAG = 'citadel.dopamine';
 let booted = false;
 let api = null;
 
+// Support `?dopamine=1` (active) / `?dopamine=0` (désactive) — pratique pour
+// montrer le mode à quelqu'un sans lui faire ouvrir la console. Le flag est
+// persisté en localStorage, donc un seul passage suffit.
+try {
+  const qs = new URLSearchParams(globalThis.location?.search || '');
+  if (qs.has('dopamine')) {
+    const v = qs.get('dopamine') === '1' ? '1' : '0';
+    localStorage.setItem(FLAG, v);
+    // Active aussi le sfx par défaut pour avoir l'expérience complète au
+    // premier coup. L'utilisateur peut le toggler depuis la cog wheel.
+    if (v === '1' && !localStorage.getItem('citadel.sfx')) {
+      localStorage.setItem('citadel.sfx', '1');
+    }
+  }
+} catch (_) {}
+
 export function dopamineEnabled() {
   return localStorage.getItem(FLAG) === '1';
 }

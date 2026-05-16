@@ -454,6 +454,14 @@ async function load() {
     applySrcUI();
     render();
     try { detectNotifs(); } catch (e) { console.warn('notif detect failed', e); }
+    // Hook dopamine-mode (cf client/dopamine-boot.mjs). Best-effort, jamais
+    // bloquant : si personne n'écoute, l'event tombe dans le vide.
+    try {
+      window.dispatchEvent(new CustomEvent('citadel:state-rebuilt', {
+        detail: { state, prevTick: window.__citadelPrevTick ?? null }
+      }));
+      window.__citadelPrevTick = state.manifest?.tick ?? null;
+    } catch (_) {}
     // Auto-revealer : publie les reveals des sceaux dont le tick_impact est
     // atteint. Async, ne bloque pas l'UI. Erreurs catchées en interne.
     runAutoRevealer().catch(e => console.warn('autoRevealer error:', e));

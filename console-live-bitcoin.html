@@ -20,6 +20,9 @@
 }
 </script>
 <link rel="stylesheet" href="client/styles.css">
+<!-- Vague 1 living-galaxy-dopamine : CSS additif, jamais surcharge.
+     Effet visuel nul tant que localStorage.citadel.dopamine !== '1'. -->
+<link rel="stylesheet" href="client/dopamine.css">
 </head>
 <body>
 
@@ -500,5 +503,19 @@ try {
 </script>
 
 <script src="client/app.js"></script>
+
+<!-- Living Galaxy mode (vague 1 living-galaxy-dopamine).
+     Auto-boot derrière le flag localStorage.citadel.dopamine === '1'.
+     Si le flag est absent, ce module ne fait littéralement rien : aucun
+     import secondaire, aucun listener installé, aucun rendu modifié. -->
+<script type="module">
+  try {
+    const mod = await import('./client/dopamine-boot.mjs');
+    // Expose pour debug console + toggle UI futur.
+    window.dopamine = mod;
+  } catch (e) {
+    console.warn('[dopamine] import failed', e);
+  }
+</script>
 </body>
 </html>

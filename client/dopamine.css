@@ -1,0 +1,293 @@
+/* client/dopamine.css — Feedbacks visuels (vague 1 living-galaxy-dopamine)
+ *
+ * Tout est additif. Aucune règle ne surcharge styles.css. Si dopamine-mode
+ * est désactivé, ce CSS reste chargé mais aucun élément ne porte les
+ * classes correspondantes → impact visuel nul.
+ */
+
+/* ─── Floating numbers (gains de prod, ticks de combo) ───────────── */
+@keyframes fx-float-up {
+  0%   { opacity: 0; transform: translate(-50%, 0)    scale(0.8); }
+  18%  { opacity: 1; transform: translate(-50%, -10px) scale(1.12); }
+  100% { opacity: 0; transform: translate(-50%, -64px) scale(1); }
+}
+.fx-float {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font: 600 17px/1 'JetBrains Mono', ui-monospace, monospace;
+  text-shadow: 0 0 8px currentColor, 0 1px 2px rgba(0,0,0,0.6);
+  animation: fx-float-up 1.2s ease-out forwards;
+  transform: translate(-50%, 0);
+  white-space: nowrap;
+}
+
+/* ─── Screen shake ───────────────────────────────────────────────── */
+@keyframes fx-shake-kf {
+  0%,100% { transform: translate(0,0); }
+  18%     { transform: translate(calc(var(--shake-i, 6px) * -1),   calc(var(--shake-i, 6px) * 0.5));  }
+  36%     { transform: translate(var(--shake-i, 6px),               calc(var(--shake-i, 6px) * -0.4)); }
+  54%     { transform: translate(calc(var(--shake-i, 6px) * -0.5), var(--shake-i, 6px));               }
+  72%     { transform: translate(calc(var(--shake-i, 6px) * 0.4),  calc(var(--shake-i, 6px) * -0.3)); }
+}
+.fx-shake { animation: fx-shake-kf 0.42s ease-in-out; }
+
+/* ─── Particle burst ─────────────────────────────────────────────── */
+@keyframes fx-burst-kf {
+  0%   { opacity: 1; transform: translate(0,0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.25); }
+}
+.fx-particle {
+  position: fixed;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+  box-shadow: 0 0 10px currentColor, 0 0 4px currentColor;
+  animation: fx-burst-kf 0.8s ease-out forwards;
+}
+
+/* ─── Achievement toast ──────────────────────────────────────────── */
+.achv-toast {
+  position: fixed;
+  right: 24px;
+  z-index: 10000;
+  background: linear-gradient(135deg, rgba(26,20,38,0.96) 0%, rgba(42,26,54,0.96) 100%);
+  border: 1px solid #dad45e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-width: 260px;
+  max-width: 360px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 24px rgba(218,212,94,0.18);
+  transform: translateX(120%);
+  transition: transform 0.42s cubic-bezier(0.2, 1.25, 0.4, 1);
+  font: 500 12.5px/1.42 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
+  color: #f4ecdc;
+  pointer-events: none;
+}
+.achv-toast.on { transform: translateX(0); }
+.achv-toast .achv-icon {
+  font-size: 26px;
+  color: #dad45e;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(218,212,94,0.6);
+  flex-shrink: 0;
+}
+.achv-toast .achv-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.achv-toast .achv-body b {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f4ecdc;
+}
+.achv-toast .achv-body small {
+  font-size: 11.5px;
+  color: rgba(244,236,220,0.7);
+  font-weight: 400;
+}
+
+/* ─── Pulse one-shot (rail groups quand un build termine) ────────── */
+@keyframes fx-pulse-once-kf {
+  0%   { box-shadow: 0 0 0 0 rgba(218,212,94,0.55); background-color: rgba(218,212,94,0.08); }
+  100% { box-shadow: 0 0 0 22px rgba(218,212,94,0); background-color: transparent; }
+}
+.fx-pulse-once { animation: fx-pulse-once-kf 0.7s ease-out; }
+
+/* ─── Bridge panel (idle-clicker.mjs) ────────────────────────────── */
+.bridge-panel {
+  margin: 18px 0 8px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(180deg, rgba(20,12,28,0.55), rgba(20,12,28,0.2));
+  border: 1px solid rgba(218,212,94,0.18);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+.bridge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bridge-title { display: flex; align-items: center; gap: 10px; }
+.bridge-icon {
+  font-size: 20px;
+  color: #dad45e;
+  text-shadow: 0 0 10px rgba(218,212,94,0.5);
+}
+.bridge-rang {
+  font: 600 13px/1 'JetBrains Mono', monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f4ecdc;
+}
+.bridge-stats {
+  display: flex;
+  gap: 18px;
+  font: 500 11.5px/1 'JetBrains Mono', monospace;
+  color: rgba(244,236,220,0.6);
+}
+.bridge-stats b { color: #dad45e; font-weight: 600; }
+
+.bridge-arena {
+  position: relative;
+  height: 200px;
+  display: grid;
+  place-items: center;
+  user-select: none;
+}
+.bridge-orb {
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #6dc2ca 0%, #346524 60%, #140c1c 100%);
+  border: 1px solid rgba(109,194,202,0.5);
+  cursor: pointer;
+  box-shadow:
+    0 0 60px rgba(109,194,202,0.25),
+    inset 0 0 30px rgba(20,12,28,0.4);
+  position: relative;
+  outline: none;
+  transition: transform 0.08s ease-out, box-shadow 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bridge-orb:hover {
+  box-shadow:
+    0 0 90px rgba(109,194,202,0.4),
+    inset 0 0 30px rgba(20,12,28,0.4);
+}
+.bridge-orb:active { transform: scale(0.94); }
+.bridge-orb-core,
+.bridge-orb-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.bridge-orb-core {
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.18) 0%, transparent 60%);
+}
+@keyframes bridge-pulse-kf {
+  0%,100% { box-shadow: inset 0 0 0 0 rgba(218,212,94,0); }
+  50%     { box-shadow: inset 0 0 40px 4px rgba(218,212,94,0.15); }
+}
+.bridge-orb-pulse { animation: bridge-pulse-kf 2.4s ease-in-out infinite; }
+
+.bridge-combo {
+  position: absolute;
+  top: 12px; right: 14px;
+  font: 700 22px/1 'Fraunces', serif;
+  color: rgba(244,236,220,0.25);
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  transition: color 0.2s, transform 0.2s, text-shadow 0.2s;
+}
+.bridge-combo.on {
+  color: #d04648;
+  text-shadow: 0 0 18px rgba(208,70,72,0.6);
+  transform: scale(1.15);
+}
+.bridge-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bridge-spark {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font: 600 14px/1 'JetBrains Mono', monospace;
+  color: #dad45e;
+  text-shadow: 0 0 8px rgba(218,212,94,0.7);
+  pointer-events: none;
+  animation: fx-float-up 0.8s ease-out forwards;
+}
+
+.bridge-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(244,236,220,0.08);
+  overflow: hidden;
+  margin: 4px 0 12px;
+}
+.bridge-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #dad45e, #6dc2ca);
+  transition: width 0.4s ease-out;
+  box-shadow: 0 0 12px rgba(218,212,94,0.45);
+}
+.bridge-foot {
+  margin: 0;
+  font: 400 11.5px/1.52 'Plus Jakarta Sans', sans-serif;
+  color: rgba(244,236,220,0.55);
+}
+.bridge-foot b { color: rgba(244,236,220,0.85); font-weight: 600; }
+.bridge-foot em { color: rgba(218,212,94,0.85); font-style: normal; }
+
+/* ─── Feed galactique (rail group) ───────────────────────────────── */
+.feed-host { max-height: 280px; overflow-y: auto; }
+.feed-empty {
+  font: 400 11.5px/1.5 'Plus Jakarta Sans', sans-serif;
+  color: rgba(244,236,220,0.4);
+  padding: 12px 4px;
+  font-style: italic;
+}
+.feed-list {
+  list-style: none;
+  padding: 0; margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.feed-item {
+  display: grid;
+  grid-template-columns: 18px 38px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 6px 4px;
+  font: 400 11.5px/1.4 'Plus Jakarta Sans', sans-serif;
+  color: rgba(244,236,220,0.78);
+  border-left: 2px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.feed-item:hover { background: rgba(244,236,220,0.04); }
+.feed-icon {
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(244,236,220,0.5);
+}
+.feed-tick {
+  font: 500 10.5px/1.4 'JetBrains Mono', monospace;
+  color: rgba(218,212,94,0.7);
+  letter-spacing: 0.05em;
+}
+.feed-text { min-width: 0; word-wrap: break-word; }
+.feed-text b { color: #f4ecdc; font-weight: 600; }
+.feed-text em { color: rgba(109,194,202,0.85); font-style: normal; }
+.feed-text code {
+  font: 500 10.5px/1.3 'JetBrains Mono', monospace;
+  background: rgba(244,236,220,0.06);
+  padding: 1px 5px;
+  border-radius: 2px;
+  color: rgba(218,212,94,0.85);
+}
+.feed-join   { border-left-color: rgba(109,194,202,0.5); }
+.feed-sealed { border-left-color: rgba(208,70,72,0.6); }
+.feed-fleet  { border-left-color: rgba(218,212,94,0.5); }
+.feed-colo   { border-left-color: rgba(133,149,161,0.5); }
+.feed-battle { border-left-color: rgba(208,70,72,0.9); }
+
+/* ─── Mobile : toasts plus compacts ─────────────────────────────── */
+@media (max-width: 720px) {
+  .achv-toast {
+    right: 12px;
+    left: 12px;
+    max-width: none;
+    min-width: 0;
+  }
+  .bridge-arena { height: 170px; }
+  .bridge-orb { width: 110px; height: 110px; }
+}

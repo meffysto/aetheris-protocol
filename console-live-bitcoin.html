@@ -13,11 +13,16 @@
     "@noble/hashes/sha256": "https://esm.sh/@noble/hashes@1.7.2/esm/sha256.js",
     "@noble/curves/secp256k1": "https://esm.sh/@noble/curves@1.9.7/esm/secp256k1.js",
     "@scure/btc-signer": "https://esm.sh/@scure/btc-signer@1.6.0",
-    "fflate": "https://esm.sh/fflate@0.8.2"
+    "fflate": "https://esm.sh/fflate@0.8.2",
+    "three": "https://esm.sh/three@0.169.0",
+    "three/addons/controls/OrbitControls.js": "https://esm.sh/three@0.169.0/examples/jsm/controls/OrbitControls.js"
   }
 }
 </script>
 <link rel="stylesheet" href="client/styles.css">
+<!-- Vague 1 living-galaxy-dopamine : CSS additif, jamais surcharge.
+     Effet visuel nul tant que localStorage.citadel.dopamine !== '1'. -->
+<link rel="stylesheet" href="client/dopamine.css">
 </head>
 <body>
 
@@ -278,6 +283,14 @@
       <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="2"/><path d="M3 12c5-9 13-9 18 0M21 12c-5 9-13 9-18 0"/></svg></span>
       Galaxie
     </button>
+    <button data-view="pulse">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg></span>
+      Pulse · 3D
+    </button>
+    <button data-view="codex">
+      <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 4h12a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M4 17a3 3 0 0 1 3-3h12"/></svg></span>
+      Codex <span class="ct" id="ctCodex">—</span>
+    </button>
     <div class="heading" style="margin-top:18px">outils</div>
     <button data-view="decoder">
       <span class="gl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5l4 4"/><path d="M8 11h6M11 8v6"/></svg></span>
@@ -316,6 +329,8 @@
     <div class="view" data-v="flotte" id="vFlt"></div>
     <div class="view" data-v="defense" id="vDef"></div>
     <div class="view" data-v="galaxie" id="vGal"></div>
+    <div class="view" data-v="pulse" id="vPulse"></div>
+    <div class="view" data-v="codex" id="vCodex"></div>
     <div class="view" data-v="journal" id="vJou"></div>
     <div class="view" data-v="messagerie" id="vMsg"></div>
     <div class="view" data-v="rapports" id="vRap"></div>
@@ -432,6 +447,12 @@ try {
     { computeSealHash },
     btc,
     { schnorr },
+    sfxMod,
+    tacticalMod,
+    feedMod,
+    galaxy3dMod,
+    achievementsMod,
+    shareCardMod,
   ] = await Promise.all([
     import('./engine/boot-bitcoin.mjs'),
     import('./engine/inscribe-core.mjs'),
@@ -442,6 +463,12 @@ try {
     import('./engine/sealed-protocol.mjs'),
     import('@scure/btc-signer'),
     import('@noble/curves/secp256k1'),
+    import('./client/sfx.mjs'),
+    import('./client/tactical-console.mjs'),
+    import('./client/feed.mjs'),
+    import('./client/galaxy3d.mjs'),
+    import('./client/achievements.mjs'),
+    import('./client/share-card.mjs'),
   ]);
 
   const cacheAdapter = await makeBrowserAdapter('aetheris-bitcoin');
@@ -454,6 +481,20 @@ try {
     btc, schnorr, cacheAdapter,
     ready: true,
   };
+
+  // Pack "Vivant" (cf. bitcoin/vivant) — modules client-only, n'altèrent
+  // ni l'engine ni le déterminisme. Tout est attaché à un namespace
+  // séparé pour que app.js puisse les consommer via window.citadelVivant.
+  window.citadelVivant = {
+    sfx: sfxMod,
+    tactical: tacticalMod,
+    feed: feedMod,
+    galaxy3d: galaxy3dMod,
+    achievements: achievementsMod,
+    shareCard: shareCardMod,
+    ready: true,
+  };
+  window.dispatchEvent(new CustomEvent('citadel-vivant-ready'));
   console.log('[aetheris-bitcoin] modules ready');
   window.dispatchEvent(new CustomEvent('aetheris-bitcoin-ready'));
 } catch (e) {
@@ -462,5 +503,19 @@ try {
 </script>
 
 <script src="client/app.js"></script>
+
+<!-- Living Galaxy mode (vague 1 living-galaxy-dopamine).
+     Auto-boot derrière le flag localStorage.citadel.dopamine === '1'.
+     Si le flag est absent, ce module ne fait littéralement rien : aucun
+     import secondaire, aucun listener installé, aucun rendu modifié. -->
+<script type="module">
+  try {
+    const mod = await import('./client/dopamine-boot.mjs');
+    // Expose pour debug console + toggle UI futur.
+    window.dopamine = mod;
+  } catch (e) {
+    console.warn('[dopamine] import failed', e);
+  }
+</script>
 </body>
 </html>

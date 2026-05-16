@@ -454,6 +454,14 @@ async function load() {
     applySrcUI();
     render();
     try { detectNotifs(); } catch (e) { console.warn('notif detect failed', e); }
+    // Hook dopamine-mode (cf client/dopamine-boot.mjs). Best-effort, jamais
+    // bloquant : si personne n'écoute, l'event tombe dans le vide.
+    try {
+      window.dispatchEvent(new CustomEvent('citadel:state-rebuilt', {
+        detail: { state, prevTick: window.__citadelPrevTick ?? null }
+      }));
+      window.__citadelPrevTick = state.manifest?.tick ?? null;
+    } catch (_) {}
     // Auto-revealer : publie les reveals des sceaux dont le tick_impact est
     // atteint. Async, ne bloque pas l'UI. Erreurs catchées en interne.
     runAutoRevealer().catch(e => console.warn('autoRevealer error:', e));
@@ -5151,3 +5159,491 @@ setInterval(pollNewBlocks, 15000);
     });
   }
 }
+
+/* ───────────────────────────── Pack "Vivant" ─────────────────────────────
+ * Modules client-only chargés via <script type="module"> dans
+ * console-live-bitcoin.html. Tout est opt-in et ne touche pas l'engine.
+ * Si window.citadelVivant n'est pas dispo (offline, vieux navigateur), les
+ * helpers ci-dessous deviennent no-ops — la console reste fonctionnelle.
+ *
+ * Voir aussi : docs/ROADMAP-500-JOUEURS.md pour la stratégie d'ensemble.
+ */
+function V() { return window.citadelVivant || null; }
+
+let __lastAchievementTick = -1;
+let __pulseMounted = false;
+
+function renderTacticalPanelHTML() {
+  const v = V(); if (!v?.tactical) return '';
+  try { return v.tactical.renderConsolePanel(); } catch { return ''; }
+}
+
+function bindTacticalPanel() {
+  const root = document.querySelector('.tac-panel');
+  if (!root || root.dataset.bound === '1') return;
+  root.dataset.bound = '1';
+
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-tactical]');
+    if (!btn) return;
+    const v = V();
+    try { v?.sfx?.sfx?.scan?.(); } catch {}
+    const kind = btn.dataset.tactical;
+    const out = runTactical(kind);
+    flashTacticalOutput(out);
+  });
+}
+
+function flashTacticalOutput(html) {
+  const out = document.getElementById('tacOutput');
+  if (!out) return;
+  out.innerHTML = html;
+  out.hidden = false;
+  out.classList.remove('flash');
+  void out.offsetWidth;
+  out.classList.add('flash');
+}
+
+function runTactical(kind) {
+  const emp = state.players[state.current];
+  const p = emp?.planetes?.[0];
+  if (!emp || !p) {
+    return `<b>Aucune planète active</b> — connecte ton wallet d'abord.`;
+  }
+
+  if (kind === 'proj') {
+    const utj = 10 * 6; // 10 ticks × 6 UTJ
+    const fe = (p.ressources?.ferrum?.production_par_utj || 0);
+    const lu = (p.ressources?.lumen?.production_par_utj || 0);
+    const pl = (p.ressources?.plasmide?.production_par_utj || 0);
+    const stFe = (p.ressources?.ferrum?.stock || 0);
+    const stLu = (p.ressources?.lumen?.stock || 0);
+    const stPl = (p.ressources?.plasmide?.stock || 0);
+    const capFe = (p.ressources?.ferrum?.capacite || Infinity);
+    const capLu = (p.ressources?.lumen?.capacite || Infinity);
+    const capPl = (p.ressources?.plasmide?.capacite || Infinity);
+    const projFe = Math.min(capFe, stFe + fe * utj);
+    const projLu = Math.min(capLu, stLu + lu * utj);
+    const projPl = Math.min(capPl, stPl + pl * utj);
+    const cap = (v, c) => v >= c ? ' <em>cap</em>' : '';
+    return `<b>Projection · +10 ticks (60 UTJ)</b>
+<div class="tac-out-grid">
+  <div><span>Ferrum</span><b>${fmt(projFe)}</b><small>+${fmt(projFe - stFe)}${cap(projFe, capFe)}</small></div>
+  <div><span>Lumen</span><b>${fmt(projLu)}</b><small>+${fmt(projLu - stLu)}${cap(projLu, capLu)}</small></div>
+  <div><span>Plasmide</span><b>${fmt(projPl)}</b><small>+${fmt(projPl - stPl)}${cap(projPl, capPl)}</small></div>
+</div>`;
+  }
+
+  if (kind === 'roi') {
+    // Compare ROI = gain de prod par UTJ / coût (en équivalent ferrum)
+    // pour les 3 mines + centrale. Le moins de ratio = le plus rentable.
+    const keys = ['mine_ferrum', 'extracteur_lumen', 'synthetiseur_plasmide', 'centrale_solaire'];
+    const candidates = [];
+    for (const k of keys) {
+      const lvl = p.batiments?.[k] || 0;
+      const cur = simProd(k, lvl, p) || 0;
+      const next = simProd(k, lvl + 1, p) || 0;
+      const delta = next - cur;
+      // Coût approx : base × mult^lvl
+      const cfgMap = {
+        mine_ferrum: { fe: 60, lu: 15, mult: 1.5 },
+        extracteur_lumen: { fe: 48, lu: 24, mult: 1.6 },
+        synthetiseur_plasmide: { fe: 225, lu: 75, mult: 1.5 },
+        centrale_solaire: { fe: 75, lu: 30, mult: 1.5 },
+      };
+      const cfg = cfgMap[k];
+      const cost = (cfg.fe + cfg.lu * 1.5) * Math.pow(cfg.mult, lvl);
+      const roi = delta > 0 ? cost / delta : Infinity;
+      candidates.push({ k, lvl, delta, cost, roi });
+    }
+    candidates.sort((a, b) => a.roi - b.roi);
+    const best = candidates[0];
+    const lblMap = {
+      mine_ferrum: 'Mine de Ferrum',
+      extracteur_lumen: 'Extracteur Lumen',
+      synthetiseur_plasmide: 'Synthétiseur Plasmide',
+      centrale_solaire: 'Centrale solaire',
+    };
+    const lines = candidates.map(c => {
+      const isBest = c === best ? ' <em>← meilleur</em>' : '';
+      const unit = c.k === 'centrale_solaire' ? 'énergie' : 'unit./UTJ';
+      return `<li><b>${lblMap[c.k]}</b> niv ${c.lvl} → ${c.lvl + 1} · +${fmt(c.delta)} ${unit} · coût ≈ ${fmtCompact(c.cost)} ¤${isBest}</li>`;
+    }).join('');
+    return `<b>Meilleur ROI</b> — prochaine amélioration recommandée :
+<ul class="tac-out-list">${lines}</ul>`;
+  }
+
+  if (kind === 'cap') {
+    // Time avant que chaque ressource sature son dépôt
+    const lines = ['ferrum', 'lumen', 'plasmide'].map(r => {
+      const ri = p.ressources?.[r]; if (!ri) return null;
+      const left = (ri.capacite || 0) - (ri.stock || 0);
+      const prod = ri.production_par_utj || 0;
+      if (prod <= 0) return `<li><b>${cap1(r)}</b> · prod nulle</li>`;
+      if (left <= 0) return `<li><b>${cap1(r)}</b> · <em>déjà cap</em> · perte en cours</li>`;
+      const utjLeft = left / prod;
+      const ticksLeft = utjLeft / 6;
+      const minLeft = ticksLeft * 15; // 1 tick = ~15 min
+      const hLeft = minLeft / 60;
+      return `<li><b>${cap1(r)}</b> · cap dans <em>${ticksLeft.toFixed(1)} ticks</em> (~${hLeft.toFixed(1)}h)</li>`;
+    }).filter(Boolean).join('');
+    return `<b>Time-to-cap dépôt</b> — quand saturer :
+<ul class="tac-out-list">${lines}</ul>`;
+  }
+
+  if (kind === 'advice') {
+    const advice = [];
+    // 1. Énergie en déficit ?
+    const e = p.energie;
+    if (e && e.production < e.consommation) {
+      const def = e.consommation - e.production;
+      advice.push(`<li>⚡ <b>Énergie en déficit (-${def})</b>. Améliore centrale_solaire ou recherche fusion_controlee.</li>`);
+    }
+    // 2. Stock proche du cap ?
+    for (const r of ['ferrum', 'lumen', 'plasmide']) {
+      const ri = p.ressources?.[r]; if (!ri || !ri.capacite) continue;
+      const ratio = (ri.stock || 0) / ri.capacite;
+      if (ratio > 0.85) {
+        advice.push(`<li>📦 <b>${cap1(r)}</b> à ${(ratio * 100).toFixed(0)}% du cap. Dépense ou augmente le dépôt.</li>`);
+      }
+    }
+    // 3. Pas de labo ?
+    if (!p.batiments?.laboratoire) {
+      advice.push(`<li>🔬 <b>Aucun laboratoire</b>. Sans recherche, ton empire stagne au tier 1.</li>`);
+    }
+    // 4. Pas d'usine robotique ?
+    if (!p.batiments?.usine_robotique) {
+      advice.push(`<li>⚒ <b>Aucune usine robotique</b>. Les chantiers durent 2× plus longtemps qu'avec niv 5.</li>`);
+    }
+    // 5. Pas de chantier spatial ?
+    if (!p.batiments?.chantier_spatial) {
+      advice.push(`<li>🚀 <b>Pas de chantier spatial</b>. Tu ne peux construire ni vaisseau ni défense — vulnérable.</li>`);
+    }
+    // 6. File chantier vide ?
+    if (!(p.file_chantier || []).length) {
+      advice.push(`<li>⏱ <b>Chantier inactif</b>. Lance une amélioration — chaque tick perdu est définitif.</li>`);
+    }
+    // 7. Aucune flotte ?
+    const totalFleet = Object.values(p.flotte_au_sol || {}).reduce((a, b) => a + (b | 0), 0);
+    if (totalFleet === 0 && p.batiments?.chantier_spatial) {
+      advice.push(`<li>🛡 <b>Aucun vaisseau au sol</b>. Construis au moins quelques chasseurs légers.</li>`);
+    }
+    if (advice.length === 0) {
+      advice.push(`<li>✓ <b>Empire optimisé</b>. Continue sur cette lancée, commandant.</li>`);
+    }
+    return `<b>Conseil tactique global</b> :
+<ul class="tac-out-list tac-out-advice">${advice.join('')}</ul>`;
+  }
+
+  return '?';
+}
+
+function cap1(s) { return s[0].toUpperCase() + s.slice(1); }
+
+function renderFeedPanelHTML() {
+  const v = V(); if (!v?.feed) return '';
+  try {
+    v.feed.ingestState(state);
+    return v.feed.renderFeed(10);
+  } catch { return ''; }
+}
+
+function evaluateAchievementsSoft() {
+  const v = V(); if (!v?.achievements) return;
+  const tick = state.manifest?.tick ?? -1;
+  if (tick === __lastAchievementTick && __lastAchievementTick !== -1) return;
+  __lastAchievementTick = tick;
+  try {
+    const newly = v.achievements.evaluateAchievements(state);
+    for (const a of newly) {
+      try { v.sfx?.sfx?.achievement?.(); } catch {}
+      // Pop-up toast léger
+      try {
+        const t = document.getElementById('toast');
+        if (t) {
+          t.textContent = `🏆 ${a.icon} ${a.title}`;
+          t.classList.add('on');
+          setTimeout(() => t.classList.remove('on'), 3000);
+        }
+      } catch {}
+    }
+    // Met à jour le badge nav
+    const ct = document.getElementById('ctCodex');
+    if (ct) ct.textContent = String(v.achievements.unlockedCount());
+  } catch (e) { console.warn('[achievements]', e); }
+}
+
+function renderPulseView() {
+  const v = V();
+  const root = document.getElementById('vPulse');
+  if (!root) return;
+  if (!v?.galaxy3d) {
+    root.innerHTML = `<div class="empty-stamp">vue 3D indisponible (Three.js requis)</div>`;
+    return;
+  }
+  // Premier render : prépare le shell HTML
+  if (!root.dataset.shellReady) {
+    root.dataset.shellReady = '1';
+    root.innerHTML = `
+      <h2 class="sect">Pulse · galaxie 3D <span class="num">§ ✦</span> <span class="rule"></span></h2>
+      <div class="pulse-shell">
+        <div class="pulse-stage" id="pulseStage"></div>
+        <div class="pulse-hud" id="pulseHud">
+          <div class="pulse-row"><b>SYSTÈME</b><span id="pulseSys">—</span></div>
+          <div class="pulse-row"><b>ÉTOILE</b><span id="pulseStar">—</span></div>
+          <div class="pulse-row"><b>POSITIONS</b><span id="pulsePos">—</span></div>
+          <div class="pulse-row pulse-tip">Glisse pour orbiter · molette pour zoomer · clic sur un corps pour son nom.</div>
+          <div class="pulse-row" id="pulsePicked"></div>
+        </div>
+      </div>`;
+  }
+  const stage = document.getElementById('pulseStage');
+  if (!stage) return;
+
+  // Récupère le système du joueur courant
+  const emp = state.players[state.current];
+  const myPlanet = emp?.planetes?.[0];
+  const myCoord = myPlanet?.coordonnees;
+  const mySysKey = myCoord ? myCoord.slice(0, 2).join(':') : null;
+  const myPlanetCoord = myCoord ? myCoord.join(':') : null;
+  const sys = (state.galaxie?.systemes || {})[mySysKey] || null;
+  if (!sys) {
+    document.getElementById('pulseSys').textContent = '—';
+    document.getElementById('pulseStar').textContent = '—';
+    document.getElementById('pulsePos').textContent = '—';
+    return;
+  }
+
+  // Routes hostiles entrantes (sur planètes de mon système)
+  const hostileTypes = new Set(['attaque', 'siege', 'pillage', 'bombardement', 'espionnage']);
+  const routes = [];
+  for (const [pn, ep] of Object.entries(state.players || {})) {
+    for (const f of (ep.flottes_en_vol || [])) {
+      const from = f.depuis?.planete, to = f.vers?.planete;
+      if (!from || !to) continue;
+      if (pn === state.current) continue;
+      if (f.vers?.joueur !== state.current) continue;
+      const t = (f.type_mission || '').toLowerCase();
+      if (!hostileTypes.has(t)) continue;
+      routes.push({ from, to, kind: 'hostile' });
+    }
+  }
+
+  // Marque le contexte du joueur courant dans `sys` pour halo
+  sys.__currentPlayer = state.current;
+  sys.__coord = mySysKey;
+
+  const tryMount = async () => {
+    if (!__pulseMounted) {
+      const ok = await v.galaxy3d.mount(stage, {
+        onPick: (data) => {
+          const el = document.getElementById('pulsePicked');
+          if (!el) return;
+          const p = data?.pos;
+          if (!p) { el.textContent = ''; return; }
+          if (p.type === 'asteroide') {
+            el.innerHTML = `<b>SÉLECTION</b> astéroïde — ${data.i ? '§'+data.i : ''}`;
+          } else if (p.type === 'planete') {
+            const owner = p.proprietaire || 'libre';
+            el.innerHTML = `<b>SÉLECTION</b> ${p.nom || 'planète'} · ${p.classe || '—'} · <em>${owner}</em>`;
+          }
+          try { v.sfx?.sfx?.click?.(); } catch {}
+        },
+      });
+      __pulseMounted = !!ok;
+      if (!ok) {
+        stage.innerHTML = `<div class="empty-stamp">moteur 3D indisponible (Three.js bloqué)</div>`;
+        return;
+      }
+    }
+    v.galaxy3d.update({ system: sys, myPlanetCoord, hostileRoutes: routes });
+
+    // HUD
+    const positions = Object.values(sys.positions || {});
+    const nP = positions.filter(x => x?.type === 'planete').length;
+    const nA = positions.filter(x => x?.type === 'asteroide').length;
+    document.getElementById('pulseSys').textContent = mySysKey;
+    document.getElementById('pulseStar').textContent = `${sys.etoile?.nom || '—'} · ${sys.etoile?.type || ''} · ${sys.etoile?.temperature_k || ''}K`;
+    document.getElementById('pulsePos').textContent = `${nP} planète${nP > 1 ? 's' : ''} · ${nA} astéroïde${nA > 1 ? 's' : ''}`;
+  };
+  tryMount();
+}
+
+function renderCodexView() {
+  const v = V();
+  const root = document.getElementById('vCodex');
+  if (!root) return;
+  if (!v?.achievements) {
+    root.innerHTML = `<div class="empty-stamp">codex indisponible</div>`;
+    return;
+  }
+  const all = v.achievements.listAchievements();
+  const got = all.filter(a => a.unlocked).length;
+  const cards = all.map(a => `
+    <div class="codex-card ${a.unlocked ? 'on' : 'off'}" title="${esc(a.desc)}">
+      <div class="codex-icon">${a.unlocked ? a.icon : '·'}</div>
+      <div class="codex-body">
+        <div class="codex-title">${esc(a.title)}</div>
+        <div class="codex-desc">${esc(a.desc)}</div>
+        ${a.unlocked && a.unlockedTick != null ? `<div class="codex-stamp">débloqué · T${a.unlockedTick}</div>` : ''}
+      </div>
+    </div>`).join('');
+
+  // Stats commandant pour le bouton "partager"
+  const emp = state.players[state.current];
+  const p = emp?.planetes?.[0];
+  let totalLevels = 0;
+  for (const pl of (emp?.planetes || [])) for (const lv of Object.values(pl.batiments || {})) totalLevels += (lv | 0);
+  const ferrum = p?.ressources?.ferrum?.stock || 0;
+  // Callsign dérivé du nombre d'achievements débloqués (remplace l'ancien rang clicker)
+  const callsign = (n => {
+    if (n >= 12) return { rang: 'légende', rangEmoji: '✪' };
+    if (n >= 9)  return { rang: 'stratège', rangEmoji: '★' };
+    if (n >= 6)  return { rang: 'vétéran', rangEmoji: '◆' };
+    if (n >= 3)  return { rang: 'explorateur', rangEmoji: '◐' };
+    return { rang: 'commandant', rangEmoji: '✦' };
+  })(got);
+
+  root.innerHTML = `
+    <h2 class="sect">Codex · achievements <span class="num">§ ★</span> <span class="rule"></span></h2>
+    <div class="codex-header">
+      <div class="codex-score"><b>${got}</b><small>/${all.length} débloqués</small></div>
+      <div class="codex-actions">
+        <button type="button" class="codex-btn" id="codexShareBtn">📷 Générer ma carte commandant</button>
+        <button type="button" class="codex-btn ghost" id="codexTweetBtn">𝕏 Partager sur Twitter</button>
+        <button type="button" class="codex-btn ghost" id="codexSfxBtn">${v.sfx?.sfxEnabled?.() ? '🔊 SFX activés' : '🔇 SFX désactivés'}</button>
+      </div>
+    </div>
+    <div class="codex-grid">${cards}</div>
+    <div class="codex-preview" id="codexPreview" hidden></div>
+  `;
+
+  document.getElementById('codexShareBtn')?.addEventListener('click', () => {
+    try { v.sfx?.sfx?.confirm?.(); } catch {}
+    const cv = v.shareCard.generateCommanderCard({
+      pseudo: state.current || 'commandant',
+      planetCount: emp?.planetes?.length || 0,
+      totalLevels,
+      rang: callsign.rang,
+      rangEmoji: callsign.rangEmoji,
+      tick: state.manifest?.tick ?? 0,
+      achievements: got,
+      ferrum,
+    });
+    const pre = document.getElementById('codexPreview');
+    pre.innerHTML = '';
+    cv.style.maxWidth = '100%';
+    cv.style.borderRadius = '6px';
+    cv.style.boxShadow = '0 4px 14px rgba(0,0,0,0.18)';
+    pre.appendChild(cv);
+    const dl = document.createElement('button');
+    dl.type = 'button';
+    dl.className = 'codex-btn';
+    dl.style.marginTop = '12px';
+    dl.textContent = '⬇ télécharger PNG';
+    dl.addEventListener('click', () => v.shareCard.downloadCardPNG(cv, `citadel-${state.current || 'commander'}.png`));
+    pre.appendChild(dl);
+    pre.hidden = false;
+  });
+  document.getElementById('codexTweetBtn')?.addEventListener('click', () => {
+    try { v.sfx?.sfx?.click?.(); } catch {}
+    v.shareCard.shareToTwitter({ pseudo: state.current || 'commandant', tick: state.manifest?.tick ?? 0 });
+  });
+  document.getElementById('codexSfxBtn')?.addEventListener('click', (e) => {
+    const cur = v.sfx?.sfxEnabled?.() || false;
+    v.sfx?.setSfxEnabled?.(!cur);
+    e.target.textContent = !cur ? '🔊 SFX activés' : '🔇 SFX désactivés';
+    if (!cur) try { v.sfx.sfx.confirm(); } catch {}
+  });
+}
+
+// Helper esc (au cas où il n'existerait pas déjà — protection)
+if (typeof esc === 'undefined') {
+  // Pas réassignable, juste shadow via window
+  window.esc = window.esc || ((s) => String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])));
+}
+
+// Hook : à chaque render, on tente :
+//   1) injecter le panneau "Pont" en haut de la vue Aperçu
+//   2) ingérer les events pour le fil galactique
+//   3) évaluer les achievements
+// Idempotent et tolère window.citadelVivant absent (no-op).
+function __vivantPostRender() {
+  evaluateAchievementsSoft();
+
+  // Injection Console tactique + Feed en haut d'Aperçu
+  const overview = document.getElementById('vOverview');
+  if (overview && state.current && state.players[state.current]) {
+    if (!overview.querySelector('.tac-panel')) {
+      const tacHTML = renderTacticalPanelHTML();
+      const feedHTML = renderFeedPanelHTML();
+      if (tacHTML || feedHTML) {
+        const wrap = document.createElement('div');
+        wrap.className = 'vivant-overview-prepend';
+        wrap.innerHTML = `
+          ${tacHTML}
+          ${feedHTML ? `<section class="feed-panel"><header class="feed-head"><b>Fil galactique</b><small>events on-chain · live</small></header>${feedHTML}</section>` : ''}
+        `;
+        overview.prepend(wrap);
+        bindTacticalPanel();
+      }
+    } else {
+      // Refresh feed in-place
+      const feedHost = overview.querySelector('.feed-panel');
+      if (feedHost) {
+        const fresh = renderFeedPanelHTML();
+        if (fresh) {
+          const oldList = feedHost.querySelector('.feed-list, .feed-empty');
+          if (oldList) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = fresh;
+            const next = tmp.firstElementChild;
+            if (next) oldList.replaceWith(next);
+          }
+        }
+      }
+    }
+  }
+
+  // Pulse view : si actif, refresh data
+  if (state.view === 'pulse') renderPulseView();
+  if (state.view === 'codex') renderCodexView();
+}
+
+// Wrap render() existant. On chaîne via setInterval safety + écouteur natif :
+// la fonction render() est déjà appelée à chaque boot, à chaque tick, à
+// chaque submit. Pour éviter de la patcher, on observe les mutations du DOM
+// de la vue Aperçu, OU on hooke un setInterval léger qui appelle juste
+// __vivantPostRender(). C'est cheap (le contenu est idempotent).
+setInterval(__vivantPostRender, 600);
+
+// Démontage du 3D quand on quitte la vue Pulse (économise GPU)
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-view]');
+  if (!btn) return;
+  const target = btn.dataset.view;
+  if (target !== 'pulse' && __pulseMounted) {
+    try { V()?.galaxy3d?.unmount?.(); } catch {}
+    __pulseMounted = false;
+    const root = document.getElementById('vPulse');
+    if (root) root.dataset.shellReady = '';
+  }
+});
+
+// SFX sur quelques boutons clés (additif, n'altère pas la logique)
+document.addEventListener('click', (e) => {
+  const v = V(); if (!v?.sfx?.sfx) return;
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.matches('button[data-improve]') || btn.matches('button[data-construct]') || btn.matches('button[data-research]')) {
+    try { v.sfx.sfx.click(); } catch {}
+  } else if (btn.id === 'missionSubmit' || btn.id === 'confirmOkBtn') {
+    try { v.sfx.sfx.fleetLaunch(); } catch {}
+  } else if (btn.id === 'confirmCancelBtn' || btn.id === 'missionCancel') {
+    try { v.sfx.sfx.cancel(); } catch {}
+  } else if (btn.classList?.contains('primary')) {
+    try { v.sfx.sfx.confirm(); } catch {}
+  } else if (btn.classList?.contains('ghost')) {
+    try { v.sfx.sfx.tap(); } catch {}
+  }
+});

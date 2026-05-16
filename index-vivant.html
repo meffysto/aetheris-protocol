@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>CITADEL // PROTOCOL — Un 4X spatial qui vit dans Bitcoin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="MMO 4X spatial inscrit on-chain sur Bitcoin. Pas de serveur. Pas de compte. Une pubkey Schnorr = un empire.">
+<meta property="og:title" content="CITADEL // PROTOCOL · vivant">
+<meta property="og:description" content="Un MMO 4X qui vit dans Bitcoin. Pulse 3D, codex, console tactique. Sans serveur.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..600,0..100&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.169.0"
+  }
+}
+</script>
+<style>
+/* ─── Tokens DA parchemin (alignés sur index.html) ─────────────── */
+:root {
+  --ink:        #f4ecdc;   /* parchemin clair */
+  --ink-2:      #ffffff;
+  --ink-3:      #f7f0df;
+  --ink-4:      #e8dcc0;
+  --hairline:   #e6d9bd;
+  --brass:      #0e1d33;   /* encre bleu nuit */
+  --brass-2:    #1f3556;
+  --brass-dim:  #c4b48a;
+  --phosphor:   #a83a25;   /* rouge oxydé */
+  --phosphor-2: #c64a30;
+  --bone:       #2c2014;   /* encre brune */
+  --bone-2:     #0d0a06;   /* encre noire */
+  --bone-dim:   #8a7c64;
+  --gold:       #b8862a;   /* doré tamisé (parchemin-safe) */
+  --green:      #5a7a3a;
+
+  --serif:   "Fraunces", Georgia, serif;
+  --sans:    "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --mono:    "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  --display: "Fraunces", Georgia, serif;
+
+  --shadow-card: 0 1px 2px rgba(28,20,8,0.04), 0 8px 22px rgba(28,20,8,0.06);
+  --shadow-pop:  0 2px 6px rgba(28,20,8,0.08), 0 14px 36px rgba(28,20,8,0.10);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+  background-image:
+    radial-gradient(ellipse 90% 60% at 15% -5%, rgba(255,250,235,0.7), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168,90,40,0.06), transparent 60%),
+    linear-gradient(180deg, #f6efde 0%, #ece1c6 100%);
+  min-height: 100vh;
+}
+/* Vignettes orbitales en filigrane — DA carto/cartouche */
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><g fill='none' stroke='%23000' stroke-width='0.4' opacity='0.04'><circle cx='150' cy='200' r='80'/><circle cx='450' cy='350' r='120'/><circle cx='300' cy='100' r='60'/><circle cx='100' cy='500' r='100'/><path d='M0 300 Q 150 280 300 320 T 600 300'/><path d='M0 150 Q 200 130 400 170 T 600 150'/></g></svg>");
+  background-size: 700px 700px;
+}
+/* Grain papier */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+  mix-blend-mode: multiply;
+  opacity: 0.10;
+}
+
+main { position: relative; z-index: 2; max-width: 980px; margin: 0 auto; padding: 48px 24px 96px; }
+
+/* ─── topbar ──────────────────────────────────────────────── */
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 64px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+}
+.topbar .brand { color: var(--brass); letter-spacing: 0.22em; font-weight: 600; }
+.topbar nav { display: flex; gap: 24px; }
+.topbar a { color: var(--bone-dim); text-decoration: none; transition: color 0.2s; }
+.topbar a:hover { color: var(--phosphor); }
+
+/* ─── hero ────────────────────────────────────────────────── */
+.hero {
+  display: grid; gap: 56px; align-items: center;
+  grid-template-columns: 1fr; margin-bottom: 72px;
+}
+@media (min-width: 880px) { .hero { grid-template-columns: 1.05fr 0.95fr; gap: 40px; } }
+
+.hero-copy .label {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--phosphor);
+  padding: 5px 14px;
+  border: 1px solid var(--phosphor);
+  border-radius: 999px;
+  margin-bottom: 22px;
+}
+.hero-copy h1 {
+  font-family: var(--display);
+  font-size: 56px;
+  font-weight: 500;
+  font-variation-settings: "SOFT" 50;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+  color: var(--bone-2);
+}
+.hero-copy h1 em { font-style: italic; color: var(--phosphor); font-weight: 400; }
+.hero-copy .lead {
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--bone);
+  max-width: 560px;
+  margin: 0 0 32px;
+}
+.hero-copy .lead em { color: var(--brass); font-style: normal; font-weight: 600; }
+
+.cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.cta-primary, .cta-secondary {
+  font-family: var(--sans);
+  font-size: 14px; font-weight: 600;
+  padding: 14px 26px; border-radius: 10px;
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 10px;
+  transition: all 0.2s; letter-spacing: 0.01em;
+}
+.cta-primary { background: var(--brass); color: var(--ink); box-shadow: var(--shadow-card); }
+.cta-primary:hover { background: var(--brass-2); transform: translateY(-1px); box-shadow: var(--shadow-pop); }
+.cta-secondary { background: transparent; color: var(--brass); border: 1px solid var(--brass); }
+.cta-secondary:hover { background: var(--brass); color: var(--ink); }
+.arrow { transition: transform 0.2s; }
+.cta-primary:hover .arrow, .cta-secondary:hover .arrow { transform: translateX(2px); }
+
+/* ─── encart 3D (vignette manuscrit) ─────────────────────── */
+.hero-vignette {
+  position: relative;
+  background: var(--ink-2);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+  min-height: 380px;
+}
+.hero-vignette .frame {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background:
+    radial-gradient(ellipse 100% 80% at 50% 45%, #1c2c4a 0%, #0d1830 45%, #06090e 100%);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 0 60px rgba(0,0,0,0.65), inset 0 0 4px rgba(196,180,138,0.25);
+}
+.hero-vignette .frame canvas { display: block; width: 100%; height: 100%; }
+.hero-vignette .corner {
+  position: absolute;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--bone-dim);
+  background: var(--ink-2); padding: 2px 8px;
+}
+.hero-vignette .corner.tl { top: 6px; left: 16px; }
+.hero-vignette .corner.br { bottom: 6px; right: 16px; }
+.hero-vignette .legend {
+  margin-top: 14px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+  color: var(--bone-dim); display: flex; justify-content: space-between; gap: 8px;
+}
+.hero-vignette .legend b { color: var(--bone-2); font-weight: 500; }
+
+/* ─── status block ────────────────────────────────────────── */
+.status {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--hairline);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 56px 0;
+  box-shadow: var(--shadow-card);
+}
+.status .item { background: var(--ink-2); padding: 22px 18px; display: flex; flex-direction: column; gap: 8px; }
+.status .lbl {
+  font-family: var(--mono); font-size: 9.5px;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--bone-dim);
+}
+.status .val {
+  font-family: var(--display); font-size: 26px; font-weight: 500;
+  color: var(--bone-2); font-variant-numeric: tabular-nums;
+}
+.status .val.dim { color: var(--bone-dim); font-size: 18px; font-weight: 400; }
+
+/* ─── pillars ─────────────────────────────────────────────── */
+.pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 72px 0; }
+.pillar {
+  background: var(--ink-2); border: 1px solid var(--hairline);
+  border-radius: 14px; padding: 28px; box-shadow: var(--shadow-card);
+}
+.pillar h3 {
+  font-family: var(--display); font-size: 21px; font-weight: 500;
+  color: var(--bone-2); margin: 0 0 14px;
+  display: flex; align-items: baseline; gap: 14px;
+}
+.pillar h3 .num {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--phosphor); letter-spacing: 0.1em;
+}
+.pillar p { margin: 0; font-size: 14px; line-height: 1.65; color: var(--bone); }
+.pillar code {
+  font-family: var(--mono); font-size: 12.5px; color: var(--phosphor);
+  background: rgba(168,58,37,0.06); padding: 1px 6px; border-radius: 3px;
+}
+.pillar em { color: var(--brass); font-style: normal; font-weight: 600; }
+
+/* ─── pack vivant (nouvelles features) ───────────────────── */
+.living {
+  margin: 80px 0;
+  background: var(--ink-3);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 40px;
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+.living::before {
+  content: "v0.3 · vivant"; position: absolute; top: 14px; right: 16px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--phosphor);
+}
+.living h2 {
+  font-family: var(--display); font-size: 32px; font-weight: 500;
+  font-variation-settings: "SOFT" 50;
+  color: var(--bone-2); margin: 0 0 10px; letter-spacing: -0.01em;
+}
+.living .sub {
+  font-size: 14.5px; color: var(--bone); margin: 0 0 30px; max-width: 620px;
+}
+.living .sub em { color: var(--brass); font-style: normal; font-weight: 600; }
+.living .features {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+}
+.living .feat {
+  padding: 18px;
+  background: var(--ink-2);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+}
+.living .feat h4 {
+  font-family: var(--display); font-size: 17px; font-weight: 500;
+  color: var(--bone-2); margin: 0 0 8px;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.living .feat h4 .ico {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+  color: var(--phosphor); padding: 1px 6px;
+  border: 1px solid var(--phosphor); border-radius: 999px;
+}
+.living .feat p {
+  margin: 0; font-size: 13px; line-height: 1.6; color: var(--bone);
+}
+
+/* ─── paths (réutilisé) ──────────────────────────────────── */
+.paths { margin: 80px 0; }
+.paths h2 {
+  font-family: var(--display); font-size: 32px; font-weight: 500;
+  font-variation-settings: "SOFT" 50;
+  color: var(--bone-2); margin: 0 0 12px; letter-spacing: -0.01em;
+}
+.paths .sub { font-size: 15px; color: var(--bone); margin: 0 0 32px; max-width: 620px; }
+.paths .sub em { color: var(--brass); font-style: normal; font-weight: 600; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.path-card {
+  background: var(--ink-3); border: 1px solid var(--hairline);
+  border-radius: 14px; padding: 28px; position: relative; overflow: hidden;
+}
+.path-card h4 {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--phosphor);
+  margin: 0 0 8px; font-weight: 500;
+}
+.path-card .name {
+  font-family: var(--display); font-size: 22px; font-weight: 500;
+  color: var(--bone-2); margin-bottom: 14px; letter-spacing: -0.01em;
+}
+.path-card p { margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--bone); }
+
+/* ─── citation ───────────────────────────────────────────── */
+.quote {
+  margin: 80px 0 0;
+  padding: 36px 40px;
+  background: var(--ink-2);
+  border-left: 3px solid var(--phosphor);
+  border-radius: 0 14px 14px 0;
+  box-shadow: var(--shadow-card);
+}
+.quote p {
+  font-family: var(--display); font-style: italic; font-size: 22px;
+  line-height: 1.4; color: var(--bone-2); margin: 0 0 14px;
+}
+.quote cite {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--bone-dim); font-style: normal;
+}
+
+/* ─── footer ──────────────────────────────────────────────── */
+footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 80px; padding-top: 24px;
+  border-top: 1px solid var(--hairline);
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  color: var(--bone-dim);
+  flex-wrap: wrap; gap: 16px;
+}
+footer .links { display: flex; gap: 20px; }
+footer a { color: var(--bone-dim); text-decoration: none; transition: color 0.2s; }
+footer a:hover { color: var(--phosphor); }
+
+@media (max-width: 760px) {
+  main { padding: 32px 18px 60px; }
+  .topbar { margin-bottom: 40px; flex-direction: column; gap: 12px; align-items: flex-start; }
+  .topbar nav { gap: 16px; flex-wrap: wrap; }
+  .hero-copy h1 { font-size: 40px; }
+  .hero-copy .lead { font-size: 15px; }
+  .status { grid-template-columns: repeat(2, 1fr); margin: 36px 0; }
+  .pillars, .paths, .living { margin: 56px 0; }
+  .pillars, .grid, .living .features { grid-template-columns: 1fr; gap: 16px; }
+  .paths h2, .living h2 { font-size: 26px; }
+  .living { padding: 28px 22px; }
+  .quote { padding: 26px; }
+  .quote p { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+<main>
+
+  <div class="topbar">
+    <span class="brand">Citadel // Protocol · vivant</span>
+    <nav>
+      <a href="./console-live-bitcoin.html">Console</a>
+      <a href="./join-bitcoin.html">Rejoindre</a>
+      <a href="./docs/HOW-TO-PLAY.md">Guide</a>
+      <a href="https://codeberg.org/meffysto/aetheris-protocol" target="_blank" rel="noopener">Repo</a>
+    </nav>
+  </div>
+
+  <!-- ─── HERO ───────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="label">v0.3 · vivant · Mutinynet</div>
+      <h1>Bâtis une <em>légende</em><br>qui survivra<br>à tous les serveurs.</h1>
+      <p class="lead">
+        Un 4X spatial dont l'état entier vit dans la blockchain Bitcoin.
+        <em>Une pubkey Schnorr = un empire.</em> Aucun tiers ne peut
+        l'éteindre, l'altérer, ou te bannir.
+      </p>
+      <div class="cta-row">
+        <a class="cta-primary" href="./join-bitcoin.html">Inscrire mon empire <span class="arrow">→</span></a>
+        <a class="cta-secondary" href="./console-live-bitcoin.html">Ouvrir la console</a>
+      </div>
+    </div>
+    <div class="hero-vignette">
+      <span class="corner tl">§ système-0</span>
+      <span class="corner br">vue orbitale</span>
+      <div class="frame">
+        <canvas id="vignette3d"></canvas>
+      </div>
+      <div class="legend">
+        <span>Carte céleste · projection orbitale</span>
+        <span><b id="vbloc">—</b> · bloc tip</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── STATUS LIVE ───────────────────────────────────── -->
+  <div class="status">
+    <div class="item">
+      <div class="lbl">Cycle courant</div>
+      <div class="val" id="status-tick">—</div>
+    </div>
+    <div class="item">
+      <div class="lbl">Bloc Mutinynet</div>
+      <div class="val dim" id="status-block">—</div>
+    </div>
+    <div class="item">
+      <div class="lbl">Tick = 30 blocs</div>
+      <div class="val dim">≈ 15 min</div>
+    </div>
+    <div class="item">
+      <div class="lbl">Genesis</div>
+      <div class="val dim">3 085 121</div>
+    </div>
+  </div>
+
+  <!-- ─── PILIERS ───────────────────────────────────────── -->
+  <section class="pillars">
+    <div class="pillar">
+      <h3><span class="num">01</span>Sans serveur</h3>
+      <p>Le moteur (<code>engine/tick-core.mjs</code>) est une fonction pure déterministe. Il tourne dans <em>chaque</em> navigateur — chaque joueur reconstruit l'état complet en rejouant les inscriptions Bitcoin depuis la genesis. Personne au milieu, personne à corrompre.</p>
+    </div>
+    <div class="pillar">
+      <h3><span class="num">02</span>Sans compte</h3>
+      <p>Un wallet taproot BIP-86 généré dans ton navigateur. La pubkey Schnorr qui signe ton inscription <em>est</em> ton identité. Aucun email, aucun mot de passe, aucune session.</p>
+    </div>
+    <div class="pillar">
+      <h3><span class="num">03</span>Bitcoin-native</h3>
+      <p>Tes ordres deviennent des inscriptions tapscript (commit + reveal). Un agent autonome qui sait broadcaster une TX peut jouer. La surface est <em>identique</em> humain / agent.</p>
+    </div>
+  </section>
+
+
+  <!-- ─── TROIS VOIES (réutilisé) ────────────────────────── -->
+  <section class="paths">
+    <h2>Trois façons de jouer.</h2>
+    <p class="sub">Le cycle est toujours le même : <em>lire</em> son empire, <em>donner des ordres</em>, <em>attendre le bloc</em>. Choisis ton style.</p>
+    <div class="grid">
+      <div class="path-card">
+        <h4>Confort</h4>
+        <div class="name">Console web</div>
+        <p>Une UI qui te montre ta planète, te laisse cliquer "construire", "rechercher", "envoyer une flotte". L'inscription Bitcoin se fait toute seule. Voie par défaut après l'inscription.</p>
+      </div>
+      <div class="path-card">
+        <h4>Puriste</h4>
+        <div class="name">CLI Node</div>
+        <p>Pour les tatoués : <code style="font-family:var(--mono);font-size:12px;color:var(--phosphor);background:rgba(168,58,37,0.06);padding:1px 6px;border-radius:3px">vim ordres.yaml</code>, <code style="font-family:var(--mono);font-size:12px;color:var(--phosphor);background:rgba(168,58,37,0.06);padding:1px 6px;border-radius:3px">node engine/inscribe.mjs</code>. Le wallet taproot signe, broadcast direct sur Mutinynet.</p>
+      </div>
+      <div class="path-card">
+        <h4>Avenir</h4>
+        <div class="name">Agent autonome</div>
+        <p>Un script qui scanne les blocs, raisonne, construit un YAML d'ordres, l'inscrit. La pubkey du witness l'authentifie. Pas d'API, pas de proxy — juste Bitcoin.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── CITATION ───────────────────────────────────────── -->
+  <section class="quote">
+    <p>« Tant qu'un client peut signer une inscription Taproot avec ta clé, tu <em>es</em> ton empire. Aucun admin, aucun support, aucun reset. »</p>
+    <cite>— CONTEXT.md · section 3 — Identité</cite>
+  </section>
+
+  <!-- ─── FOOTER ─────────────────────────────────────────── -->
+  <footer>
+    <span>Protocole v0.3 · vivant · serveur citadel-mvp-1 · Mutinynet</span>
+    <div class="links">
+      <a href="https://codeberg.org/meffysto/aetheris-protocol" target="_blank" rel="noopener">Codeberg</a>
+      <a href="./docs/ROADMAP-500-JOUEURS.md">Roadmap</a>
+      <a href="https://faucet.mutinynet.com" target="_blank" rel="noopener">Faucet</a>
+    </div>
+  </footer>
+
+</main>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ─── Mini 3D vignette : galaxie en miniature, dans un cadre ──────
+const cv = document.getElementById('vignette3d');
+if (cv) {
+  const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(38, 1, 0.1, 500);
+  cam.position.set(0, 12, 38);
+  cam.lookAt(0, 0, 0);
+
+  // Starfield (fin, pour ne pas saturer)
+  {
+    const N = 700;
+    const arr = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const r = 80 + Math.random() * 180;
+      const t = Math.random() * Math.PI * 2;
+      const u = Math.random() * 2 - 1;
+      const phi = Math.acos(u);
+      arr[i*3]   = r * Math.sin(phi) * Math.cos(t);
+      arr[i*3+1] = r * Math.sin(phi) * Math.sin(t);
+      arr[i*3+2] = r * Math.cos(phi);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    const m = new THREE.PointsMaterial({ size: 1.2, color: 0xf4ecdc, transparent: true, opacity: 0.45, sizeAttenuation: false });
+    scene.add(new THREE.Points(g, m));
+  }
+
+  // Étoile centrale
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1.5, 32, 32),
+    new THREE.MeshBasicMaterial({ color: 0xf7e09a })
+  ));
+  scene.add(new THREE.PointLight(0xfff2c2, 2.0, 200, 1.2));
+  scene.add(new THREE.AmbientLight(0x556688, 0.4));
+
+  // 5 planètes en orbite (différentes classes CITADEL)
+  const palette = [0x7fa570, 0x3a8a8a, 0x88c8e0, 0xa83a25, 0x5a3a6a];
+  const planets = [];
+  for (let i = 0; i < 5; i++) {
+    const r = 5 + i * 3.2;
+    const size = 0.5 + Math.random() * 0.9;
+    const color = palette[i];
+    const grp = new THREE.Group();
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(size, 24, 24),
+      new THREE.MeshStandardMaterial({
+        color, roughness: 0.6, metalness: 0.05,
+        emissive: new THREE.Color(color).multiplyScalar(0.08),
+      })
+    );
+    grp.add(mesh);
+    if (i === 3) { // anneau gazeux
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(size * 1.5, size * 2.2, 48),
+        new THREE.MeshBasicMaterial({ color: 0xc4b48a, side: THREE.DoubleSide, transparent: true, opacity: 0.45 })
+      );
+      ring.rotation.x = Math.PI / 2.4;
+      grp.add(ring);
+    }
+    scene.add(grp);
+    planets.push({ grp, r, a0: Math.random() * Math.PI * 2, speed: 0.05 + Math.random() * 0.06 });
+
+    // Orbite (fine ligne brass)
+    const pts = [];
+    for (let k = 0; k <= 96; k++) {
+      const ang = (k / 96) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(ang) * r, 0, Math.sin(ang) * r));
+    }
+    const og = new THREE.BufferGeometry().setFromPoints(pts);
+    const om = new THREE.LineBasicMaterial({ color: 0xc4b48a, transparent: true, opacity: 0.22 });
+    scene.add(new THREE.Line(og, om));
+  }
+
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const w = Math.max(64, r.width | 0), h = Math.max(64, r.height | 0);
+    renderer.setSize(w, h, false);
+    cam.aspect = w / h;
+    cam.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(cv);
+  resize();
+
+  const t0 = performance.now();
+  function loop() {
+    requestAnimationFrame(loop);
+    const t = (performance.now() - t0) / 1000;
+    for (const p of planets) {
+      const a = p.a0 + t * p.speed;
+      p.grp.position.set(Math.cos(a) * p.r, Math.sin(a * 0.5) * 0.3, Math.sin(a) * p.r);
+      p.grp.rotation.y = t * 0.15;
+    }
+    cam.position.x = Math.sin(t * 0.08) * 4;
+    cam.position.y = 12 + Math.sin(t * 0.1) * 1.4;
+    cam.lookAt(0, 0, 0);
+    renderer.render(scene, cam);
+  }
+  loop();
+}
+
+// ─── Live status (bloc Mutinynet + tick) ─────────────────
+const BLOC_GENESIS = 3085121;
+const BLOCS_PAR_TICK = 30;
+async function loadStatus() {
+  try {
+    const r = await fetch('https://mutinynet.com/api/blocks/tip/height', { cache: 'no-store' });
+    const tip = parseInt(await r.text(), 10);
+    if (!isNaN(tip)) {
+      const cycle = Math.max(0, Math.floor((tip - BLOC_GENESIS) / BLOCS_PAR_TICK));
+      const t = document.getElementById('status-tick');
+      if (t) t.textContent = String(cycle).padStart(3, '0');
+      const b = document.getElementById('status-block');
+      if (b) b.textContent = tip.toLocaleString('fr-FR');
+      const vb = document.getElementById('vbloc');
+      if (vb) vb.textContent = tip.toLocaleString('fr-FR');
+    }
+  } catch {}
+}
+loadStatus();
+setInterval(loadStatus, 30000);
+</script>
+</body>
+</html>

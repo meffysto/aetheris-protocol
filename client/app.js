@@ -5173,15 +5173,172 @@ function V() { return window.citadelVivant || null; }
 let __lastAchievementTick = -1;
 let __pulseMounted = false;
 
-function renderBridgePanelHTML() {
-  const v = V(); if (!v?.bridge) return '';
-  try { return v.bridge.renderBridgePanel(); } catch { return ''; }
+function renderTacticalPanelHTML() {
+  const v = V(); if (!v?.tactical) return '';
+  try { return v.tactical.renderConsolePanel(); } catch { return ''; }
 }
 
-function bindBridgePanel() {
-  const v = V(); if (!v?.bridge) return;
-  try { v.bridge.bindBridge(v.sfx?.sfx || null); } catch {}
+function bindTacticalPanel() {
+  const root = document.querySelector('.tac-panel');
+  if (!root || root.dataset.bound === '1') return;
+  root.dataset.bound = '1';
+
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-tactical]');
+    if (!btn) return;
+    const v = V();
+    try { v?.sfx?.sfx?.scan?.(); } catch {}
+    const kind = btn.dataset.tactical;
+    const out = runTactical(kind);
+    flashTacticalOutput(out);
+  });
 }
+
+function flashTacticalOutput(html) {
+  const out = document.getElementById('tacOutput');
+  if (!out) return;
+  out.innerHTML = html;
+  out.hidden = false;
+  out.classList.remove('flash');
+  void out.offsetWidth;
+  out.classList.add('flash');
+}
+
+function runTactical(kind) {
+  const emp = state.players[state.current];
+  const p = emp?.planetes?.[0];
+  if (!emp || !p) {
+    return `<b>Aucune planète active</b> — connecte ton wallet d'abord.`;
+  }
+
+  if (kind === 'proj') {
+    const utj = 10 * 6; // 10 ticks × 6 UTJ
+    const fe = (p.ressources?.ferrum?.production_par_utj || 0);
+    const lu = (p.ressources?.lumen?.production_par_utj || 0);
+    const pl = (p.ressources?.plasmide?.production_par_utj || 0);
+    const stFe = (p.ressources?.ferrum?.stock || 0);
+    const stLu = (p.ressources?.lumen?.stock || 0);
+    const stPl = (p.ressources?.plasmide?.stock || 0);
+    const capFe = (p.ressources?.ferrum?.capacite || Infinity);
+    const capLu = (p.ressources?.lumen?.capacite || Infinity);
+    const capPl = (p.ressources?.plasmide?.capacite || Infinity);
+    const projFe = Math.min(capFe, stFe + fe * utj);
+    const projLu = Math.min(capLu, stLu + lu * utj);
+    const projPl = Math.min(capPl, stPl + pl * utj);
+    const cap = (v, c) => v >= c ? ' <em>cap</em>' : '';
+    return `<b>Projection · +10 ticks (60 UTJ)</b>
+<div class="tac-out-grid">
+  <div><span>Ferrum</span><b>${fmt(projFe)}</b><small>+${fmt(projFe - stFe)}${cap(projFe, capFe)}</small></div>
+  <div><span>Lumen</span><b>${fmt(projLu)}</b><small>+${fmt(projLu - stLu)}${cap(projLu, capLu)}</small></div>
+  <div><span>Plasmide</span><b>${fmt(projPl)}</b><small>+${fmt(projPl - stPl)}${cap(projPl, capPl)}</small></div>
+</div>`;
+  }
+
+  if (kind === 'roi') {
+    // Compare ROI = gain de prod par UTJ / coût (en équivalent ferrum)
+    // pour les 3 mines + centrale. Le moins de ratio = le plus rentable.
+    const keys = ['mine_ferrum', 'extracteur_lumen', 'synthetiseur_plasmide', 'centrale_solaire'];
+    const candidates = [];
+    for (const k of keys) {
+      const lvl = p.batiments?.[k] || 0;
+      const cur = simProd(k, lvl, p) || 0;
+      const next = simProd(k, lvl + 1, p) || 0;
+      const delta = next - cur;
+      // Coût approx : base × mult^lvl
+      const cfgMap = {
+        mine_ferrum: { fe: 60, lu: 15, mult: 1.5 },
+        extracteur_lumen: { fe: 48, lu: 24, mult: 1.6 },
+        synthetiseur_plasmide: { fe: 225, lu: 75, mult: 1.5 },
+        centrale_solaire: { fe: 75, lu: 30, mult: 1.5 },
+      };
+      const cfg = cfgMap[k];
+      const cost = (cfg.fe + cfg.lu * 1.5) * Math.pow(cfg.mult, lvl);
+      const roi = delta > 0 ? cost / delta : Infinity;
+      candidates.push({ k, lvl, delta, cost, roi });
+    }
+    candidates.sort((a, b) => a.roi - b.roi);
+    const best = candidates[0];
+    const lblMap = {
+      mine_ferrum: 'Mine de Ferrum',
+      extracteur_lumen: 'Extracteur Lumen',
+      synthetiseur_plasmide: 'Synthétiseur Plasmide',
+      centrale_solaire: 'Centrale solaire',
+    };
+    const lines = candidates.map(c => {
+      const isBest = c === best ? ' <em>← meilleur</em>' : '';
+      const unit = c.k === 'centrale_solaire' ? 'énergie' : 'unit./UTJ';
+      return `<li><b>${lblMap[c.k]}</b> niv ${c.lvl} → ${c.lvl + 1} · +${fmt(c.delta)} ${unit} · coût ≈ ${fmtCompact(c.cost)} ¤${isBest}</li>`;
+    }).join('');
+    return `<b>Meilleur ROI</b> — prochaine amélioration recommandée :
+<ul class="tac-out-list">${lines}</ul>`;
+  }
+
+  if (kind === 'cap') {
+    // Time avant que chaque ressource sature son dépôt
+    const lines = ['ferrum', 'lumen', 'plasmide'].map(r => {
+      const ri = p.ressources?.[r]; if (!ri) return null;
+      const left = (ri.capacite || 0) - (ri.stock || 0);
+      const prod = ri.production_par_utj || 0;
+      if (prod <= 0) return `<li><b>${cap1(r)}</b> · prod nulle</li>`;
+      if (left <= 0) return `<li><b>${cap1(r)}</b> · <em>déjà cap</em> · perte en cours</li>`;
+      const utjLeft = left / prod;
+      const ticksLeft = utjLeft / 6;
+      const minLeft = ticksLeft * 15; // 1 tick = ~15 min
+      const hLeft = minLeft / 60;
+      return `<li><b>${cap1(r)}</b> · cap dans <em>${ticksLeft.toFixed(1)} ticks</em> (~${hLeft.toFixed(1)}h)</li>`;
+    }).filter(Boolean).join('');
+    return `<b>Time-to-cap dépôt</b> — quand saturer :
+<ul class="tac-out-list">${lines}</ul>`;
+  }
+
+  if (kind === 'advice') {
+    const advice = [];
+    // 1. Énergie en déficit ?
+    const e = p.energie;
+    if (e && e.production < e.consommation) {
+      const def = e.consommation - e.production;
+      advice.push(`<li>⚡ <b>Énergie en déficit (-${def})</b>. Améliore centrale_solaire ou recherche fusion_controlee.</li>`);
+    }
+    // 2. Stock proche du cap ?
+    for (const r of ['ferrum', 'lumen', 'plasmide']) {
+      const ri = p.ressources?.[r]; if (!ri || !ri.capacite) continue;
+      const ratio = (ri.stock || 0) / ri.capacite;
+      if (ratio > 0.85) {
+        advice.push(`<li>📦 <b>${cap1(r)}</b> à ${(ratio * 100).toFixed(0)}% du cap. Dépense ou augmente le dépôt.</li>`);
+      }
+    }
+    // 3. Pas de labo ?
+    if (!p.batiments?.laboratoire) {
+      advice.push(`<li>🔬 <b>Aucun laboratoire</b>. Sans recherche, ton empire stagne au tier 1.</li>`);
+    }
+    // 4. Pas d'usine robotique ?
+    if (!p.batiments?.usine_robotique) {
+      advice.push(`<li>⚒ <b>Aucune usine robotique</b>. Les chantiers durent 2× plus longtemps qu'avec niv 5.</li>`);
+    }
+    // 5. Pas de chantier spatial ?
+    if (!p.batiments?.chantier_spatial) {
+      advice.push(`<li>🚀 <b>Pas de chantier spatial</b>. Tu ne peux construire ni vaisseau ni défense — vulnérable.</li>`);
+    }
+    // 6. File chantier vide ?
+    if (!(p.file_chantier || []).length) {
+      advice.push(`<li>⏱ <b>Chantier inactif</b>. Lance une amélioration — chaque tick perdu est définitif.</li>`);
+    }
+    // 7. Aucune flotte ?
+    const totalFleet = Object.values(p.flotte_au_sol || {}).reduce((a, b) => a + (b | 0), 0);
+    if (totalFleet === 0 && p.batiments?.chantier_spatial) {
+      advice.push(`<li>🛡 <b>Aucun vaisseau au sol</b>. Construis au moins quelques chasseurs légers.</li>`);
+    }
+    if (advice.length === 0) {
+      advice.push(`<li>✓ <b>Empire optimisé</b>. Continue sur cette lancée, commandant.</li>`);
+    }
+    return `<b>Conseil tactique global</b> :
+<ul class="tac-out-list tac-out-advice">${advice.join('')}</ul>`;
+  }
+
+  return '?';
+}
+
+function cap1(s) { return s[0].toUpperCase() + s.slice(1); }
 
 function renderFeedPanelHTML() {
   const v = V(); if (!v?.feed) return '';
@@ -5338,7 +5495,14 @@ function renderCodexView() {
   let totalLevels = 0;
   for (const pl of (emp?.planetes || [])) for (const lv of Object.values(pl.batiments || {})) totalLevels += (lv | 0);
   const ferrum = p?.ressources?.ferrum?.stock || 0;
-  const bridge = v.bridge?.getBridgeState?.() || { rang: 'cadet', rangEmoji: '◦' };
+  // Callsign dérivé du nombre d'achievements débloqués (remplace l'ancien rang clicker)
+  const callsign = (n => {
+    if (n >= 12) return { rang: 'légende', rangEmoji: '✪' };
+    if (n >= 9)  return { rang: 'stratège', rangEmoji: '★' };
+    if (n >= 6)  return { rang: 'vétéran', rangEmoji: '◆' };
+    if (n >= 3)  return { rang: 'explorateur', rangEmoji: '◐' };
+    return { rang: 'commandant', rangEmoji: '✦' };
+  })(got);
 
   root.innerHTML = `
     <h2 class="sect">Codex · achievements <span class="num">§ ★</span> <span class="rule"></span></h2>
@@ -5360,8 +5524,8 @@ function renderCodexView() {
       pseudo: state.current || 'commandant',
       planetCount: emp?.planetes?.length || 0,
       totalLevels,
-      rang: bridge.rang,
-      rangEmoji: bridge.rangEmoji,
+      rang: callsign.rang,
+      rangEmoji: callsign.rangEmoji,
       tick: state.manifest?.tick ?? 0,
       achievements: got,
       ferrum,
@@ -5407,24 +5571,24 @@ if (typeof esc === 'undefined') {
 function __vivantPostRender() {
   evaluateAchievementsSoft();
 
-  // Injection Bridge + Feed en haut d'Aperçu
+  // Injection Console tactique + Feed en haut d'Aperçu
   const overview = document.getElementById('vOverview');
   if (overview && state.current && state.players[state.current]) {
-    if (!overview.querySelector('.bridge-panel')) {
-      const bridgeHTML = renderBridgePanelHTML();
+    if (!overview.querySelector('.tac-panel')) {
+      const tacHTML = renderTacticalPanelHTML();
       const feedHTML = renderFeedPanelHTML();
-      if (bridgeHTML || feedHTML) {
+      if (tacHTML || feedHTML) {
         const wrap = document.createElement('div');
         wrap.className = 'vivant-overview-prepend';
         wrap.innerHTML = `
-          ${bridgeHTML}
+          ${tacHTML}
           ${feedHTML ? `<section class="feed-panel"><header class="feed-head"><b>Fil galactique</b><small>events on-chain · live</small></header>${feedHTML}</section>` : ''}
         `;
         overview.prepend(wrap);
-        bindBridgePanel();
+        bindTacticalPanel();
       }
     } else {
-      // Refresh feed in-place sans re-render Bridge (qui se met à jour seul)
+      // Refresh feed in-place
       const feedHost = overview.querySelector('.feed-panel');
       if (feedHost) {
         const fresh = renderFeedPanelHTML();

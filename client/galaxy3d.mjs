@@ -28,7 +28,10 @@ let rafId = null;
 let pickable = [];
 let haloRefs = [];
 let routeMeshes = [];
+let labelRefs = []; // { worldPos: THREE.Vector3, el: HTMLDivElement, kind, planet }
+let labelLayer = null;
 let onPickCallback = null;
+let _v3 = null;
 
 const CLASS_COLOR = {
   tellurique: 0x7fa570,
@@ -77,10 +80,21 @@ export async function mount(targetEl, { onPick } = {}) {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.setClearColor(0x000000, 0);
+  // Conteneur stable pour stack canvas + label overlay
+  if (getComputedStyle(targetEl).position === 'static') targetEl.style.position = 'relative';
   targetEl.appendChild(renderer.domElement);
   renderer.domElement.style.display = 'block';
   renderer.domElement.style.width = '100%';
   renderer.domElement.style.height = '100%';
+
+  // Overlay HTML pour les labels de planètes — projeté à chaque frame
+  labelLayer = document.createElement('div');
+  labelLayer.className = 'pulse-labels-layer';
+  labelLayer.setAttribute('aria-hidden', 'true');
+  Object.assign(labelLayer.style, {
+    position: 'absolute', inset: '0', pointerEvents: 'none', overflow: 'hidden',
+  });
+  targetEl.appendChild(labelLayer);
 
   // Scene
   scene = new THREE.Scene();
@@ -155,9 +169,11 @@ export function unmount() {
     renderer.dispose();
     if (renderer.domElement?.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
   }
+  if (labelLayer?.parentNode) labelLayer.parentNode.removeChild(labelLayer);
+  labelLayer = null;
   scene = camera = renderer = controls = clock = null;
   starGroup = planetGroup = routeGroup = null;
-  pickable = []; haloRefs = []; routeMeshes = [];
+  pickable = []; haloRefs = []; routeMeshes = []; labelRefs = [];
   mountEl = null;
   onPickCallback = null;
 }
@@ -215,6 +231,9 @@ export function update({ system, myPlanetCoord, hostileRoutes = [] }) {
   pickable.length = 0;
   haloRefs.length = 0;
   routeMeshes.length = 0;
+  // Vide les labels HTML
+  if (labelLayer) labelLayer.innerHTML = '';
+  labelRefs.length = 0;
 
   if (!system) return;
 
@@ -297,6 +316,28 @@ export function update({ system, myPlanetCoord, hostileRoutes = [] }) {
     grp.add(mesh);
     pickable.push(mesh);
     planetByName.set(pos.nom, { center, i });
+
+    // Label HTML pour ce corps
+    if (labelLayer && pos.nom) {
+      const isMine = `${system.__coord}:${i}` === myPlanetCoord;
+      const owner = pos.proprietaire;
+      const isEnemy = owner && owner !== (system.__currentPlayer || null);
+      const isFree = !owner || owner === '~' || owner === 'null';
+      let lblClass = 'pulse-label';
+      if (isMine) lblClass += ' is-mine';
+      else if (isEnemy) lblClass += ' is-enemy';
+      else if (isFree) lblClass += ' is-free';
+      const sub = pos.classe || '';
+      const ownerLabel = isMine ? 'toi' : (isEnemy ? owner : (isFree ? 'libre' : owner));
+      const el = document.createElement('div');
+      el.className = lblClass;
+      el.innerHTML = `<b>${escapeHtml(pos.nom)}</b><small>§${i} · ${escapeHtml(sub)} · ${escapeHtml(ownerLabel || '')}</small>`;
+      labelLayer.appendChild(el);
+      // Position d'ancrage juste au-dessus de la planète (offset Y dans le world)
+      const anchor = grp.position.clone();
+      anchor.y += size + 0.6;
+      labelRefs.push({ worldPos: anchor, el });
+    }
 
     // Anneau gazeuse
     if (cls === 'gazeuse') {
@@ -385,6 +426,29 @@ function loop() {
   controls.update();
   clock.getDelta();
   renderer.render(scene, camera);
+
+  // Sync labels HTML (projection world → screen)
+  if (labelLayer && labelRefs.length) {
+    if (!_v3) _v3 = new THREE.Vector3();
+    const rect = renderer.domElement.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    for (const ref of labelRefs) {
+      _v3.copy(ref.worldPos).project(camera);
+      // Hors-frustum z (derrière la caméra) ⇒ cacher
+      if (_v3.z > 1 || _v3.z < -1) { ref.el.style.opacity = '0'; ref.el.style.visibility = 'hidden'; continue; }
+      const x = (_v3.x * 0.5 + 0.5) * W;
+      const y = (1 - (_v3.y * 0.5 + 0.5)) * H;
+      ref.el.style.transform = `translate(-50%, -100%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      ref.el.style.visibility = 'visible';
+      // Fade selon profondeur z (proche = 1, loin = 0.4)
+      const a = 1 - Math.min(1, Math.max(0, _v3.z * 0.6 + 0.4));
+      ref.el.style.opacity = String(Math.max(0.35, Math.min(1, a)));
+    }
+  }
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 }
 
 export function isMounted() { return mounted; }

@@ -2655,20 +2655,39 @@ body.tick-pulsed::after {
   text-transform: uppercase; color: var(--bone-dim);
 }
 
-/* ── Pulse · galaxie 3D ────────────────────────────────────────────── */
+/* ── Pulse · galaxie 3D ──────────────────────────────────────────────
+   Fond "deep space" 100 % opaque pour ne pas laisser le bone du body
+   transparaître à travers la 3D (alpha clearColor du canvas) — c'est
+   ce qui rendait les labels et corps illisibles avant. */
 .pulse-shell {
   position: relative; display: grid;
   grid-template-columns: 1fr; gap: 14px;
-  border: 1px solid var(--hairline); border-radius: 4px;
-  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(26,42,74,0.4), rgba(4,8,16,0.95));
+  border: 1px solid #14233d; border-radius: 4px;
+  background: #050a16;
+  background-image:
+    radial-gradient(ellipse 95% 70% at 50% 25%, #1a2c4d 0%, #0b1426 45%, #03060d 100%);
   padding: 14px;
+  box-shadow: inset 0 0 60px rgba(0,0,0,0.55);
 }
 @media (min-width: 980px) { .pulse-shell { grid-template-columns: 1fr 280px; } }
 .pulse-stage {
   position: relative; width: 100%;
   min-height: 460px; aspect-ratio: 16 / 11;
   border-radius: 3px; overflow: hidden;
-  background: rgba(0,0,0,0.25);
+  background: #02050c;
+  background-image:
+    radial-gradient(ellipse 100% 80% at 50% 50%, #0c1830 0%, #050a18 55%, #010306 100%),
+    /* fines étoiles statiques en arrière-plan, complètent le starfield Three.js */
+    radial-gradient(1.5px 1.5px at 12% 24%, rgba(247,240,223,0.7) 50%, transparent 100%),
+    radial-gradient(1px 1px at 78% 18%, rgba(247,240,223,0.5) 50%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 36% 72%, rgba(247,240,223,0.6) 50%, transparent 100%),
+    radial-gradient(1px 1px at 88% 60%, rgba(247,240,223,0.45) 50%, transparent 100%),
+    radial-gradient(2px 2px at 60% 40%, rgba(247,224,154,0.55) 50%, transparent 100%),
+    radial-gradient(1px 1px at 22% 84%, rgba(109,194,202,0.4) 50%, transparent 100%);
+  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 0 100px rgba(0,0,0,0.7),
+    inset 0 0 4px rgba(212,162,62,0.18);
 }
 .pulse-hud {
   display: flex; flex-direction: column; gap: 8px;
@@ -2761,3 +2780,242 @@ body.tick-pulsed::after {
   60% { transform: translateY(2px) scale(1.04); }
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
+
+/* ── Bridge · Console tactique (sous-section du Pont) ────────────── */
+.bridge-flex {
+  display: grid; grid-template-columns: 1fr; gap: 14px;
+  margin: 8px 0 12px;
+}
+@media (min-width: 640px) {
+  .bridge-flex { grid-template-columns: 220px 1fr; }
+}
+.bridge-arena { margin: 0; }
+.bridge-rations { color: var(--bone); }
+.bridge-console {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; background: rgba(0,0,0,0.18);
+  border: 1px solid var(--hairline); border-radius: 3px;
+  min-width: 0;
+}
+.bridge-console-title {
+  font-family: var(--serif); font-weight: 600; font-size: 15px;
+  letter-spacing: -0.01em;
+}
+.bridge-console-sub {
+  font-size: 11.5px; color: var(--bone-dim); margin-bottom: 6px;
+}
+.bridge-actions {
+  display: grid; gap: 6px;
+  grid-template-columns: 1fr 1fr;
+}
+.bridge-act {
+  appearance: none; cursor: pointer; text-align: left;
+  background: rgba(247,240,223,0.04);
+  border: 1px solid var(--hairline);
+  color: var(--bone);
+  padding: 8px 10px;
+  font: inherit; border-radius: 3px;
+  display: flex; flex-direction: column; gap: 2px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.08s ease;
+}
+.bridge-act:hover:not(.is-locked) {
+  border-color: #d4a23e;
+  background: rgba(212,162,62,0.06);
+}
+.bridge-act:active:not(.is-locked) { transform: translateY(1px); }
+.bridge-act-cost {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #d4a23e;
+}
+.bridge-act-lbl {
+  font-family: var(--sans); font-size: 12.5px; font-weight: 500;
+  color: var(--bone); line-height: 1.3;
+}
+.bridge-act.is-locked {
+  opacity: 0.4; cursor: not-allowed;
+}
+.bridge-output {
+  font-size: 12.5px; line-height: 1.55; color: var(--bone);
+  background: rgba(212,162,62,0.04);
+  border-left: 2px solid #d4a23e;
+  padding: 10px 12px;
+  margin-top: 4px;
+  border-radius: 0 3px 3px 0;
+}
+.bridge-output.flash { animation: bridge-flash 0.5s ease; }
+@keyframes bridge-flash {
+  0% { background: rgba(212,162,62,0.18); }
+  100% { background: rgba(212,162,62,0.04); }
+}
+.bridge-output b { color: #d4a23e; }
+.bridge-output em { font-style: normal; color: #a83a25; font-weight: 600; }
+.bridge-out-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;
+}
+.bridge-out-grid > div {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 8px; background: rgba(0,0,0,0.18); border-radius: 2px;
+}
+.bridge-out-grid span {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--bone-dim);
+}
+.bridge-out-grid b { font-family: var(--serif); font-size: 18px; font-weight: 600; color: var(--bone); }
+.bridge-out-grid small { font-size: 10.5px; color: #7fa570; }
+.bridge-out-list {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.bridge-out-list li {
+  padding: 6px 8px; background: rgba(0,0,0,0.12);
+  border-left: 2px solid var(--hairline);
+  font-size: 12px; line-height: 1.5; border-radius: 0 2px 2px 0;
+}
+.bridge-advice li { border-left-color: #a83a25; }
+
+/* ── Pulse · labels HTML overlay ─────────────────────────────────── */
+.pulse-labels-layer { z-index: 5; }
+.pulse-label {
+  position: absolute; top: 0; left: 0;
+  padding: 4px 8px;
+  background: rgba(14,20,36,0.78);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(247,240,223,0.18);
+  border-radius: 2px;
+  font-family: var(--sans);
+  color: var(--bone);
+  pointer-events: none;
+  white-space: nowrap;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  transition: opacity 0.15s ease;
+}
+.pulse-label b {
+  display: block;
+  font-family: var(--serif); font-weight: 600;
+  font-size: 12.5px; line-height: 1.1;
+  color: var(--bone);
+}
+.pulse-label small {
+  display: block;
+  font-family: var(--mono); font-size: 9.5px;
+  letter-spacing: 0.06em; color: var(--bone-dim);
+  margin-top: 1px;
+}
+.pulse-label.is-mine {
+  border-color: #d4a23e;
+  background: rgba(212,162,62,0.16);
+}
+.pulse-label.is-mine b { color: #f7e09a; }
+.pulse-label.is-enemy {
+  border-color: #a83a25;
+  background: rgba(168,58,37,0.22);
+}
+.pulse-label.is-enemy b { color: #ffb7a3; }
+.pulse-label.is-free {
+  border-color: rgba(127,165,112,0.5);
+  background: rgba(127,165,112,0.14);
+  opacity: 0.85;
+}
+.pulse-label.is-free b { color: #b7d5a8; }
+
+/* La ligne de tirage vers la planète (mince) */
+.pulse-label::after {
+  content: '';
+  position: absolute; left: 50%; bottom: -6px;
+  width: 1px; height: 6px;
+  background: rgba(247,240,223,0.4);
+  transform: translateX(-50%);
+}
+
+/* ── Console tactique (remplace .bridge-*) ──────────────────────── */
+.tac-panel {
+  background: linear-gradient(155deg, rgba(212,162,62,0.05), rgba(168,58,37,0.025) 60%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 18px 18px 14px;
+}
+.tac-head { margin-bottom: 14px; }
+.tac-title {
+  font-family: var(--serif); font-weight: 600; font-size: 18px;
+  letter-spacing: -0.01em; color: var(--bone);
+  display: flex; align-items: baseline; gap: 8px;
+}
+.tac-icon {
+  font-size: 16px; color: #d4a23e;
+  text-shadow: 0 0 6px rgba(212,162,62,0.5);
+}
+.tac-sub {
+  font-size: 12px; line-height: 1.45; color: var(--bone-dim);
+  margin-top: 4px;
+}
+.tac-actions {
+  display: grid; gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 4px;
+}
+.tac-act {
+  appearance: none; cursor: pointer; text-align: left;
+  background: rgba(247,240,223,0.04);
+  border: 1px solid var(--hairline);
+  color: var(--bone);
+  padding: 10px 12px;
+  font: inherit; border-radius: 3px;
+  display: flex; flex-direction: column; gap: 3px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.08s ease;
+}
+.tac-act:hover {
+  border-color: #d4a23e;
+  background: rgba(212,162,62,0.07);
+}
+.tac-act:active { transform: translateY(1px); }
+.tac-act-eyebrow {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #d4a23e;
+}
+.tac-act-lbl {
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+  color: var(--bone); line-height: 1.3;
+}
+.tac-output {
+  font-size: 12.5px; line-height: 1.55; color: var(--bone);
+  background: rgba(212,162,62,0.04);
+  border-left: 2px solid #d4a23e;
+  padding: 12px 14px;
+  margin-top: 12px;
+  border-radius: 0 3px 3px 0;
+}
+.tac-output.flash { animation: tac-flash 0.5s ease; }
+@keyframes tac-flash {
+  0%   { background: rgba(212,162,62,0.20); }
+  100% { background: rgba(212,162,62,0.04); }
+}
+.tac-output b { color: #d4a23e; }
+.tac-output em { font-style: normal; color: #a83a25; font-weight: 600; }
+
+.tac-out-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;
+}
+.tac-out-grid > div {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 8px; background: rgba(0,0,0,0.18); border-radius: 2px;
+}
+.tac-out-grid span {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--bone-dim);
+}
+.tac-out-grid b { font-family: var(--serif); font-size: 18px; font-weight: 600; color: var(--bone); }
+.tac-out-grid small { font-size: 10.5px; color: #7fa570; }
+.tac-out-list {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.tac-out-list li {
+  padding: 6px 8px; background: rgba(0,0,0,0.12);
+  border-left: 2px solid var(--hairline);
+  font-size: 12px; line-height: 1.5; border-radius: 0 2px 2px 0;
+}
+.tac-out-advice li { border-left-color: #a83a25; }
+
+/* Anciens .bridge-* : neutralisés pour éviter résidus visuels au cas où */
+.bridge-panel { display: none !important; }

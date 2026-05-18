@@ -2451,6 +2451,10 @@ body.tick-pulsed::after {
     z-index: 90;
     background: var(--ink-2);
     box-shadow: -4px 0 24px rgba(28,20,8,0.18);
+    /* animation: none — la rail-enter animation desktop (translateY) écrase
+       sinon notre translateX(100%) à cause de fill-mode:both, et le drawer
+       reste visible plein écran sur mobile au lieu d'être off-canvas. */
+    animation: none;
     transform: translateX(100%);
     transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     padding-top: env(safe-area-inset-top, 0);

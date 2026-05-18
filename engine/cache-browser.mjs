@@ -26,8 +26,30 @@ function asPromise(req) {
   });
 }
 
+// Fallback in-memory : utilisé quand IndexedDB est indisponible (Safari
+// Private Browsing, isolation cross-site, Lockdown Mode). Le scan
+// recommencera de zéro à chaque reload, mais la console boot.
+function makeMemoryAdapter() {
+  const m = new Map();
+  return {
+    async get(key) { return m.has(key) ? m.get(key) : null; },
+    async set(key, value) { m.set(key, value); },
+    async clear() { m.clear(); },
+  };
+}
+
 export async function makeBrowserAdapter(dbName = 'aetheris-cache') {
-  const db = await openDb(dbName);
+  if (typeof indexedDB === 'undefined') {
+    console.warn('[cache-browser] indexedDB indisponible — fallback mémoire (le scan ne sera pas persisté)');
+    return makeMemoryAdapter();
+  }
+  let db;
+  try {
+    db = await openDb(dbName);
+  } catch (e) {
+    console.warn('[cache-browser] openDb a échoué (' + (e?.message || e) + ') — fallback mémoire');
+    return makeMemoryAdapter();
+  }
   return {
     async get(key) {
       const v = await asPromise(tx(db, 'readonly').get(key));

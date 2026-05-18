@@ -2469,8 +2469,20 @@ body.tick-pulsed::after {
   }
 
   /* head + strip : padding mobile */
-  .head { padding: 0 8px; }
+  .head { padding: 0 8px; min-width: 0; }
   .strip { padding: 12px 14px; gap: 8px; }
+  /* brand : on retire le min-width 220px desktop qui mange l'écran et on
+     compacte le tagline "PROTOCOLE · CANONIQUE" (caché en très étroit). */
+  .brand { min-width: 0; padding: 10px 12px; gap: 10px; border-right: none; }
+  .brand .mark { width: 28px; height: 28px; }
+  .brand .mark::after { font-size: 15px; }
+  .brand .name { font-size: 17px; }
+  .brand .name b { display: none; }
+  .head-meta { padding: 0 8px; gap: 8px; min-width: 0; flex-wrap: nowrap; }
+  .tick-block { gap: 10px; min-width: 0; flex-shrink: 1; }
+  .tick-block .countdown { font-size: 13px; white-space: nowrap; }
+  .cycle-ring { width: 44px !important; height: 44px !important; }
+  .tick-block .value { font-size: 18px; }
 
   /* tableaux : scroll horizontal au lieu d'overflow */
   .tbl-wrap, .tbl { overflow-x: auto; }

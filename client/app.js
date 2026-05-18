@@ -2848,7 +2848,11 @@ async function inscribeQueuedOrders() {
     return;
   }
 
-  state.pending.add('inscribeQueue'); render();
+  // PARTIAL render : le lock 'inscribeQueue' n'affecte que le panier
+  // (cf. ligne ~2147). Évite le flash visuel sur les bâtiments / rail au
+  // clic "Confirmer". Le finally fera un render() complet pour refléter
+  // emp._ordres mis à jour côté rail.
+  state.pending.add('inscribeQueue'); renderCart();
   const run = async () => {
     const emp = state.players[playerName];
     if (!emp) throw new Error(`joueur "${playerName}" introuvable`);
